@@ -234,6 +234,18 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
 }
 .btn-ghost { border-color: transparent; color: var(--text-muted); }
 .btn-link { background: transparent; border: none; color: var(--accent); padding: 0; cursor: pointer; }
+.btn-tiny {
+  padding: 1px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  color: var(--accent);
+  font-family: inherit;
+}
+.btn-tiny:hover { background: #eef2ff; border-color: var(--accent); }
 
 /* ---------- Status pills ---------- */
 .pill {

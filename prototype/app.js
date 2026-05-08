@@ -495,8 +495,8 @@ function renderCaseDetail(id) {
           <div class="detail-section">
             <h3>Routing</h3>
             <div class="detail-row"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
-            <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">—</span>'}</span></div>
-            <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">—</span>'}</span></div>
+            <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
@@ -1085,6 +1085,89 @@ function handleStatusChange(caseId, to) {
   }
 }
 
+function handleReassign(caseId, type) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+  const dir = type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq;
+  const currentId = type === 'fit' ? c.fitId : c.hqId;
+  const typeLabel = type === 'fit' ? 'Local FIT' : 'HQ Product Team';
+  const detailLabel = type === 'fit' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
+
+  const opts = [
+    `<option value="">— Unassign —</option>`,
+    ...dir.map(o => `<option value="${o.id}" ${o.id === currentId ? 'selected' : ''}>${detailLabel(o)}</option>`),
+  ].join('');
+
+  showModal(`
+    <h3>${currentId ? 'Change' : 'Assign'} ${escapeHtml(typeLabel)} contact</h3>
+    <div class="modal-sub">${currentId ? 'Pick a different desk or unassign. If this is the active owner, the hold clock segment will reset to the new owner.' : 'Pick a desk for this case.'}</div>
+    <label>${escapeHtml(typeLabel)}</label>
+    <select data-field="ownerId">${opts}</select>
+    <label>Reason (optional)</label>
+    <textarea data-field="reason" placeholder="Why is the assignment changing?"></textarea>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Save</button>
+    </div>
+  `, (modal) => {
+    const newId = modal.querySelector('[data-field="ownerId"]').value || null;
+    const reason = modal.querySelector('[data-field="reason"]').value.trim();
+    if (newId === currentId) return true;
+
+    const oldOwner = currentId ? getOwner(type, currentId) : null;
+    const newOwner = newId ? getOwner(type, newId) : null;
+
+    // Stop the active hold-clock segment if currentOwner === type.
+    if (c.currentOwner === type && c.holdStartedAt) {
+      c.holdMs[type] = (c.holdMs[type] || 0) + (NOW.getTime() - new Date(c.holdStartedAt).getTime());
+      c.holdStartedAt = null;
+    }
+
+    // Update the contact pointer.
+    if (type === 'fit') c.fitId = newId;
+    else c.hqId = newId;
+
+    // Decide currentOwner / status / new clock segment.
+    if (newId) {
+      const wasActive = c.currentOwner === type;
+      const wasNew = c.status === 'new';
+      const wasReturned = c.status === 'returned_to_requester';
+      if (wasActive || wasNew) {
+        c.currentOwner = type;
+        c.status = type === 'fit' ? 'with_fit' : 'with_hq';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'fit' ? 'Slack' : 'JIRA' };
+      } else if (wasReturned) {
+        // Just updating the contact for when SLA resumes; don't restart the clock.
+      }
+      // else: case is with the other owner — just updated the inactive contact, no other changes.
+    } else {
+      // Unassigning.
+      if (c.currentOwner === type) {
+        c.currentOwner = null;
+        c.lastOwnerContact = null;
+        const otherType = type === 'fit' ? 'hq' : 'fit';
+        const otherId = otherType === 'fit' ? c.fitId : c.hqId;
+        if (otherId) {
+          c.currentOwner = otherType;
+          c.status = otherType === 'fit' ? 'with_fit' : 'with_hq';
+          c.holdStartedAt = new Date(NOW).toISOString();
+        } else {
+          c.status = 'new';
+        }
+      }
+    }
+
+    if (type === 'fit') c.fitCannotResolve = false;
+
+    const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${reason ? ' · ' + reason : ''}`;
+    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: currentId ? 'reassigned' : 'assigned', detail });
+    render();
+    return true;
+  });
+}
+
 function handleCompleteHandover() {
   alert('Handover marked complete. (Prototype: in a real build this would notify the incoming shift.)');
 }
@@ -1102,6 +1185,12 @@ function bindHandlers() {
     el.addEventListener('click', e => {
       e.preventDefault();
       handleStatusChange(el.dataset.caseId, el.dataset.to);
+    });
+  });
+  document.querySelectorAll('[data-action="reassign"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handleReassign(el.dataset.caseId, el.dataset.type);
     });
   });
   document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
