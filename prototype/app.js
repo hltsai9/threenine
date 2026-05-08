@@ -188,6 +188,10 @@ function currentRoute() {
   if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
   if (h.startsWith('#/cases')) return { name: 'cases' };
   if (h.startsWith('#/handover')) return { name: 'handover' };
+  if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
+  if (h.startsWith('#/archive')) return { name: 'archive' };
+  if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
+  if (h.startsWith('#/shifts')) return { name: 'shifts' };
   return { name: 'queue' };
 }
 
@@ -200,19 +204,40 @@ function render() {
   const route = currentRoute();
   const main = document.getElementById('main');
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
-  const active = ({ queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover' })[route.name];
+  const active = ({
+    queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover',
+    archive: 'archive', archiveWeek: 'archive',
+    shifts: 'shifts', shiftDetail: 'shifts',
+  })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
   if (route.name === 'queue') main.innerHTML = renderQueue();
   else if (route.name === 'cases') main.innerHTML = renderCaseList();
   else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
   else if (route.name === 'handover') main.innerHTML = renderHandover();
+  else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
+  else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
+  else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
+  else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   bindHandlers();
 }
 
 function renderSidebar() {
   const op = getOperator(STATE.operatorId);
-  document.getElementById('op-name').textContent = op.name;
+  // Operator switcher
+  const sw = document.getElementById('op-switcher');
+  if (sw && sw.dataset.populated !== '1') {
+    sw.innerHTML = window.OPERATORS
+      .map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
+      .join('');
+    sw.addEventListener('change', () => {
+      STATE.operatorId = sw.value;
+      render();
+    });
+    sw.dataset.populated = '1';
+  }
+  if (sw) sw.value = STATE.operatorId;
+
   document.getElementById('op-shift').textContent = op.shift;
   document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
@@ -221,11 +246,15 @@ function renderSidebar() {
   const promptCount = queueGroups.reduce((n, g) => n + g.prompts.length, 0);
   document.getElementById('nav-queue-count').textContent = promptCount;
   document.getElementById('nav-cases-count').textContent =
-    STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
+    STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
   document.getElementById('nav-handover-count').textContent =
     STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status)
-      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== getOperator(STATE.operatorId).shift)
+      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)
     ).length;
+  const navShifts = document.getElementById('nav-shifts-count');
+  if (navShifts) navShifts.textContent = window.SHIFTS.length;
+  const navArchive = document.getElementById('nav-archive-count');
+  if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
 
 /* ---------- Action Queue view ---------- */
@@ -323,7 +352,9 @@ function renderTzHint(owner) {
 /* ---------- Case List view ---------- */
 
 function renderCaseList() {
-  const cases = [...STATE.cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const cases = [...STATE.cases]
+    .filter(c => c.weekId === window.CURRENT_WEEK.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const rows = cases.map(c => {
     const fit = getOwner('fit', c.fitId);
     const hq = getOwner('hq', c.hqId);
@@ -562,6 +593,289 @@ function renderHandover() {
   `;
 }
 
+/* ---------- Weekly Archive ---------- */
+
+function weekStats(weekId) {
+  const cases = STATE.cases.filter(c => c.weekId === weekId);
+  const total = cases.length;
+  const open = cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
+  const closed = cases.filter(c => c.status === 'closed').length;
+  const cancelled = cases.filter(c => c.status === 'cancelled').length;
+  const carriedIn = cases.filter(c => c.carriedFrom).length;
+  const bounces = cases.filter(c => (c.history || []).some(h => h.kind === 'returned')).length;
+  const closedCases = cases.filter(c => c.status === 'closed');
+  const medianOnUsHrs = (() => {
+    if (closedCases.length === 0) return null;
+    const v = closedCases.map(c => (c.slaAccumulatedMs || 0) / HOUR).sort((a, b) => a - b);
+    return v[Math.floor(v.length / 2)];
+  })();
+  return { total, open, closed, cancelled, carriedIn, bounces, medianOnUsHrs };
+}
+
+function renderArchiveIndex() {
+  const cards = window.WEEKS.map(w => {
+    const s = weekStats(w.id);
+    const current = w.isCurrent ? '<span class="badge-current">Current</span>' : '';
+    return `
+      <a class="archive-card" href="#/archive/${encodeURIComponent(w.id)}">
+        <div class="week-label">${escapeHtml(w.label)} ${current}</div>
+        <div class="week-meta">${s.total} case${s.total === 1 ? '' : 's'} filed</div>
+        <div class="week-stats">
+          <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
+          <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
+          <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
+          <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
+          <div class="stat"><div class="v">${s.bounces}</div><div class="k">Bounces</div></div>
+          <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us</div></div>
+        </div>
+      </a>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Weekly Archive</h1>
+        <div class="subtitle">Browse past weekly workbooks. Each week is a snapshot — cases that carried over move to the next week's filing.</div>
+      </div>
+    </div>
+    <div class="archive-grid">${cards}</div>
+  `;
+}
+
+function renderArchiveWeek(weekId) {
+  const week = window.WEEKS.find(w => w.id === weekId);
+  if (!week) {
+    return `<div class="page-header"><div><h1>Week not found</h1><div class="subtitle">No such week: ${escapeHtml(weekId)}</div></div></div>
+      <a class="btn" href="#/archive">← Back to archive</a>`;
+  }
+  const s = weekStats(weekId);
+  const cases = STATE.cases
+    .filter(c => c.weekId === weekId)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const rows = cases.length === 0 ? '' : cases.map(c => {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+    const carry = c.carriedFrom ? ` <span class="flag" title="Carried from ${escapeHtml(c.carriedFrom)}">↩ ${escapeHtml(c.carriedFrom)}</span>` : '';
+    return `
+      <tr data-href="#/cases/${c.id}">
+        <td class="col-id">${c.id}</td>
+        <td>
+          <div class="subject">${escapeHtml(c.subject)}</div>
+          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
+        </td>
+        <td>${escapeHtml(c.requester)}</td>
+        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}${carry}</td>
+        <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
+        <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const currentLink = week.isCurrent
+    ? `<a class="btn btn-link" href="#/cases">Open in live Cases view →</a>`
+    : '';
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/archive">← archive</a>
+          <span class="mono muted">${escapeHtml(week.id)}</span>
+          ${week.isCurrent ? '<span class="badge-current">Current</span>' : ''}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(week.label)}</h1>
+        <div class="subtitle">${fmtAbsolute(week.startsAt)} → ${fmtAbsolute(week.endsAt)}</div>
+      </div>
+      <div class="toolbar">${currentLink}</div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="stat"><div class="v">${s.total}</div><div class="k">Total cases</div></div>
+      <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
+      <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
+      <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
+      <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
+      <div class="stat"><div class="v">${s.bounces}</div><div class="k">Returned to requester</div></div>
+      <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us (closed)</div></div>
+    </div>
+
+    ${cases.length === 0 ? '<div class="queue-empty">No cases filed in this week.</div>' : `
+      <table class="case-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Subject / Case Link</th>
+            <th>Requester</th>
+            <th>Local FIT</th>
+            <th>HQ Product Team</th>
+            <th>Status</th>
+            <th>Process Time</th>
+            <th>${week.isCurrent ? 'Created' : 'Closed'}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `}
+  `;
+}
+
+/* ---------- Shifts ---------- */
+
+function shiftStats(shiftName) {
+  const opIds = window.SHIFTS.find(s => s.name === shiftName)?.operatorIds || [];
+  const open = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const handedTo = open.filter(c => c.handover?.to === shiftName);
+  const handedFrom = open.filter(c => c.handover?.from === shiftName);
+  const writtenByShift = open.filter(c => c.handover && opIds.includes(c.handover.author));
+  const missingForShift = open.filter(c => c.status !== 'new' && (!c.handover || c.handover.to !== shiftName));
+  return { handedTo, handedFrom, writtenByShift, missingForShift, opIds };
+}
+
+function renderShiftsIndex() {
+  const cards = window.SHIFTS.map(sh => {
+    const s = shiftStats(sh.name);
+    const ops = sh.operatorIds.map(id => {
+      const o = getOperator(id);
+      const isYou = id === STATE.operatorId;
+      return `<span class="op ${isYou ? 'is-you' : ''}">${escapeHtml(o.name)}${isYou ? ' (you)' : ''}</span>`;
+    }).join('');
+    const isCurrent = sh.name === window.CURRENT_SHIFT.name;
+    return `
+      <a class="shift-card ${isCurrent ? 'is-current' : ''}" href="#/shifts/${encodeURIComponent(sh.name)}">
+        <div class="shift-name">${escapeHtml(sh.name)} shift ${isCurrent ? '<span class="badge-current">On now</span>' : ''}</div>
+        <div class="shift-hours">${escapeHtml(sh.hoursUtc)}</div>
+        <div class="roster">${ops}</div>
+        <div class="stats">
+          <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Handed to</div></div>
+          <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes by shift</div></div>
+          <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Missing for shift</div></div>
+        </div>
+      </a>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Shifts</h1>
+        <div class="subtitle">Coverage map for the current week. Click a shift for its handover view and roster.</div>
+      </div>
+    </div>
+    <div class="shift-grid">${cards}</div>
+  `;
+}
+
+function renderShiftDetail(shiftName) {
+  const sh = window.SHIFTS.find(s => s.name === shiftName);
+  if (!sh) {
+    return `<div class="page-header"><div><h1>Shift not found</h1></div></div>
+      <a class="btn" href="#/shifts">← Back to shifts</a>`;
+  }
+  const s = shiftStats(shiftName);
+  const isCurrent = sh.name === window.CURRENT_SHIFT.name;
+  const otherShift = window.SHIFTS.find(o => o.name !== shiftName)?.name || '';
+  const tabs = window.SHIFTS.map(o => `<a href="#/shifts/${encodeURIComponent(o.name)}" class="${o.name === shiftName ? 'active' : ''}">${escapeHtml(o.name)} shift</a>`).join('');
+
+  const renderCaseRow = (c) => {
+    const status = c.handover
+      ? `<span class="note-status ${c.handover.staleForCurrentShift ? 'stale' : 'fresh'}">${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)}${c.handover.staleForCurrentShift ? ' (stale)' : ''}</span>`
+      : '<span class="note-status missing">No note</span>';
+    return `
+      <div class="case-row">
+        <div>
+          <div class="row-flex">
+            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          </div>
+          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
+        </div>
+        <div>${status}</div>
+        <div class="muted tiny">${c.handover ? fmtRelative(c.handover.at) : '—'}</div>
+      </div>
+    `;
+  };
+
+  // Recent handover activity from history across all open cases.
+  const allOpen = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const activity = [];
+  for (const c of allOpen) {
+    for (const h of (c.history || [])) {
+      if (h.kind === 'handover' && sh.operatorIds.includes(h.who)) {
+        activity.push({ at: h.at, who: h.who, caseId: c.id, detail: h.detail });
+      }
+    }
+  }
+  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const activityHtml = activity.slice(0, 10).map(a => `
+    <li>
+      <span class="when">${fmtAbsolute(a.at)}</span>
+      <span><a class="mono" href="#/cases/${a.caseId}">${a.caseId}</a> · <strong>${escapeHtml(getOperator(a.who)?.name || a.who)}</strong> — ${escapeHtml(a.detail || 'wrote handover')}</span>
+    </li>
+  `).join('') || '<li class="muted">No recent handover activity recorded by this shift.</li>';
+
+  const ops = sh.operatorIds.map(id => {
+    const o = getOperator(id);
+    const isYou = id === STATE.operatorId;
+    const switchBtn = isYou ? '' : `<button class="btn btn-link" data-action="switch-op" data-op-id="${id}">View as ${escapeHtml(o.name)}</button>`;
+    return `<div class="kv" style="padding:6px 0;"><span class="v">${escapeHtml(o.name)}${isYou ? ' (you)' : ''}</span><span>${switchBtn}</span></div>`;
+  }).join('');
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/shifts">← shifts</a>
+          ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(sh.name)} shift</h1>
+        <div class="subtitle">${escapeHtml(sh.hoursUtc)} · handover boundary with ${escapeHtml(otherShift)} shift</div>
+      </div>
+    </div>
+
+    <div class="tabs">${tabs}</div>
+
+    <div class="summary-bar">
+      <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Cases handed to ${escapeHtml(sh.name)}</div></div>
+      <div class="stat"><div class="v">${s.handedFrom.length}</div><div class="k">Cases handed from ${escapeHtml(sh.name)}</div></div>
+      <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes authored by shift</div></div>
+      <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Open cases missing a note for ${escapeHtml(sh.name)}</div></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header"><span>Roster</span></div>
+      <div style="padding: 8px 16px;">${ops}</div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header">
+        <span>Cases handed to ${escapeHtml(sh.name)} shift</span>
+        <span class="muted tiny">${s.handedTo.length} case${s.handedTo.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="section-block-body">
+        ${s.handedTo.length === 0 ? '<div class="section-block-empty">No fresh handover notes addressed to this shift.</div>' : s.handedTo.map(renderCaseRow).join('')}
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header">
+        <span>Open cases missing a note for ${escapeHtml(sh.name)} shift</span>
+        <span class="muted tiny">${s.missingForShift.length} case${s.missingForShift.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="section-block-body">
+        ${s.missingForShift.length === 0 ? '<div class="section-block-empty">All open cases have a current note for this shift.</div>' : s.missingForShift.map(renderCaseRow).join('')}
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header"><span>Recent handover activity by this shift</span></div>
+      <ul class="activity-list">${activityHtml}</ul>
+    </div>
+  `;
+}
+
 /* ---------- Modal ---------- */
 
 function showModal(html, onSubmit) {
@@ -794,6 +1108,13 @@ function bindHandlers() {
     tr.addEventListener('click', () => { location.hash = tr.dataset.href; });
   });
   document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
+  document.querySelectorAll('[data-action="switch-op"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      STATE.operatorId = el.dataset.opId;
+      render();
+    });
+  });
   const filter = document.getElementById('case-filter');
   if (filter) {
     filter.addEventListener('input', () => {

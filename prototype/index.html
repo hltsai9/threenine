@@ -26,9 +26,20 @@
         <span>Shift Handover</span>
         <span class="count" id="nav-handover-count">—</span>
       </a>
+      <a href="#/shifts" data-route="shifts">
+        <span>Shifts</span>
+        <span class="count" id="nav-shifts-count">—</span>
+      </a>
+      <a href="#/archive" data-route="archive">
+        <span>Weekly Archive</span>
+        <span class="count" id="nav-archive-count">—</span>
+      </a>
     </nav>
     <div class="shift-info">
-      <div class="kv"><span class="k">Operator</span><span class="v" id="op-name">—</span></div>
+      <div class="kv">
+        <span class="k">Operator</span>
+        <select id="op-switcher" class="op-switcher"></select>
+      </div>
       <div class="kv"><span class="k">Shift</span><span class="v" id="op-shift">—</span></div>
       <div class="kv"><span class="k">Ends</span><span class="v" id="op-ends">—</span></div>
       <div class="kv"><span class="k">Week</span><span class="v" id="op-week">—</span></div>
