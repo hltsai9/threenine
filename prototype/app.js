@@ -529,11 +529,16 @@ function renderDetailActions(c) {
   if (c.status === 'sanity_check') {
     buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="verify_fix">Verify & close</button>`);
   }
+  if (c.status === 'returned_to_requester') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="resume">Requester replied — resume</button>`);
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="close_resolved">Close as resolved</button>`);
+  }
   if (!['closed', 'cancelled', 'returned_to_requester', 'resolved'].includes(c.status)) {
     buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="approaching_sla">Return to requester</button>`);
   }
   if (!['closed', 'cancelled'].includes(c.status)) {
     buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
+    buttons.push(`<button class="btn btn-danger" data-action="prompt" data-case-id="${c.id}" data-kind="cancel">Cancel</button>`);
   }
   return buttons.join(' ');
 }
@@ -1067,6 +1072,137 @@ function handlePrompt(caseId, kind) {
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'resume') {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const opts = [];
+    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Local FIT)</option>`);
+    if (c.hqId) opts.push(`<option value="hq">Resume with ${escapeHtml(hq.name)} (HQ Product Team)</option>`);
+    opts.push(`<option value="sanity_check">Move to Sanity Check (requester says it's fixed)</option>`);
+    opts.push(`<option value="new">Resume unassigned (status: New)</option>`);
+    showModal(`
+      <h3>Requester replied — resume case</h3>
+      <div class="modal-sub">SLA clock will resume. Pick where to route the case next.</div>
+      <label>Destination</label>
+      <select data-field="dest">${opts.join('')}</select>
+      <label>What did the requester say? (optional)</label>
+      <textarea data-field="note" placeholder="Summary of the reply / what changes…"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Resume</button>
+      </div>
+    `, (modal) => {
+      const dest = modal.querySelector('[data-field="dest"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+
+      // Resume SLA clock: open a new running segment from NOW.
+      c.slaPaused = false;
+      c.slaStartedAt = new Date(NOW).toISOString();
+
+      let detail;
+      if (dest === 'fit') {
+        c.currentOwner = 'fit';
+        c.status = 'with_fit';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
+        detail = `Requester replied · resumed to Local FIT (${getOwner('fit', c.fitId).name})`;
+      } else if (dest === 'hq') {
+        c.currentOwner = 'hq';
+        c.status = 'with_hq';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
+        detail = `Requester replied · resumed to HQ Product Team (${getOwner('hq', c.hqId).name})`;
+      } else if (dest === 'sanity_check') {
+        c.status = 'sanity_check';
+        c.currentOwner = null;
+        c.holdStartedAt = null;
+        detail = `Requester replied · moved to Sanity Check`;
+      } else {
+        c.currentOwner = null;
+        c.status = 'new';
+        c.holdStartedAt = null;
+        c.lastOwnerContact = null;
+        detail = `Requester replied · resumed unassigned`;
+      }
+      if (note) detail += ` · ${note}`;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'resumed', detail });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'close_resolved') {
+    showModal(`
+      <h3>Close case</h3>
+      <div class="modal-sub">Close directly without further owner work (e.g., requester resolved it themselves, no longer needed).</div>
+      <label>Resolution code</label>
+      <select data-field="code">
+        <option value="fixed_by_requester">fixed_by_requester</option>
+        <option value="fixed_by_owner">fixed_by_owner</option>
+        <option value="fixed_with_workaround">fixed_with_workaround</option>
+        <option value="not_a_bug">not_a_bug</option>
+        <option value="no_response">no_response</option>
+      </select>
+      <label>Resolution note</label>
+      <textarea data-field="note" placeholder="What was the outcome?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Close case</button>
+      </div>
+    `, (modal) => {
+      const code = modal.querySelector('[data-field="code"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Resolution note is required.'); return false; }
+
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+        c.holdStartedAt = null;
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'closed';
+      c.closedAt = new Date(NOW).toISOString();
+      c.resolutionCode = code;
+      c.currentOwner = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'cancel') {
+    showModal(`
+      <h3>Cancel case</h3>
+      <div class="modal-sub">Mark this case as cancelled (duplicate, withdrawn, out of scope, etc.). Different from closing — no resolution code.</div>
+      <label>Reason</label>
+      <textarea data-field="reason" placeholder="Why is this being cancelled?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Keep open</button>
+        <button class="btn btn-danger" data-modal-submit>Confirm cancel</button>
+      </div>
+    `, (modal) => {
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      if (!reason) { alert('A reason is required.'); return false; }
+
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+        c.holdStartedAt = null;
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'cancelled';
+      c.currentOwner = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'cancelled', detail: reason });
       render();
       return true;
     });
