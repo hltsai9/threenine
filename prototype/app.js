@@ -1,0 +1,811 @@
+// Case Tracker prototype — single-file SPA.
+// Renders four views (Action Queue, Cases, Case Detail, Shift Handover)
+// against the seed data in data.js. State is in-memory; reload resets.
+
+const STATE = {
+  cases: window.CASES.map(c => structuredClone(c)),
+  operatorId: window.CURRENT_OPERATOR_ID,
+};
+
+const HOUR = 3600 * 1000;
+const NOW = window.NOW;
+
+/* ---------- Helpers ---------- */
+
+function getOperator(id) { return window.OPERATORS.find(o => o.id === id); }
+function getOwner(type, id) {
+  if (!id) return null;
+  return (type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq).find(o => o.id === id) || null;
+}
+function caseById(id) { return STATE.cases.find(c => c.id === id); }
+
+function caseSlaMs(c) {
+  // Total accumulated SLA time, including the running segment if currently running.
+  let total = c.slaAccumulatedMs || 0;
+  if (!c.slaPaused && !['resolved', 'closed', 'cancelled'].includes(c.status)) {
+    const start = new Date(c.slaStartedAt).getTime();
+    total += Math.max(0, NOW.getTime() - start);
+  }
+  return total;
+}
+function caseHoldMs(c, kind /* 'fit' | 'hq' */) {
+  let total = c.holdMs?.[kind] || 0;
+  if (c.currentOwner === kind && c.holdStartedAt) {
+    total += Math.max(0, NOW.getTime() - new Date(c.holdStartedAt).getTime());
+  }
+  return total;
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return '—';
+  const totalMin = Math.floor(ms / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
+}
+function fmtRelative(iso) {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  const diff = NOW.getTime() - then;
+  if (diff < 0) return 'in the future';
+  if (diff < 60_000) return 'just now';
+  return `${fmtDuration(diff)} ago`;
+}
+function fmtAbsolute(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const date = d.toISOString().slice(0, 10);
+  const time = d.toISOString().slice(11, 16);
+  return `${date} ${time}Z`;
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
+function ownerLocalNow(owner) {
+  if (!owner) return null;
+  try {
+    const fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: owner.tz, hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+    return fmt.format(NOW);
+  } catch (e) { return null; }
+}
+function ownerInOfficeHours(owner) {
+  if (!owner || !owner.office) return null;
+  const local = ownerLocalNow(owner);
+  if (!local) return null;
+  const [start, end] = owner.office.split('–').map(s => s.trim());
+  if (!start || !end) return null;
+  return local >= start && local <= end;
+}
+
+function statusLabel(s) {
+  return ({
+    new: 'New',
+    with_fit: 'With Local FIT',
+    with_hq: 'With HQ Product Team',
+    sanity_check: 'Sanity Check',
+    returned_to_requester: 'Returned to Requester',
+    resolved: 'Resolved',
+    closed: 'Closed',
+    cancelled: 'Cancelled',
+  })[s] || s;
+}
+
+/* ---------- Action queue derivation ---------- */
+
+function deriveQueue() {
+  const op = getOperator(STATE.operatorId);
+  const shiftEndsSoon =
+    (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
+    window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
+
+  const items = [];
+  for (const c of STATE.cases) {
+    if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
+
+    const onUsHrs = caseSlaMs(c) / HOUR;
+    const ownerIdleHrs = c.lastOwnerContact
+      ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
+      : Infinity;
+
+    if (c.status === 'new' && !c.fitId) {
+      items.push({ caseId: c.id, kind: 'assign_fit' });
+    }
+    if (c.status === 'with_fit' && c.fitCannotResolve) {
+      items.push({ caseId: c.id, kind: 'escalate_to_hq' });
+    } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
+      items.push({ caseId: c.id, kind: 'chase_fit' });
+    }
+    if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
+      items.push({ caseId: c.id, kind: 'chase_hq' });
+    }
+    if (c.status === 'sanity_check') {
+      items.push({ caseId: c.id, kind: 'verify_fix' });
+    }
+    if (onUsHrs > window.THRESHOLDS.approachingSlaHours && !c.slaPaused) {
+      items.push({ caseId: c.id, kind: 'approaching_sla' });
+    }
+    if (c.flags?.includes('escalated') && !['sanity_check'].includes(c.status)) {
+      items.push({ caseId: c.id, kind: 'watch_escalated' });
+    }
+    if (shiftEndsSoon && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)) {
+      // Surface only for cases the current operator is coordinating (proxy: open & not new-unassigned)
+      if (c.status !== 'new') {
+        items.push({ caseId: c.id, kind: 'end_of_shift_handover' });
+      }
+    }
+  }
+
+  // Group by case for display.
+  const byCase = new Map();
+  for (const it of items) {
+    if (!byCase.has(it.caseId)) byCase.set(it.caseId, []);
+    byCase.get(it.caseId).push(it);
+  }
+
+  // Order: high priority first, then oldest case.
+  const groups = [...byCase.entries()].map(([caseId, prompts]) => {
+    const c = caseById(caseId);
+    return { case: c, prompts };
+  });
+  const pri = { high: 0, medium: 1, low: 2 };
+  groups.sort((a, b) => {
+    const p = pri[a.case.priority] - pri[b.case.priority];
+    if (p !== 0) return p;
+    return new Date(a.case.slaStartedAt) - new Date(b.case.slaStartedAt);
+  });
+  return groups;
+}
+
+const PROMPT_DEFS = {
+  assign_fit:           { label: 'Assign to Local FIT',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
+  chase_fit:            { label: 'Chase Local FIT — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
+  chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  verify_fix:           { label: 'Verify reported fix (Sanity Check)',   icon: 'V', cls: 'icon-verify',   action: 'Verify & close' },
+  approaching_sla:      { label: 'Approaching SLA — consider returning', icon: 'S', cls: 'icon-sla',      action: 'Return to requester' },
+  watch_escalated:      { label: 'Watch escalated case',                 icon: 'W', cls: 'icon-watch',    action: 'Open case' },
+  end_of_shift_handover:{ label: 'End-of-shift handover note required',  icon: 'H', cls: 'icon-handover', action: 'Write handover' },
+};
+
+/* ---------- Router ---------- */
+
+function navigate(hash) {
+  if (location.hash !== hash) location.hash = hash;
+  else render();
+}
+
+function currentRoute() {
+  const h = location.hash || '#/queue';
+  if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
+  if (h.startsWith('#/cases')) return { name: 'cases' };
+  if (h.startsWith('#/handover')) return { name: 'handover' };
+  return { name: 'queue' };
+}
+
+window.addEventListener('hashchange', render);
+
+/* ---------- Render dispatch ---------- */
+
+function render() {
+  renderSidebar();
+  const route = currentRoute();
+  const main = document.getElementById('main');
+  document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+  const active = ({ queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover' })[route.name];
+  document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
+
+  if (route.name === 'queue') main.innerHTML = renderQueue();
+  else if (route.name === 'cases') main.innerHTML = renderCaseList();
+  else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
+  else if (route.name === 'handover') main.innerHTML = renderHandover();
+  bindHandlers();
+}
+
+function renderSidebar() {
+  const op = getOperator(STATE.operatorId);
+  document.getElementById('op-name').textContent = op.name;
+  document.getElementById('op-shift').textContent = op.shift;
+  document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
+  document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
+
+  const queueGroups = deriveQueue();
+  const promptCount = queueGroups.reduce((n, g) => n + g.prompts.length, 0);
+  document.getElementById('nav-queue-count').textContent = promptCount;
+  document.getElementById('nav-cases-count').textContent =
+    STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
+  document.getElementById('nav-handover-count').textContent =
+    STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status)
+      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== getOperator(STATE.operatorId).shift)
+    ).length;
+}
+
+/* ---------- Action Queue view ---------- */
+
+function renderQueue() {
+  const groups = deriveQueue();
+  if (groups.length === 0) {
+    return `
+      <div class="page-header">
+        <div>
+          <h1>Action Queue</h1>
+          <div class="subtitle">Your prioritized to-do list, derived from open cases.</div>
+        </div>
+      </div>
+      <div class="queue-empty">All clear — no action prompts right now.</div>
+    `;
+  }
+  const cards = groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Action Queue</h1>
+        <div class="subtitle">${groups.length} case${groups.length === 1 ? '' : 's'} need attention.</div>
+      </div>
+      <div class="toolbar">
+        <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
+      </div>
+    </div>
+    ${cards}
+  `;
+}
+
+function renderQueueCard(c, prompts) {
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const onUs = fmtDuration(caseSlaMs(c));
+  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+  const ownerLine = owner ? `
+    Owner: <strong>${escapeHtml(owner.name)}</strong>
+    ${renderTzHint(owner)}
+    · last contact ${fmtRelative(c.lastOwnerContact?.at)}
+  ` : `<span class="muted">Unassigned</span>`;
+
+  const promptRows = prompts.map(p => {
+    const def = PROMPT_DEFS[p.kind];
+    return `
+      <div class="prompt">
+        <div class="label">
+          <span class="prompt-icon ${def.cls}">${def.icon}</span>
+          ${escapeHtml(def.label)}
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="${p.kind}">${escapeHtml(def.action)}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card queue-card">
+      <div class="queue-row">
+        <div>
+          <div class="row-flex">
+            <a href="#/cases/${c.id}" class="mono muted">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+            <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
+            ${flags}
+          </div>
+          <div style="margin-top:6px; font-weight:500; font-size:14px;">${escapeHtml(c.subject)}</div>
+          <div class="queue-meta">
+            ${ownerLine}
+            <span>·</span>
+            <span>On us: <strong>${onUs}</strong></span>
+            <span>·</span>
+            <a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">case-center ↗</a>
+          </div>
+          <div class="prompts">${promptRows}</div>
+        </div>
+        <div>
+          <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTzHint(owner) {
+  if (!owner) return '';
+  const local = ownerLocalNow(owner);
+  const inHours = ownerInOfficeHours(owner);
+  if (!local) return '';
+  const cls = inHours == null ? '' : (inHours ? 'in-hours' : 'out-of-hours');
+  return `<span class="tz-hint ${cls}" title="${escapeHtml(owner.tz)} · office ${escapeHtml(owner.office)}">${escapeHtml(local)} ${escapeHtml(owner.tz.split('/').pop())}</span>`;
+}
+
+/* ---------- Case List view ---------- */
+
+function renderCaseList() {
+  const cases = [...STATE.cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const rows = cases.map(c => {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+    return `
+      <tr data-href="#/cases/${c.id}">
+        <td class="col-id">${c.id}</td>
+        <td>
+          <div class="subject">${escapeHtml(c.subject)}</div>
+          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
+        </td>
+        <td>${escapeHtml(c.requester)}</td>
+        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}</td>
+        <td><span class="priority-${c.priority}">${escapeHtml(c.priority)}</span></td>
+        <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
+        <td class="muted tiny">${fmtRelative(c.createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
+        <div class="subtitle">${cases.length} cases this week. Click a row for full detail.</div>
+      </div>
+      <div class="toolbar">
+        <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
+      </div>
+    </div>
+    <table class="case-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Subject / Case Link</th>
+          <th>Requester</th>
+          <th>Local FIT</th>
+          <th>HQ Product Team</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Process Time</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+/* ---------- Case Detail view ---------- */
+
+function renderCaseDetail(id) {
+  const c = caseById(id);
+  if (!c) {
+    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
+      <a class="btn" href="#/cases">← Back to cases</a>`;
+  }
+  const fit = getOwner('fit', c.fitId);
+  const hq = getOwner('hq', c.hqId);
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+
+  const slaMs = caseSlaMs(c);
+  const fitMs = caseHoldMs(c, 'fit');
+  const hqMs = caseHoldMs(c, 'hq');
+
+  const handoverHtml = c.handover ? `
+    <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
+      ${escapeHtml(c.handover.note)}
+      <div class="meta">
+        ${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)} ·
+        ${escapeHtml(c.handover.author)} · ${fmtAbsolute(c.handover.at)}
+        ${c.handover.staleForCurrentShift ? ' · <strong>stale for current shift</strong>' : ''}
+      </div>
+    </div>
+  ` : `<div class="muted tiny">No handover note.</div>`;
+
+  const history = (c.history || []).slice().reverse().map(h => `
+    <li>
+      <span class="when">${fmtAbsolute(h.at)}</span>
+      <span><strong>${escapeHtml(h.kind)}</strong> by ${escapeHtml(h.who)}${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span>
+    </li>
+  `).join('');
+
+  const actions = renderDetailActions(c);
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/cases">← cases</a>
+          <span class="mono muted">${c.id}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
+          ${flags}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
+        <div class="subtitle"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+      </div>
+      <div class="toolbar">${actions}</div>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <div class="card"><div class="card-body">
+          <div class="detail-section">
+            <h3>Two clocks</h3>
+            <div class="clock-grid">
+              <div class="clock">
+                <div class="label">SLA clock (time on us)</div>
+                <div class="value">${fmtDuration(slaMs)}</div>
+                <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
+              </div>
+              <div class="clock">
+                <div class="label">Owner-hold totals</div>
+                <div class="value mono" style="font-size:13px;">FIT ${fmtDuration(fitMs)} · HQ ${fmtDuration(hqMs)}</div>
+                <div class="state ${c.currentOwner ? 'running' : ''}">${c.currentOwner ? `Active: ${c.currentOwner.toUpperCase()}` : 'No active owner'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h3>Handover (latest)</h3>
+            ${handoverHtml}
+          </div>
+          <div class="detail-section">
+            <h3>Notes</h3>
+            <div>${escapeHtml(c.notes || '—')}</div>
+          </div>
+          <div class="detail-section">
+            <h3>History</h3>
+            <ul class="history">${history || '<li class="muted">No history.</li>'}</ul>
+          </div>
+        </div></div>
+      </div>
+
+      <div>
+        <div class="card"><div class="card-body">
+          <div class="detail-section">
+            <h3>Routing</h3>
+            <div class="detail-row"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
+            <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">—</span>'}</span></div>
+            <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">—</span>'}</span></div>
+            <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
+            <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
+          </div>
+          <div class="detail-section">
+            <h3>Filing</h3>
+            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(statusLabel(c.status))}</span></div>
+            <div class="detail-row"><span class="k">Case type</span><span class="v">${escapeHtml(c.caseType)}</span></div>
+            <div class="detail-row"><span class="k">Week</span><span class="v">${escapeHtml(c.weekId)}</span></div>
+            <div class="detail-row"><span class="k">Created</span><span class="v">${fmtAbsolute(c.createdAt)} · ${escapeHtml(c.createdBy)}</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDetailActions(c) {
+  const buttons = [];
+  if (c.status === 'new' && !c.fitId) {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="assign_fit">Assign to Local FIT</button>`);
+  }
+  if (c.status === 'with_fit') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="escalate_to_hq">Escalate to HQ</button>`);
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder</button>`);
+  }
+  if (c.status === 'with_hq') {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder</button>`);
+    buttons.push(`<button class="btn" data-action="status" data-case-id="${c.id}" data-to="sanity_check">Move to Sanity Check</button>`);
+  }
+  if (c.status === 'sanity_check') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="verify_fix">Verify & close</button>`);
+  }
+  if (!['closed', 'cancelled', 'returned_to_requester', 'resolved'].includes(c.status)) {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="approaching_sla">Return to requester</button>`);
+  }
+  if (!['closed', 'cancelled'].includes(c.status)) {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
+  }
+  return buttons.join(' ');
+}
+
+/* ---------- Shift Handover view ---------- */
+
+function renderHandover() {
+  const op = getOperator(STATE.operatorId);
+  const open = STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status));
+  const fresh = open.filter(c => c.handover && !c.handover.staleForCurrentShift && c.handover.author === op.id);
+  const stale = open.filter(c => c.handover && (c.handover.staleForCurrentShift || c.handover.author !== op.id));
+  const missing = open.filter(c => !c.handover);
+
+  const rows = [...missing, ...stale, ...fresh].map(c => {
+    let status = '<span class="note-status fresh">Note current</span>';
+    if (!c.handover) status = '<span class="note-status missing">No note</span>';
+    else if (c.handover.staleForCurrentShift || c.handover.author !== op.id) {
+      status = `<span class="note-status stale">Stale (${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)})</span>`;
+    }
+    return `
+      <div class="case-row">
+        <div>
+          <div class="row-flex">
+            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          </div>
+          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
+          <div class="meta">On us: ${fmtDuration(caseSlaMs(c))} · last contact ${fmtRelative(c.lastOwnerContact?.at)}</div>
+        </div>
+        <div>${status}</div>
+        <div>
+          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write note</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const blockers = missing.length + stale.length;
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Shift Handover</h1>
+        <div class="subtitle">Manual cutover. Every open case must have a note authored during this shift.</div>
+      </div>
+    </div>
+    <div class="handover-bar">
+      <div class="progress-text">
+        <strong>${fresh.length}</strong> of <strong>${open.length}</strong> open cases have a current ${op.shift}-shift note.
+        ${blockers > 0 ? `<span class="muted"> · ${blockers} pending.</span>` : ''}
+      </div>
+      <div>
+        <button class="btn btn-primary" id="complete-handover" ${blockers > 0 ? 'disabled' : ''}>Complete handover</button>
+      </div>
+    </div>
+    <div class="handover-list">${rows || '<div class="queue-empty">No open cases requiring handover.</div>'}</div>
+  `;
+}
+
+/* ---------- Modal ---------- */
+
+function showModal(html, onSubmit) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
+  const close = () => { root.innerHTML = ''; };
+  root.querySelector('[data-modal-cancel]')?.addEventListener('click', close);
+  root.querySelector('[data-modal-submit]')?.addEventListener('click', () => {
+    if (onSubmit(root.querySelector('.modal'))) close();
+  });
+  root.querySelector('.modal-backdrop')?.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-backdrop')) close();
+  });
+}
+
+/* ---------- Action handlers ---------- */
+
+function handlePrompt(caseId, kind) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+
+  if (kind === 'assign_fit') {
+    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
+    showModal(`
+      <h3>Assign to Local FIT</h3>
+      <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
+      <label>FIT desk</label>
+      <select data-field="fitId">${opts}</select>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Assign</button>
+      </div>
+    `, (modal) => {
+      const fitId = modal.querySelector('[data-field="fitId"]').value;
+      c.fitId = fitId;
+      c.currentOwner = 'fit';
+      c.status = 'with_fit';
+      c.holdStartedAt = new Date(NOW).toISOString();
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'assigned', detail: `Local FIT — ${getOwner('fit', fitId).name}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'escalate_to_hq') {
+    const opts = window.OWNERS.hq.map(h => `<option value="${h.id}">${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
+    showModal(`
+      <h3>Escalate to HQ Product Team</h3>
+      <div class="modal-sub">FIT can't resolve. Pick the HQ team that owns this area.</div>
+      <label>HQ team</label>
+      <select data-field="hqId">${opts}</select>
+      <label>Reason (optional)</label>
+      <textarea data-field="reason" placeholder="What did FIT find?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Escalate</button>
+      </div>
+    `, (modal) => {
+      const hqId = modal.querySelector('[data-field="hqId"]').value;
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      // stop FIT clock, start HQ clock
+      if (c.currentOwner === 'fit' && c.holdStartedAt) {
+        c.holdMs.fit += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      c.hqId = hqId;
+      c.currentOwner = 'hq';
+      c.status = 'with_hq';
+      c.holdStartedAt = new Date(NOW).toISOString();
+      c.fitCannotResolve = false;
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'escalated', detail: `FIT → ${getOwner('hq', hqId).name}${reason ? ' · ' + reason : ''}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'chase_fit' || kind === 'chase_hq') {
+    const owner = c.currentOwner === 'fit' ? getOwner('fit', c.fitId) : getOwner('hq', c.hqId);
+    const channel = c.currentOwner === 'fit' ? 'Slack' : 'JIRA';
+    showModal(`
+      <h3>Send reminder to ${escapeHtml(owner?.name || 'owner')}</h3>
+      <div class="modal-sub">Channel: ${escapeHtml(channel)} · ${renderTzHint(owner)}</div>
+      <label>Reminder message</label>
+      <textarea data-field="msg" placeholder="Quick nudge — any update on this?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Send reminder</button>
+      </div>
+    `, (modal) => {
+      const msg = modal.querySelector('[data-field="msg"]').value.trim();
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder', detail: `Reminder via ${channel}${msg ? ': ' + msg : ''}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'verify_fix') {
+    showModal(`
+      <h3>Verify reported fix and close</h3>
+      <div class="modal-sub">Confirm the fix with the requester before closing.</div>
+      <label>Resolution code</label>
+      <select data-field="code">
+        <option value="fixed_by_owner">fixed_by_owner</option>
+        <option value="fixed_with_workaround">fixed_with_workaround</option>
+        <option value="not_a_bug">not_a_bug</option>
+      </select>
+      <label>Resolution note</label>
+      <textarea data-field="note" placeholder="What was the fix? Was it confirmed?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Close case</button>
+      </div>
+    `, (modal) => {
+      const code = modal.querySelector('[data-field="code"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Resolution note is required.'); return false; }
+      // stop active clocks
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'closed';
+      c.closedAt = new Date(NOW).toISOString();
+      c.resolutionCode = code;
+      c.currentOwner = null;
+      c.holdStartedAt = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'approaching_sla') {
+    showModal(`
+      <h3>Return to requester</h3>
+      <div class="modal-sub">This pauses the SLA clock until the requester responds.</div>
+      <label>Reason / what we need from them</label>
+      <textarea data-field="reason" placeholder="Need repro steps / awaiting confirmation / …"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Return to requester</button>
+      </div>
+    `, (modal) => {
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      if (!reason) { alert('A reason is required.'); return false; }
+      // stop owner clock, freeze SLA
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      c.slaAccumulatedMs = caseSlaMs(c);
+      c.slaPaused = true;
+      c.currentOwner = null;
+      c.holdStartedAt = null;
+      c.status = 'returned_to_requester';
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'returned', detail: `Returned to requester · ${reason}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'watch_escalated') {
+    navigate(`#/cases/${c.id}`);
+    return;
+  }
+
+  if (kind === 'end_of_shift_handover') {
+    showModal(`
+      <h3>Handover note</h3>
+      <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(op.shift === 'Day' ? 'Night' : 'Day')} · case ${escapeHtml(c.id)}</div>
+      <label>Note for the next shift</label>
+      <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Save note</button>
+      </div>
+    `, (modal) => {
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Handover note is required.'); return false; }
+      const target = op.shift === 'Day' ? 'Night' : 'Day';
+      c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
+      render();
+      return true;
+    });
+    return;
+  }
+}
+
+function handleStatusChange(caseId, to) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+  if (to === 'sanity_check') {
+    c.status = 'sanity_check';
+    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'status', detail: `→ Sanity Check` });
+    render();
+  }
+}
+
+function handleCompleteHandover() {
+  alert('Handover marked complete. (Prototype: in a real build this would notify the incoming shift.)');
+}
+
+/* ---------- Bind handlers after render ---------- */
+
+function bindHandlers() {
+  document.querySelectorAll('[data-action="prompt"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handlePrompt(el.dataset.caseId, el.dataset.kind);
+    });
+  });
+  document.querySelectorAll('[data-action="status"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handleStatusChange(el.dataset.caseId, el.dataset.to);
+    });
+  });
+  document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => { location.hash = tr.dataset.href; });
+  });
+  document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
+  const filter = document.getElementById('case-filter');
+  if (filter) {
+    filter.addEventListener('input', () => {
+      const q = filter.value.toLowerCase();
+      document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+}
+
+/* ---------- Boot ---------- */
+
+if (!location.hash) location.hash = '#/queue';
+render();

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Tracker — Prototype</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">Case Tracker</div>
+      <span class="badge">prototype</span>
+    </div>
+    <nav class="nav">
+      <a href="#/queue" data-route="queue">
+        <span>Action Queue</span>
+        <span class="count" id="nav-queue-count">—</span>
+      </a>
+      <a href="#/cases" data-route="cases">
+        <span>Cases</span>
+        <span class="count" id="nav-cases-count">—</span>
+      </a>
+      <a href="#/handover" data-route="handover">
+        <span>Shift Handover</span>
+        <span class="count" id="nav-handover-count">—</span>
+      </a>
+    </nav>
+    <div class="shift-info">
+      <div class="kv"><span class="k">Operator</span><span class="v" id="op-name">—</span></div>
+      <div class="kv"><span class="k">Shift</span><span class="v" id="op-shift">—</span></div>
+      <div class="kv"><span class="k">Ends</span><span class="v" id="op-ends">—</span></div>
+      <div class="kv"><span class="k">Week</span><span class="v" id="op-week">—</span></div>
+    </div>
+    <div class="footer-note">
+      Click-through prototype.<br>
+      State resets on reload.
+    </div>
+  </aside>
+  <main id="main"><!-- view rendered here --></main>
+</div>
+<div id="modal-root"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
