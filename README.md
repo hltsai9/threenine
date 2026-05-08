@@ -18,6 +18,10 @@ cd prototype && python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
+## Take the interactive tour
+
+The prototype ships with a built-in guided tour: ~10 stepped tooltips that walk through every screen. It launches automatically the first time you load the app, and you can re-launch any time via **Take the tour →** in the sidebar footer. Use **← / →** keys to step, **Esc** to skip.
+
 ## Demo anchor — what "now" means
 
 To keep the demo stable, the prototype freezes time:
