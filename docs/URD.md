@@ -1,7 +1,7 @@
 # User Requirements Document — Case Tracking Tool (Excel Replacement)
 
-**Date:** 2026-05-07
-**Status:** Draft v2
+**Date:** 2026-05-08
+**Status:** Draft v3
 **Owner:** Product
 
 ## 1. Background & Problem
@@ -33,56 +33,99 @@ Today's pain points:
 ## 3. Users & Roles (v1)
 - **Front-line operator** — any department member. Coordinates cases: assigns to owners, chases, escalates, returns to requesters, writes handover notes. The only logged-in user type.
 - **Admin** — manages reference data (owners, teams, case types, escalation thresholds, shift definitions, dropdown values) and the operator user list.
-- **Owner** — represented as a record (name, team, time zone, posted office hours, contact channel) but does **not** log in. Cases are assigned *to* owner records so the operator knows whom to chase.
+- **Local FIT (owner, first line)** — represented as records (name, region, time zone, posted office hours, contact channel). First port of call for a new case. Does **not** log in.
+- **HQ Product Team (owner, second line)** — represented as records (name, product area, time zone, posted office hours, contact channel). Receives cases that Local FIT cannot resolve. Does **not** log in.
 - **Requester** — represented as a field on the case; does not log in. Assigning a case back to the requester pauses the SLA clock.
 
 ## 4. Functional Requirements
 
 ### 4.1 Case Record
-Each case must capture at minimum:
+Each case must capture at minimum (Excel column → field mapping in parentheses):
 - Case ID (system-generated, stable across weekly workbooks)
-- Source case-center reference (free-text in v1; API-linked in v2)
-- Title / summary
-- Requester (the party the case originated from and will be returned to)
-- Current owner (an owner record, may be unassigned)
-- Status (see lifecycle)
+- Case-center link / reference *(Excel: **Case Link**)* — URL or ID of the upstream record. Free-text in v1; API-linked in v2.
+- Subject / summary *(Excel: **Subject**)*
+- Requester
+- Local FIT contact *(Excel: **Local FIT**)* — owner record, optional
+- HQ Product Team contact *(Excel: **HQ Product Team**)* — owner record, optional
+- Current owner pointer — `Local FIT` or `HQ Product Team` (or unassigned). Determines which owner the chase prompts target.
+- Status *(Excel: **Status**)* — see §4.2
+- Process Time *(Excel: **Process Time**)* — see §4.2.1
+- Weekend Case flag — boolean, separate from status (see §4.2.2)
 - Priority
 - Case type / category (referential)
-- Team or queue (referential)
 - Week (workbook the case is currently filed under — see §4.10)
 - SLA-clock state: running / paused, accumulated time
-- Owner-hold-clock state: running when assigned to an owner, accumulated time
-- Last contact with owner (timestamp + channel)
-- Handover note (latest, with author and shift)
+- Owner-hold-clock state: running per owner, with per-owner accumulated time
+- Last contact with current owner (timestamp + channel)
+- Handover note *(Excel: **Handover**)* — latest only, with author, source-shift, target-shift (e.g. day → night)
+- Notes *(Excel: **Note**)* — free-text rolling notes; comments thread (§4.6) is the v1 replacement, but a single Notes field is preserved for migration parity
 - Created at / created by, last updated at / by
 
 ### 4.2 Lifecycle (state machine)
-States: **New → Assigned to Owner → Awaiting Owner → Returned to Requester → Resolved → Closed**, plus **Escalated** and **Cancelled**, plus **Reopened** from Closed.
+The legacy Excel `Status` column conflates three concepts: **state**, **action prompt**, and **flag**. v1 splits them.
 
-- The **SLA clock** runs in *New*, *Assigned to Owner*, *Awaiting Owner*, and *Escalated*. It pauses in *Returned to Requester*. It stops in *Resolved* and *Closed*.
-- The **owner-hold clock** runs whenever an owner is assigned and the case is not in *Returned to Requester*.
+**v1 states (the Status field):**
+**New → With Local FIT → With HQ Product Team → Sanity Check → Resolved → Closed**, plus **Returned to Requester**, **Cancelled**, and **Reopened** from Closed.
+
+- **With Local FIT** — case sits with first-line; covers the legacy "2nd line did not handle" situation when the operator is chasing FIT.
+- **With HQ Product Team** — case has been escalated past FIT; covers legacy `Product Team Handling`.
+- **Sanity Check** — owner reports a fix; operator verifies before closing. Maps to legacy `Sanity Check`.
+- **Returned to Requester** — pauses the SLA clock; covers legacy `Need to contact user, please assist` when used as a state rather than a prompt.
+
+Rules:
+- The **SLA clock** runs in *New*, *With Local FIT*, *With HQ Product Team*, and *Sanity Check*. It pauses in *Returned to Requester*. It stops in *Resolved* and *Closed*.
+- The **owner-hold clock** runs whenever an owner is assigned and the case is not in *Returned to Requester*; per-owner accumulation so we can report Local FIT hold time vs. HQ Product Team hold time separately.
 - Closing a case requires a resolution note and a resolution code.
 - Transitions are explicit and audit-logged. Any operator may transition any case.
 
+**Legacy Status → v1 mapping (used by the importer in §4.11):**
+
+| Legacy Status                           | v1 Status              | Action-queue item (§4.4)               | Flag (§4.2.2) |
+|-----------------------------------------|------------------------|----------------------------------------|---------------|
+| `Weekend Case`                          | (preserve current)     | —                                      | Weekend Case  |
+| `Escalated, please keep an eye on this` | (preserve current)     | "Watch escalated case"                 | Escalated     |
+| `2nd line did not handle`               | With Local FIT         | "Chase Local FIT — no response"        | —             |
+| `Escalate to Local FIT`                 | New                    | "Assign to Local FIT"                  | —             |
+| `Need to contact user, please assist`   | (preserve current)     | "Contact requester / return to requester" | —          |
+| `Product Team Handling`                 | With HQ Product Team   | —                                      | —             |
+| `Case Closed`                           | Closed                 | —                                      | —             |
+| `Sanity Check`                          | Sanity Check           | "Verify owner's reported fix"          | —             |
+| `Scheduled OOC`                         | (preserve current)     | —                                      | Scheduled OOC *(definition TBD — see §8)* |
+
+#### 4.2.1 Process Time
+- **v1**: system-computed from state-transition timestamps. Surfaced as the SLA-clock accumulator (i.e. "time on us"). The legacy manually-typed value is migrated as a one-time seed and then replaced by the computed value going forward.
+- **v2**: sourced from the case-center API; the local computation becomes a fallback / cross-check.
+
+#### 4.2.2 Flags (orthogonal to status)
+- **Weekend Case** — set automatically when a case is created during the configured weekend window; visible as a tag, used for reporting only.
+- **Escalated (watch)** — set by an operator when a case needs heightened attention regardless of which owner has it. Replaces legacy `Escalated, please keep an eye on this`.
+- **Scheduled OOC** — preserved during migration; semantics confirmed with operators before v1 GA (see §8).
+
 ### 4.3 Routing & Handoff
 - **Manual assignment is primary**: the operator picks the owner from the owner directory.
-- Reassigning to a new owner stops the previous owner's hold clock and starts a new one.
-- Assigning back to the requester is a first-class action that pauses the SLA clock and clears the current owner.
+- **Default flow**: New → assign to **Local FIT** → if FIT cannot resolve, the operator escalates to **HQ Product Team**. Both the FIT contact and the HQ contact are retained on the case once populated; the *current owner pointer* says which one is active.
+- Switching the current owner pointer stops the previous owner's hold clock and starts the next one. Per-owner accumulators are preserved.
+- Assigning back to the requester is a first-class action that pauses the SLA clock and clears the current-owner pointer (FIT/HQ records remain on the case for context).
 - Every assignment / reassignment is recorded with timestamp, actor, from→to, and reason (optional).
-- Optional team queues from which an operator may pull a case to themselves for coordination.
 
 ### 4.4 Action Queue (per-operator to-do list)
 The home screen for each operator is a prioritized list of prompts derived from the cases they are coordinating. The queue must surface, at minimum:
-- **Owner idle** — owner has held the case past a configurable threshold without response → "send a reminder."
-- **Approaching SLA** — case has been on us long enough that the operator should consider returning it to the requester or escalating.
-- **Escalation criteria met** — priority/age/repeat-non-response combination triggers an "escalate now" prompt.
+- **Assign to Local FIT** — new case has no FIT owner yet (replaces legacy `Escalate to Local FIT` status).
+- **Chase Local FIT — no response** — case has sat with FIT past the idle threshold (replaces legacy `2nd line did not handle`).
+- **Escalate to HQ Product Team** — FIT has reported they cannot resolve, or FIT has exceeded the escalation threshold without progress.
+- **Chase HQ Product Team — no response** — case has sat with HQ past the idle threshold.
+- **Verify reported fix (Sanity Check)** — owner says it's fixed; operator must confirm before closing.
+- **Contact requester / return to requester** — replaces legacy `Need to contact user, please assist`. Pauses the SLA clock when actioned.
+- **Watch escalated case** — surfaced for cases flagged Escalated regardless of owner.
+- **Approaching SLA** — case has been on us long enough that the operator should return it to the requester or escalate.
 - **End-of-shift handover** — for every open case the operator owns, prompt to write/refresh a handover note before shift cutover.
-- **Owner office hours** — each prompt that involves contacting an owner must display the owner's local time and posted office hours so the operator can decide whether to act now or defer. The system does **not** gate prompts on time-of-day; the operator decides.
+- **Owner office hours** — each chase prompt must display the current owner's local time and posted office hours so the operator can decide whether to act now or defer. The system does **not** gate prompts on time-of-day; the operator decides.
 - Operators can snooze, dismiss with reason, or act on each prompt; dismissals are audit-logged.
 
 ### 4.5 Shifts & Handover
-- Shifts and shift membership are configured by admins.
+- Shifts and shift membership are configured by admins. Day ↔ Night is the canonical pair; other configurations are allowed.
 - Shift cutover is **manual**: the outgoing operator clicks "complete handover" once every open case in their bucket has a current handover note; the incoming operator clicks "take over."
+- The Handover field on the case is **latest-only** (one current note labelled with source-shift → target-shift, e.g. `Day → Night`). Prior handover notes are preserved in the audit log, not in the field.
 - A case cannot be marked handed-over without a handover note authored during the current shift.
 - The system records who handed over which cases to whom and when.
 - An operator can see all open cases pending their incoming handover.
@@ -99,8 +142,9 @@ The home screen for each operator is a prioritized list of prompts derived from 
 - **Audit log**: every field change records who/what/when/old→new; viewable per case; exportable.
 
 ### 4.8 Reporting & Insights
-- **Status dashboards** — counts by status, owner, team, queue, age bucket; overdue view; "stuck with owner" view.
-- **Two-clock reporting** — for any slice: total elapsed, **time on us** (SLA-clock running), **time with owner** (owner-hold-clock running), **time with requester** (SLA-clock paused).
+- **Status dashboards** — counts by status, current owner pointer (FIT vs. HQ), team, age bucket; overdue view; "stuck with owner" view.
+- **Two-clock reporting** — for any slice: total elapsed, **time on us** (SLA-clock running), **time with owner** (owner-hold-clock running, split by FIT vs. HQ), **time with requester** (SLA-clock paused).
+- **FIT vs. HQ split** — what fraction of cases are resolved by Local FIT without HQ escalation; median time-with-FIT before escalation.
 - **Owner performance** — median/percentile owner-hold time per owner and per team; non-response rate.
 - **Bounce metrics** — number of times a case was returned to the requester before close.
 - **Trend charts** — opened vs. closed over time, throughput, median time-to-resolution.
@@ -118,8 +162,21 @@ The home screen for each operator is a prioritized list of prompts derived from 
 - Reports can be filtered or rolled up by week.
 
 ### 4.11 Import / Export
-- **Import**: CSV/Excel import for initial migration, with column mapping, validation preview, and per-row error reporting before commit. Must accommodate the existing weekly workbook layout.
-- **Export**: any list/view exportable to CSV/Excel; audit log exportable per case; weekly snapshot exportable as a workbook for archive parity.
+- **Import**: CSV/Excel import for initial migration, with column mapping, validation preview, and per-row error reporting before commit.
+- **Default column map** for the existing weekly workbooks:
+
+  | Excel column      | v1 field                                                              |
+  |-------------------|------------------------------------------------------------------------|
+  | Case Link         | Case-center reference (URL/ID)                                         |
+  | Subject           | Subject / summary                                                      |
+  | Process Time      | Seed value for SLA-clock accumulator (then system-computed; §4.2.1)    |
+  | Status            | Split into v1 Status + Action-queue prompt + Flag per §4.2 mapping    |
+  | Handover          | Handover note (latest-only, with shift labels)                         |
+  | Local FIT         | Local FIT contact (owner record)                                       |
+  | HQ Product Team   | HQ Product Team contact (owner record)                                 |
+  | Note              | Notes field + auto-imported as initial comment thread entry            |
+
+- **Export**: any list/view exportable to CSV/Excel; audit log exportable per case; weekly snapshot exportable as a workbook for archive parity (with the original 8 columns reconstructable for hand-back to legacy consumers).
 
 ### 4.12 Authentication
 - Logged-in access required for operators and admins. SSO is desirable but not a hard v1 requirement.
@@ -144,11 +201,14 @@ Tracked at 30/60/90 days post-launch:
 - *(Secondary, monitored: median time-on-us, median owner-hold, return-to-requester count per case.)*
 
 ## 8. Open Questions
-1. **Thresholds**: numeric values for "owner idle," "approaching SLA," and escalation criteria — workshop with operators.
+1. **Thresholds**: numeric values for FIT-idle, HQ-idle, "approaching SLA," and escalation criteria — workshop with operators.
 2. **Resolution codes / case types** — workshop with operators.
-3. **Shift definitions** — exact times, team membership, weekend coverage.
+3. **Shift definitions** — exact times of Day vs. Night (and any others), team membership, weekend coverage.
 4. **Week start** — day and local time of the weekly rollover.
-5. **History depth** — how many past weekly workbooks to import for v1.
-6. **v2 case-center API** — contract, polling vs. push, conflict resolution when both systems edit a case.
-7. **SSO provider** (Google / Microsoft / Okta) — confirm with IT.
-8. **Targets** for §7 success metrics.
+5. **`Scheduled OOC` definition** — the legacy status is preserved during migration but its meaning is unclear; confirm with operators whether it is a flag, a future-dated state, or obsolete.
+6. **`Weekend Case` semantics** — confirm whether it changes SLA treatment or is reporting-only.
+7. **Owner directory seed** — source of truth for the Local FIT and HQ Product Team rosters (incl. time zones and posted office hours) — pull from HRIS, IT directory, or maintained manually in §4 admin tools?
+8. **History depth** — how many past weekly workbooks to import for v1.
+9. **v2 case-center API** — contract, polling vs. push, authoritative source for Process Time, conflict resolution when both systems edit a case.
+10. **SSO provider** (Google / Microsoft / Okta) — confirm with IT.
+11. **Targets** for §7 success metrics.
