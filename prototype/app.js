@@ -514,33 +514,62 @@ function renderCaseDetail(id) {
 }
 
 function renderDetailActions(c) {
-  const buttons = [];
-  if (c.status === 'new' && !c.fitId) {
-    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="assign_fit">Assign to Local FIT</button>`);
-  }
+  const items = [];
+
+  // Non-status actions stay as buttons.
   if (c.status === 'with_fit') {
-    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="escalate_to_hq">Escalate to HQ</button>`);
-    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder</button>`);
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to FIT</button>`);
   }
   if (c.status === 'with_hq') {
-    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder</button>`);
-    buttons.push(`<button class="btn" data-action="status" data-case-id="${c.id}" data-to="sanity_check">Move to Sanity Check</button>`);
-  }
-  if (c.status === 'sanity_check') {
-    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="verify_fix">Verify & close</button>`);
-  }
-  if (c.status === 'returned_to_requester') {
-    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="resume">Requester replied — resume</button>`);
-    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="close_resolved">Close as resolved</button>`);
-  }
-  if (!['closed', 'cancelled', 'returned_to_requester', 'resolved'].includes(c.status)) {
-    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="approaching_sla">Return to requester</button>`);
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
   }
   if (!['closed', 'cancelled'].includes(c.status)) {
-    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
-    buttons.push(`<button class="btn btn-danger" data-action="prompt" data-case-id="${c.id}" data-kind="cancel">Cancel</button>`);
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
   }
-  return buttons.join(' ');
+
+  // Status transitions consolidated into a dropdown.
+  const transitions = statusTransitions(c);
+  if (transitions.length > 0) {
+    const opts = transitions.map(t =>
+      `<option value="${t.kind}"${t.danger ? ' class="danger"' : ''}>${escapeHtml(t.label)}</option>`
+    ).join('');
+    items.push(`
+      <select class="status-dropdown" data-action="status-select" data-case-id="${c.id}">
+        <option value="" disabled selected>Change status…</option>
+        ${opts}
+      </select>
+    `);
+  }
+
+  return items.join(' ');
+}
+
+function statusTransitions(c) {
+  const t = [];
+  switch (c.status) {
+    case 'new':
+      if (!c.fitId) t.push({ kind: 'assign_fit', label: 'Assign to Local FIT' });
+      break;
+    case 'with_fit':
+      t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
+      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
+      break;
+    case 'with_hq':
+      t.push({ kind: 'move_to_sanity_check', label: 'Move to Sanity Check' });
+      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
+      break;
+    case 'sanity_check':
+      t.push({ kind: 'verify_fix', label: 'Verify & close' });
+      break;
+    case 'returned_to_requester':
+      t.push({ kind: 'resume', label: 'Requester replied — resume' });
+      t.push({ kind: 'close_resolved', label: 'Close as resolved' });
+      break;
+  }
+  if (!['closed', 'cancelled'].includes(c.status)) {
+    t.push({ kind: 'cancel', label: 'Cancel case', danger: true });
+  }
+  return t;
 }
 
 /* ---------- Shift Handover view ---------- */
@@ -1179,6 +1208,13 @@ function handlePrompt(caseId, kind) {
     return;
   }
 
+  if (kind === 'move_to_sanity_check') {
+    c.status = 'sanity_check';
+    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'status', detail: '→ Sanity Check' });
+    render();
+    return;
+  }
+
   if (kind === 'cancel') {
     showModal(`
       <h3>Cancel case</h3>
@@ -1207,17 +1243,6 @@ function handlePrompt(caseId, kind) {
       return true;
     });
     return;
-  }
-}
-
-function handleStatusChange(caseId, to) {
-  const c = caseById(caseId);
-  if (!c) return;
-  const op = getOperator(STATE.operatorId);
-  if (to === 'sanity_check') {
-    c.status = 'sanity_check';
-    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'status', detail: `→ Sanity Check` });
-    render();
   }
 }
 
@@ -1317,10 +1342,12 @@ function bindHandlers() {
       handlePrompt(el.dataset.caseId, el.dataset.kind);
     });
   });
-  document.querySelectorAll('[data-action="status"]').forEach(el => {
-    el.addEventListener('click', e => {
-      e.preventDefault();
-      handleStatusChange(el.dataset.caseId, el.dataset.to);
+  document.querySelectorAll('[data-action="status-select"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const kind = el.value;
+      const caseId = el.dataset.caseId;
+      el.value = '';
+      if (kind) handlePrompt(caseId, kind);
     });
   });
   document.querySelectorAll('[data-action="reassign"]').forEach(el => {
