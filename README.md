@@ -11,12 +11,22 @@ This repo holds the **User Requirements Document** and a **click-through web pro
 
 **Online (deployed):** GitHub Pages publishes the contents of `prototype/` via the workflow at `.github/workflows/pages.yml`. After enabling **Settings → Pages → Source = GitHub Actions**, the site is reachable at the Pages URL shown in the deploy job (typically `https://<user>.github.io/threenine/`).
 
-**Locally:** open `prototype/index.html` in any modern browser. No build step, no install. Or serve the folder with anything:
+**Locally — easiest (just open a file):** double-click `prototype/standalone.html`, or open it in any browser via `file://`. It's a self-contained build of the prototype with the CSS and JS inlined, so no HTTP server or relative file fetches are needed. This is the recommended path for sharing the prototype as a single file.
+
+**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
 
 ```bash
 cd prototype && python3 -m http.server 8000
 # then open http://localhost:8000
 ```
+
+**Re-bundling after edits:** the modular source files are the source of truth. When you edit any of them, regenerate `standalone.html`:
+
+```bash
+node prototype/bundle.mjs
+```
+
+The Pages workflow runs this step automatically on every deploy.
 
 ## Take the interactive tour
 
@@ -144,10 +154,13 @@ Reload the page. There's no persistence, so any modals you submitted (assignment
 ├── docs/
 │   └── URD.md                   # User Requirements Document (v3)
 ├── prototype/
-│   ├── index.html               # SPA shell
+│   ├── index.html               # SPA shell (modular dev entry point)
 │   ├── styles.css               # all styles
 │   ├── app.js                   # router + render + handlers
 │   ├── data.js                  # seed: operators, owners, weeks, shifts, cases
+│   ├── tour.js                  # interactive guided tour
+│   ├── bundle.mjs               # build script: produces standalone.html
+│   ├── standalone.html          # self-contained single-file build (file://-safe)
 │   └── .nojekyll                # disables Jekyll on Pages
 └── .github/workflows/pages.yml  # deploys prototype/ to GitHub Pages
 ```

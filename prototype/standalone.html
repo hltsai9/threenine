@@ -1,0 +1,3153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Tracker — Prototype (standalone)</title>
+<style>
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --sidebar: #1f2937;
+  --sidebar-fg: #e5e7eb;
+  --sidebar-muted: #9ca3af;
+  --border: #e5e7eb;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --good: #059669;
+  --chip: #eef2ff;
+  --chip-fg: #3730a3;
+  --shadow: 0 1px 2px rgba(17, 24, 39, .04), 0 1px 3px rgba(17, 24, 39, .06);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  background: var(--sidebar);
+  color: var(--sidebar-fg);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-name { font-weight: 600; font-size: 16px; }
+.badge {
+  background: rgba(255,255,255,.12);
+  color: var(--sidebar-muted);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  color: var(--sidebar-fg);
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.nav a:hover { background: rgba(255,255,255,.06); }
+.nav a.active { background: rgba(255,255,255,.12); font-weight: 500; }
+.nav .count {
+  background: rgba(255,255,255,.12);
+  color: var(--sidebar-muted);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  min-width: 22px;
+  text-align: center;
+}
+.nav a.active .count {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.shift-info {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.kv { display: flex; justify-content: space-between; gap: 8px; }
+.kv .k { color: var(--sidebar-muted); }
+.kv .v { color: var(--sidebar-fg); }
+.footer-note {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--sidebar-muted);
+  line-height: 1.5;
+}
+
+/* ---------- Main ---------- */
+main {
+  padding: 24px 32px;
+  max-width: 1280px;
+  width: 100%;
+}
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 24px 0 12px; }
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+.page-header .subtitle { color: var(--text-muted); font-size: 13px; }
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar input[type="search"], .toolbar select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fafbfc;
+}
+.card-body { padding: 12px 16px; }
+
+/* ---------- Queue ---------- */
+.queue-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 48px 16px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.queue-card { padding: 14px 16px; }
+.queue-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+}
+.queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.queue-meta a { color: var(--accent); text-decoration: none; }
+.queue-meta a:hover { text-decoration: underline; }
+.prompts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.prompt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.prompt .label { display: flex; gap: 8px; align-items: center; }
+.prompt .actions { display: flex; gap: 6px; }
+.prompt-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+}
+.icon-assign { background: #6366f1; }
+.icon-chase { background: #d97706; }
+.icon-escalate { background: #dc2626; }
+.icon-verify { background: #059669; }
+.icon-return { background: #0891b2; }
+.icon-watch { background: #7c3aed; }
+.icon-sla { background: #b91c1c; }
+.icon-handover { background: #2563eb; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover { background: #f3f4f6; }
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.btn-primary:hover { background: #1d4ed8; }
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn-ghost { border-color: transparent; color: var(--text-muted); }
+.btn-link { background: transparent; border: none; color: var(--accent); padding: 0; cursor: pointer; }
+.btn-tiny {
+  padding: 1px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  color: var(--accent);
+  font-family: inherit;
+}
+.btn-tiny:hover { background: #eef2ff; border-color: var(--accent); }
+
+/* ---------- Status pills ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.pill-new { background: #e0e7ff; color: #3730a3; }
+.pill-with_fit { background: #fef3c7; color: #92400e; }
+.pill-with_hq { background: #fee2e2; color: #991b1b; }
+.pill-sanity_check { background: #d1fae5; color: #065f46; }
+.pill-returned_to_requester { background: #cffafe; color: #155e75; }
+.pill-resolved { background: #d1fae5; color: #065f46; }
+.pill-closed { background: #e5e7eb; color: #4b5563; }
+.pill-cancelled { background: #f3f4f6; color: #6b7280; text-decoration: line-through; }
+
+.flag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid var(--border);
+}
+.flag-weekend { background: #ecfeff; color: #155e75; border-color: #a5f3fc; }
+.flag-escalated { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.flag-scheduled_ooc { background: #f3e8ff; color: #6b21a8; border-color: #e9d5ff; }
+
+.priority-high { color: #dc2626; font-weight: 600; }
+.priority-medium { color: #d97706; }
+.priority-low { color: #6b7280; }
+
+/* ---------- Table ---------- */
+table.case-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+  box-shadow: var(--shadow);
+}
+.case-table th, .case-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.case-table th {
+  background: #fafbfc;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.case-table tbody tr:hover { background: #fafbfc; cursor: pointer; }
+.case-table .col-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-muted); }
+.case-table .subject { font-weight: 500; color: var(--text); }
+.case-table a.link-inline { color: var(--accent); text-decoration: none; font-size: 12px; }
+
+/* ---------- Detail ---------- */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 1000px) { .detail-grid { grid-template-columns: 1fr; } }
+.detail-section { margin-bottom: 16px; }
+.detail-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 0 0 8px; }
+.detail-row { display: grid; grid-template-columns: 140px 1fr; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.detail-row:last-child { border-bottom: none; }
+.detail-row .k { color: var(--text-muted); font-size: 13px; }
+.detail-row .v { font-size: 13px; }
+
+.clock-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.clock {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.clock .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.clock .value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+.clock .state { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.clock .state.running { color: var(--good); }
+.clock .state.paused { color: var(--warn); }
+
+.history { font-size: 12px; }
+.history li {
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+}
+.history li:last-child { border-bottom: none; }
+.history .when { color: var(--text-muted); font-family: ui-monospace, monospace; font-size: 11px; }
+
+.handover-note {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.handover-note .meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.handover-stale { background: #fef3c7; border-color: #fde68a; }
+
+/* ---------- Handover screen ---------- */
+.handover-bar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+.handover-bar .progress-text { font-size: 13px; color: var(--text-muted); }
+.handover-bar .progress-text strong { color: var(--text); }
+.handover-list .case-row {
+  display: grid;
+  grid-template-columns: 1fr 220px 120px;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+.handover-list .case-row .meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.handover-list .case-row .note-status { font-size: 12px; }
+.note-status.fresh { color: var(--good); }
+.note-status.stale { color: var(--warn); }
+.note-status.missing { color: var(--danger); font-weight: 500; }
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(17, 24, 39, .4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: white;
+  border-radius: 8px;
+  padding: 20px 24px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,.15);
+}
+.modal h3 { margin: 0 0 4px; font-size: 16px; }
+.modal .modal-sub { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
+.modal label { display: block; font-size: 12px; color: var(--text-muted); margin: 12px 0 4px; }
+.modal select, .modal textarea, .modal input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.modal textarea { min-height: 80px; resize: vertical; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* ---------- Misc ---------- */
+.muted { color: var(--text-muted); }
+.tiny { font-size: 11px; }
+.row-flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tz-hint {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.tz-hint.in-hours { background: #d1fae5; color: #065f46; }
+.tz-hint.out-of-hours { background: #fef3c7; color: #92400e; }
+
+/* ---------- Operator switcher ---------- */
+.op-switcher {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  color: var(--sidebar-fg);
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  max-width: 130px;
+}
+.op-switcher option { color: var(--text); }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.tabs a {
+  padding: 8px 14px;
+  text-decoration: none;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+}
+.tabs a:hover { color: var(--text); }
+.tabs a.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- Archive ---------- */
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.archive-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+}
+.archive-card:hover { border-color: var(--accent); }
+.archive-card .week-label { font-weight: 600; font-size: 14px; }
+.archive-card .week-meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.archive-card .week-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.archive-card .stat .v { font-weight: 600; font-size: 16px; color: var(--text); }
+.archive-card .stat .k { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.archive-card .badge-current {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.summary-bar .stat .v { font-weight: 600; font-size: 18px; }
+.summary-bar .stat .k { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ---------- Shifts ---------- */
+.shift-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+.shift-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+}
+.shift-card:hover { border-color: var(--accent); }
+.shift-card.is-current { border-color: var(--accent); border-width: 2px; padding: 15px; }
+.shift-card .shift-name { font-size: 18px; font-weight: 600; }
+.shift-card .shift-hours { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.shift-card .roster { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.shift-card .roster .op {
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.shift-card .roster .op.is-you { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
+.shift-card .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.shift-card .stats .v { font-weight: 600; font-size: 16px; }
+.shift-card .stats .k { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+
+.section-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.section-block-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.section-block-body { padding: 8px 0; }
+.section-block-body .case-row {
+  display: grid;
+  grid-template-columns: 1fr 220px 120px;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.section-block-body .case-row:last-child { border-bottom: none; }
+.section-block-empty { padding: 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
+
+.activity-list { font-size: 12px; padding: 8px 16px; }
+.activity-list li {
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+}
+.activity-list li:last-child { border-bottom: none; }
+.activity-list .when { color: var(--text-muted); font-family: ui-monospace, monospace; font-size: 11px; }
+
+/* ---------- Tour ---------- */
+.footer-tour-link {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.footer-tour-link a {
+  color: #93c5fd;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+}
+.footer-tour-link a:hover { color: #bfdbfe; text-decoration: underline; }
+
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+.tour-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, .45);
+  pointer-events: auto;
+}
+.tour-tooltip {
+  background: white;
+  border-radius: 10px;
+  padding: 18px 20px 14px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.22), 0 4px 8px rgba(0,0,0,.08);
+  border: 1px solid var(--border);
+  pointer-events: auto;
+  position: fixed;
+  z-index: 202;
+}
+.tour-modal {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 460px;
+}
+.tour-step-counter {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+.tour-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.tour-body {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.tour-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.tour-actions-right { display: flex; gap: 6px; }
+.tour-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tour-btn:hover { background: #f3f4f6; }
+.tour-btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.tour-btn-primary:hover { background: #1d4ed8; }
+.tour-btn-link {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+}
+.tour-btn-link:hover { background: transparent; color: var(--text); }
+
+/* Pulsing highlight on the anchored element */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(37, 99, 235, .45), 0 0 22px rgba(37, 99, 235, .55); }
+  50%      { box-shadow: 0 0 0 4px rgba(37, 99, 235, .65), 0 0 32px rgba(37, 99, 235, .85); }
+}
+.tour-highlight {
+  position: relative;
+  z-index: 201;
+  border-radius: 6px;
+  animation: tour-pulse 1.8s ease-in-out infinite;
+}
+
+/* Tooltip arrow pointing at the anchor */
+.tour-tooltip[data-placement]::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+}
+.tour-tooltip[data-placement="bottom"]::before {
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: white;
+}
+.tour-tooltip[data-placement="top"]::before {
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: white;
+}
+.tour-tooltip[data-placement="right"]::before {
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: white;
+}
+.tour-tooltip[data-placement="left"]::before {
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: white;
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">Case Tracker</div>
+      <span class="badge">prototype</span>
+    </div>
+    <nav class="nav">
+      <a href="#/queue" data-route="queue">
+        <span>Action Queue</span>
+        <span class="count" id="nav-queue-count">—</span>
+      </a>
+      <a href="#/cases" data-route="cases">
+        <span>Cases</span>
+        <span class="count" id="nav-cases-count">—</span>
+      </a>
+      <a href="#/handover" data-route="handover">
+        <span>Shift Handover</span>
+        <span class="count" id="nav-handover-count">—</span>
+      </a>
+      <a href="#/shifts" data-route="shifts">
+        <span>Shifts</span>
+        <span class="count" id="nav-shifts-count">—</span>
+      </a>
+      <a href="#/archive" data-route="archive">
+        <span>Weekly Archive</span>
+        <span class="count" id="nav-archive-count">—</span>
+      </a>
+    </nav>
+    <div class="shift-info">
+      <div class="kv">
+        <span class="k">Operator</span>
+        <select id="op-switcher" class="op-switcher"></select>
+      </div>
+      <div class="kv"><span class="k">Shift</span><span class="v" id="op-shift">—</span></div>
+      <div class="kv"><span class="k">Ends</span><span class="v" id="op-ends">—</span></div>
+      <div class="kv"><span class="k">Week</span><span class="v" id="op-week">—</span></div>
+    </div>
+    <div class="footer-note">
+      Click-through prototype.<br>
+      State resets on reload.
+      <div class="footer-tour-link">
+        <a href="#" id="launch-tour">Take the tour →</a>
+      </div>
+    </div>
+  </aside>
+  <main id="main"><!-- view rendered here --></main>
+</div>
+<div id="modal-root"></div>
+<script>
+// Seed data for the Case Tracker prototype.
+// All timestamps are ISO UTC. The app uses a fixed NOW for stable demos.
+
+window.NOW = new Date('2026-05-08T13:00:00Z');
+
+window.THRESHOLDS = {
+  fitIdleHours: 4,
+  hqIdleHours: 8,
+  approachingSlaHours: 20,
+  shiftEndingSoonMinutes: 60,
+};
+
+window.OPERATORS = [
+  { id: 'op-alex',  name: 'Alex Chen',   shift: 'Day' },
+  { id: 'op-sam',   name: 'Sam Patel',   shift: 'Night' },
+  { id: 'op-jordan',name: 'Jordan Kim',  shift: 'Day' },
+];
+
+window.OWNERS = {
+  fit: [
+    { id: 'fit-apac', name: 'FIT — APAC desk',  region: 'APAC', tz: 'Asia/Tokyo',     office: '09:00–18:00', channel: 'Slack #fit-apac' },
+    { id: 'fit-emea', name: 'FIT — EMEA desk',  region: 'EMEA', tz: 'Europe/Dublin',  office: '08:00–17:00', channel: 'Slack #fit-emea' },
+    { id: 'fit-amer', name: 'FIT — AMER desk',  region: 'AMER', tz: 'America/New_York', office: '08:00–17:00', channel: 'Slack #fit-amer' },
+  ],
+  hq: [
+    { id: 'hq-identity', name: 'HQ Identity Team',  area: 'Identity / SSO', tz: 'America/Los_Angeles', office: '09:00–17:00', channel: 'JIRA queue' },
+    { id: 'hq-data',     name: 'HQ Data Platform',  area: 'Data Platform',  tz: 'America/Los_Angeles', office: '09:00–17:00', channel: 'JIRA queue' },
+    { id: 'hq-mobile',   name: 'HQ Mobile App',     area: 'Mobile',         tz: 'Asia/Singapore',      office: '09:00–18:00', channel: 'JIRA queue' },
+  ],
+};
+
+window.CURRENT_OPERATOR_ID = 'op-alex';
+window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-05-08T12:00:00Z', date: '2026-05-08' };
+window.CURRENT_WEEK = { id: 'W19-2026', label: 'W19 · May 4 – 10, 2026', startsAt: '2026-05-04T00:00:00Z' };
+
+window.WEEKS = [
+  { id: 'W19-2026', label: 'W19 · May 4 – 10, 2026',    startsAt: '2026-05-04T00:00:00Z', endsAt: '2026-05-11T00:00:00Z', isCurrent: true },
+  { id: 'W18-2026', label: 'W18 · Apr 27 – May 3, 2026', startsAt: '2026-04-27T00:00:00Z', endsAt: '2026-05-04T00:00:00Z' },
+  { id: 'W17-2026', label: 'W17 · Apr 20 – Apr 26, 2026', startsAt: '2026-04-20T00:00:00Z', endsAt: '2026-04-27T00:00:00Z' },
+  { id: 'W16-2026', label: 'W16 · Apr 13 – Apr 19, 2026', startsAt: '2026-04-13T00:00:00Z', endsAt: '2026-04-20T00:00:00Z' },
+];
+
+window.SHIFTS = [
+  { name: 'Day',   hoursUtc: '08:00 – 20:00 UTC', operatorIds: ['op-alex', 'op-jordan'] },
+  { name: 'Night', hoursUtc: '20:00 – 08:00 UTC', operatorIds: ['op-sam'] },
+];
+
+// Each case mirrors the Excel columns plus the v1 additions from the URD.
+// status values: new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
+// flags: weekend, escalated, scheduled_ooc
+window.CASES = [
+  {
+    id: 'C-1041',
+    caseLink: 'https://case-center.example/CC-58821',
+    subject: 'APAC users locked out after MFA reset',
+    requester: 'Hana Park',
+    fitId: null,
+    hqId: null,
+    currentOwner: null,
+    status: 'new',
+    flags: ['weekend'],
+    priority: 'high',
+    caseType: 'access',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-08T05:12:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: null,
+    lastOwnerContact: null,
+    handover: null,
+    notes: 'Reported on weekend rotation. ~14 users in Tokyo affected. No workaround yet.',
+    createdAt: '2026-05-08T05:12:00Z',
+    createdBy: 'op-sam',
+    history: [
+      { at: '2026-05-08T05:12:00Z', who: 'op-sam', kind: 'created', detail: 'Imported from case-center; flagged Weekend Case' },
+    ],
+  },
+  {
+    id: 'C-1042',
+    caseLink: 'https://case-center.example/CC-58800',
+    subject: 'Login fails sporadically — APAC region',
+    requester: 'Wei Zhang',
+    fitId: 'fit-apac',
+    hqId: null,
+    currentOwner: 'fit',
+    status: 'with_fit',
+    flags: [],
+    priority: 'medium',
+    caseType: 'access',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-07T22:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: '2026-05-07T22:30:00Z',
+    lastOwnerContact: { at: '2026-05-08T07:30:00Z', channel: 'Slack' },
+    handover: { note: 'Pinged FIT-APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-sam', from: 'Night', to: 'Day', at: '2026-05-08T07:50:00Z' },
+    notes: 'User on macOS Sonoma; password works but session 401s within 60s.',
+    createdAt: '2026-05-07T22:00:00Z',
+    createdBy: 'op-sam',
+    history: [
+      { at: '2026-05-07T22:00:00Z', who: 'op-sam', kind: 'created' },
+      { at: '2026-05-07T22:30:00Z', who: 'op-sam', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+    ],
+  },
+  {
+    id: 'C-1043',
+    caseLink: 'https://case-center.example/CC-58805',
+    subject: 'Bulk export from Reports stalls at 80%',
+    requester: 'Marcus O’Donnell',
+    fitId: 'fit-emea',
+    hqId: null,
+    currentOwner: 'fit',
+    status: 'with_fit',
+    flags: [],
+    priority: 'medium',
+    caseType: 'data',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-07T13:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: '2026-05-07T13:30:00Z',
+    lastOwnerContact: { at: '2026-05-08T11:00:00Z', channel: 'Slack' },
+    handover: { note: 'FIT-EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-jordan', from: 'Day', to: 'Day', at: '2026-05-08T11:30:00Z' },
+    notes: 'FIT confirmed nothing client-side; suspect HQ Data Platform.',
+    fitCannotResolve: true,
+    createdAt: '2026-05-07T13:00:00Z',
+    createdBy: 'op-jordan',
+    history: [
+      { at: '2026-05-07T13:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-05-07T13:30:00Z', who: 'op-jordan', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-05-08T11:00:00Z', who: 'op-jordan', kind: 'note', detail: 'FIT-EMEA: server-side, recommend escalate' },
+    ],
+  },
+  {
+    id: 'C-1044',
+    caseLink: 'https://case-center.example/CC-58750',
+    subject: 'SAML SSO loop after IdP cert rotation',
+    requester: 'Priya Sharma',
+    fitId: 'fit-amer',
+    hqId: 'hq-identity',
+    currentOwner: 'hq',
+    status: 'with_hq',
+    flags: ['escalated'],
+    priority: 'high',
+    caseType: 'access',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-06T17:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 4 * 3600 * 1000, hq: 0 },
+    holdStartedAt: '2026-05-07T01:00:00Z',
+    lastOwnerContact: { at: '2026-05-07T19:00:00Z', channel: 'JIRA' },
+    handover: { note: 'HQ Identity assigned Tue PM PT. No update in ~18h. Re-ping today.', author: 'op-sam', from: 'Night', to: 'Day', at: '2026-05-08T07:55:00Z' },
+    notes: 'Affects entire AMER region. CTO has visibility.',
+    createdAt: '2026-05-06T17:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-06T17:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-06T17:30:00Z', who: 'op-alex', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-05-06T21:00:00Z', who: 'op-alex', kind: 'flag', detail: 'Marked Escalated (watch)' },
+      { at: '2026-05-07T01:00:00Z', who: 'op-alex', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
+    ],
+  },
+  {
+    id: 'C-1045',
+    caseLink: 'https://case-center.example/CC-58702',
+    subject: 'Mobile push notifications missing for iOS 18.4',
+    requester: 'Ana Souza',
+    fitId: 'fit-amer',
+    hqId: 'hq-mobile',
+    currentOwner: 'hq',
+    status: 'sanity_check',
+    flags: [],
+    priority: 'medium',
+    caseType: 'mobile',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-05T15:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 6 * 3600 * 1000, hq: 30 * 3600 * 1000 },
+    holdStartedAt: '2026-05-08T08:00:00Z',
+    lastOwnerContact: { at: '2026-05-08T08:00:00Z', channel: 'JIRA' },
+    handover: { note: 'HQ Mobile pushed fix in 4.12.1. Need to verify with requester before close.', author: 'op-jordan', from: 'Day', to: 'Day', at: '2026-05-08T10:15:00Z' },
+    notes: 'Fix released; awaiting requester confirmation.',
+    createdAt: '2026-05-05T15:00:00Z',
+    createdBy: 'op-jordan',
+    history: [
+      { at: '2026-05-05T15:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-05-05T15:30:00Z', who: 'op-jordan', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-05-06T01:00:00Z', who: 'op-sam', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
+      { at: '2026-05-08T08:00:00Z', who: 'op-jordan', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
+    ],
+  },
+  {
+    id: 'C-1046',
+    caseLink: 'https://case-center.example/CC-58680',
+    subject: 'Unknown error in Reports v3 — needs requester repro',
+    requester: 'Liam Walsh',
+    fitId: 'fit-emea',
+    hqId: null,
+    currentOwner: null,
+    status: 'returned_to_requester',
+    flags: [],
+    priority: 'low',
+    caseType: 'data',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-05T09:00:00Z',
+    slaPaused: true,
+    slaAccumulatedMs: 18 * 3600 * 1000,
+    holdMs: { fit: 6 * 3600 * 1000, hq: 0 },
+    holdStartedAt: null,
+    lastOwnerContact: { at: '2026-05-07T14:00:00Z', channel: 'Email' },
+    handover: { note: 'Returned to requester for steps to reproduce. SLA paused.', author: 'op-alex', from: 'Day', to: 'Night', at: '2026-05-07T19:30:00Z' },
+    notes: 'No repro info; cannot proceed without it.',
+    createdAt: '2026-05-05T09:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-05T09:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-05T09:30:00Z', who: 'op-alex', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-05-07T14:00:00Z', who: 'op-alex', kind: 'returned', detail: 'Returned to requester (need repro)' },
+    ],
+  },
+  {
+    id: 'C-1047',
+    caseLink: 'https://case-center.example/CC-58590',
+    subject: 'Password reset email delayed (resolved last week)',
+    requester: 'Tom Becker',
+    fitId: 'fit-emea',
+    hqId: 'hq-identity',
+    currentOwner: null,
+    status: 'closed',
+    flags: [],
+    priority: 'low',
+    caseType: 'access',
+    weekId: 'W18-2026',
+    slaStartedAt: '2026-04-30T10:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 32 * 3600 * 1000,
+    holdMs: { fit: 5 * 3600 * 1000, hq: 18 * 3600 * 1000 },
+    holdStartedAt: null,
+    lastOwnerContact: { at: '2026-05-02T11:00:00Z', channel: 'JIRA' },
+    handover: null,
+    notes: 'Mailer queue saturation; HQ Identity tuned worker pool. Closed.',
+    closedAt: '2026-05-02T13:00:00Z',
+    resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-30T10:00:00Z',
+    createdBy: 'op-jordan',
+    history: [
+      { at: '2026-04-30T10:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-05-02T13:00:00Z', who: 'op-alex', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+  {
+    id: 'C-1048',
+    caseLink: 'https://case-center.example/CC-58840',
+    subject: 'CFO laptop cannot reach VPN — exec',
+    requester: 'Elena Rossi',
+    fitId: 'fit-emea',
+    hqId: null,
+    currentOwner: 'fit',
+    status: 'with_fit',
+    flags: ['escalated'],
+    priority: 'high',
+    caseType: 'network',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-08T08:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: '2026-05-08T08:30:00Z',
+    lastOwnerContact: { at: '2026-05-08T11:00:00Z', channel: 'Slack' },
+    handover: null,
+    notes: 'Exec visibility — keep close eye even though FIT is responding.',
+    createdAt: '2026-05-08T08:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-08T08:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-08T08:15:00Z', who: 'op-alex', kind: 'flag', detail: 'Marked Escalated (watch)' },
+      { at: '2026-05-08T08:30:00Z', who: 'op-alex', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+    ],
+  },
+  {
+    id: 'C-1049',
+    caseLink: 'https://case-center.example/CC-58680B',
+    subject: 'Slow Salesforce export — running 22h on us',
+    requester: 'Yui Tanaka',
+    fitId: 'fit-apac',
+    hqId: null,
+    currentOwner: 'fit',
+    status: 'with_fit',
+    flags: [],
+    priority: 'medium',
+    caseType: 'data',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-07T15:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: '2026-05-07T15:30:00Z',
+    lastOwnerContact: { at: '2026-05-08T09:00:00Z', channel: 'Slack' },
+    handover: { note: 'FIT looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-jordan', from: 'Day', to: 'Day', at: '2026-05-08T11:45:00Z' },
+    notes: 'Approaching SLA threshold.',
+    createdAt: '2026-05-07T15:00:00Z',
+    createdBy: 'op-jordan',
+    history: [
+      { at: '2026-05-07T15:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-05-07T15:30:00Z', who: 'op-jordan', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+    ],
+  },
+  {
+    id: 'C-1050',
+    caseLink: 'https://case-center.example/CC-58770',
+    subject: 'Dashboard tile data stale — owned by me, no handover yet',
+    requester: 'Kofi Mensah',
+    fitId: 'fit-amer',
+    hqId: 'hq-data',
+    currentOwner: 'hq',
+    status: 'with_hq',
+    flags: [],
+    priority: 'medium',
+    caseType: 'data',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-07T18:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 4 * 3600 * 1000, hq: 0 },
+    holdStartedAt: '2026-05-08T03:00:00Z',
+    lastOwnerContact: { at: '2026-05-08T10:00:00Z', channel: 'JIRA' },
+    handover: { note: 'Last shift\'s note (out of date for current shift).', author: 'op-sam', from: 'Night', to: 'Day', at: '2026-05-08T07:55:00Z', staleForCurrentShift: true },
+    notes: 'No fresh handover written this shift yet.',
+    createdAt: '2026-05-07T18:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-07T18:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-07T18:30:00Z', who: 'op-alex', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-05-08T03:00:00Z', who: 'op-sam', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+    ],
+  },
+  {
+    id: 'C-1051',
+    caseLink: 'https://case-center.example/CC-58620',
+    subject: 'Cancelled — duplicate of CC-58590',
+    requester: 'Tom Becker',
+    fitId: null,
+    hqId: null,
+    currentOwner: null,
+    status: 'cancelled',
+    flags: [],
+    priority: 'low',
+    caseType: 'access',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-06T09:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 1 * 3600 * 1000,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: null,
+    lastOwnerContact: null,
+    handover: null,
+    notes: 'Cancelled — duplicate of CC-58590.',
+    createdAt: '2026-05-06T09:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-06T09:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-06T10:00:00Z', who: 'op-alex', kind: 'cancelled', detail: 'Duplicate' },
+    ],
+  },
+  {
+    id: 'C-1052',
+    caseLink: 'https://case-center.example/CC-58850',
+    subject: 'Slack outage report — APAC weekend rotation',
+    requester: 'Cheng Liu',
+    fitId: null,
+    hqId: null,
+    currentOwner: null,
+    status: 'new',
+    flags: ['weekend'],
+    priority: 'medium',
+    caseType: 'service',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-08T11:30:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: null,
+    lastOwnerContact: null,
+    handover: null,
+    notes: 'Logged via on-call rotation; needs FIT triage.',
+    createdAt: '2026-05-08T11:30:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-08T11:30:00Z', who: 'op-alex', kind: 'created' },
+    ],
+  },
+  {
+    id: 'C-1053',
+    caseLink: 'https://case-center.example/CC-58830',
+    subject: 'EMEA users — Outlook calendar invites duplicated',
+    requester: 'Astrid Berg',
+    fitId: 'fit-emea',
+    hqId: null,
+    currentOwner: 'fit',
+    status: 'with_fit',
+    flags: [],
+    priority: 'low',
+    caseType: 'productivity',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-08T08:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 },
+    holdStartedAt: '2026-05-08T11:30:00Z',
+    lastOwnerContact: { at: '2026-05-08T12:30:00Z', channel: 'Slack' },
+    handover: { note: 'FIT-EMEA on it; expect update by 16:00 UTC.', author: 'op-alex', from: 'Day', to: 'Day', at: '2026-05-08T12:35:00Z' },
+    notes: 'Fresh contact; no prompt expected.',
+    createdAt: '2026-05-08T08:00:00Z',
+    createdBy: 'op-alex',
+    history: [
+      { at: '2026-05-08T08:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-05-08T11:30:00Z', who: 'op-alex', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+    ],
+  },
+  {
+    id: 'C-1054',
+    caseLink: 'https://case-center.example/CC-58712',
+    subject: 'Identity provider intermittent 5xx — exec affected',
+    requester: 'Daniel Field',
+    fitId: 'fit-amer',
+    hqId: 'hq-identity',
+    currentOwner: 'hq',
+    status: 'sanity_check',
+    flags: ['escalated'],
+    priority: 'high',
+    caseType: 'access',
+    weekId: 'W19-2026',
+    slaStartedAt: '2026-05-06T20:00:00Z',
+    slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 3 * 3600 * 1000, hq: 22 * 3600 * 1000 },
+    holdStartedAt: '2026-05-08T11:00:00Z',
+    lastOwnerContact: { at: '2026-05-08T11:00:00Z', channel: 'JIRA' },
+    handover: { note: 'HQ Identity reports retries normalized. Need to verify with exec contact.', author: 'op-alex', from: 'Day', to: 'Day', at: '2026-05-08T12:30:00Z' },
+    notes: 'Watch closely until verified.',
+    createdAt: '2026-05-06T20:00:00Z',
+    createdBy: 'op-sam',
+    history: [
+      { at: '2026-05-06T20:00:00Z', who: 'op-sam', kind: 'created' },
+      { at: '2026-05-06T20:30:00Z', who: 'op-sam', kind: 'flag', detail: 'Marked Escalated (watch)' },
+      { at: '2026-05-06T21:00:00Z', who: 'op-sam', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-05-07T13:00:00Z', who: 'op-alex', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-05-08T11:00:00Z', who: 'op-alex', kind: 'status', detail: 'HQ → Sanity Check' },
+    ],
+  },
+
+  // ---- W18 closed cases ----
+  {
+    id: 'C-1030',
+    caseLink: 'https://case-center.example/CC-58510',
+    subject: 'New laptop missing certificates',
+    requester: 'Sara Mendez',
+    fitId: 'fit-amer', hqId: null, currentOwner: null,
+    status: 'closed', flags: [], priority: 'medium', caseType: 'access',
+    weekId: 'W18-2026',
+    slaStartedAt: '2026-04-28T13:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 6 * 3600 * 1000,
+    holdMs: { fit: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-28T18:00:00Z', channel: 'Slack' },
+    handover: null,
+    notes: 'FIT pushed certs via MDM. Closed.',
+    closedAt: '2026-04-28T19:00:00Z', resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-28T13:00:00Z', createdBy: 'op-alex',
+    history: [
+      { at: '2026-04-28T13:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-04-28T19:00:00Z', who: 'op-alex', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+  {
+    id: 'C-1031',
+    caseLink: 'https://case-center.example/CC-58530',
+    subject: 'Reports v3 dropdowns empty for AMER',
+    requester: 'Diego Romero',
+    fitId: 'fit-amer', hqId: 'hq-data', currentOwner: null,
+    status: 'closed', flags: [], priority: 'medium', caseType: 'data',
+    weekId: 'W18-2026',
+    slaStartedAt: '2026-04-29T15:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 26 * 3600 * 1000,
+    holdMs: { fit: 4 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-30T16:00:00Z', channel: 'JIRA' },
+    handover: null,
+    notes: 'HQ Data fixed query timeout. Closed.',
+    closedAt: '2026-04-30T17:00:00Z', resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-29T15:00:00Z', createdBy: 'op-jordan',
+    history: [
+      { at: '2026-04-29T15:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-04-29T19:00:00Z', who: 'op-jordan', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+      { at: '2026-04-30T17:00:00Z', who: 'op-alex', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+  {
+    id: 'C-1032',
+    caseLink: 'https://case-center.example/CC-58495',
+    subject: 'Duplicate of CC-58400',
+    requester: 'Lin Wei',
+    fitId: null, hqId: null, currentOwner: null,
+    status: 'cancelled', flags: [], priority: 'low', caseType: 'access',
+    weekId: 'W18-2026',
+    slaStartedAt: '2026-04-27T10:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 1 * 3600 * 1000,
+    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: null, handover: null,
+    notes: 'Duplicate.',
+    createdAt: '2026-04-27T10:00:00Z', createdBy: 'op-sam',
+    history: [
+      { at: '2026-04-27T10:00:00Z', who: 'op-sam', kind: 'created' },
+      { at: '2026-04-27T11:00:00Z', who: 'op-sam', kind: 'cancelled', detail: 'Duplicate' },
+    ],
+  },
+  {
+    id: 'C-1033',
+    caseLink: 'https://case-center.example/CC-58555',
+    subject: 'iPad provisioning hung at step 4',
+    requester: 'Mei Tanaka',
+    fitId: 'fit-apac', hqId: null, currentOwner: null,
+    status: 'closed', flags: [], priority: 'low', caseType: 'mobile',
+    weekId: 'W18-2026',
+    slaStartedAt: '2026-04-30T22:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 18 * 3600 * 1000,
+    holdMs: { fit: 12 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-05-01T18:00:00Z', channel: 'Slack' },
+    handover: null,
+    notes: 'Returned to user for reset, then closed.',
+    closedAt: '2026-05-01T20:00:00Z', resolutionCode: 'fixed_with_workaround',
+    createdAt: '2026-04-30T22:00:00Z', createdBy: 'op-sam',
+    history: [
+      { at: '2026-04-30T22:00:00Z', who: 'op-sam', kind: 'created' },
+      { at: '2026-05-01T08:00:00Z', who: 'op-sam', kind: 'returned', detail: 'Returned to requester' },
+      { at: '2026-05-01T20:00:00Z', who: 'op-jordan', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
+    ],
+  },
+
+  // ---- W17 closed cases ----
+  {
+    id: 'C-1015',
+    caseLink: 'https://case-center.example/CC-58300',
+    subject: 'VPN client auth loop on Windows',
+    requester: 'Petra Schmidt',
+    fitId: 'fit-emea', hqId: null, currentOwner: null,
+    status: 'closed', flags: [], priority: 'medium', caseType: 'network',
+    weekId: 'W17-2026',
+    slaStartedAt: '2026-04-21T09:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 9 * 3600 * 1000,
+    holdMs: { fit: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-21T17:00:00Z', channel: 'Slack' },
+    handover: null,
+    notes: 'FIT-EMEA reset client; closed.',
+    closedAt: '2026-04-21T18:00:00Z', resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-21T09:00:00Z', createdBy: 'op-jordan',
+    history: [
+      { at: '2026-04-21T09:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-04-21T18:00:00Z', who: 'op-jordan', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+  {
+    id: 'C-1016',
+    caseLink: 'https://case-center.example/CC-58320',
+    subject: 'Exec laptop disk encryption failed mid-update',
+    requester: 'Keith Walters',
+    fitId: 'fit-amer', hqId: 'hq-identity', currentOwner: null,
+    status: 'closed', flags: ['escalated'], priority: 'high', caseType: 'access',
+    weekId: 'W17-2026',
+    slaStartedAt: '2026-04-22T14:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 22 * 3600 * 1000,
+    holdMs: { fit: 5 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-23T11:00:00Z', channel: 'JIRA' },
+    handover: null,
+    notes: 'HQ Identity team rolled back update; closed with workaround.',
+    closedAt: '2026-04-23T12:00:00Z', resolutionCode: 'fixed_with_workaround',
+    createdAt: '2026-04-22T14:00:00Z', createdBy: 'op-alex',
+    history: [
+      { at: '2026-04-22T14:00:00Z', who: 'op-alex', kind: 'created' },
+      { at: '2026-04-22T14:30:00Z', who: 'op-alex', kind: 'flag', detail: 'Marked Escalated' },
+      { at: '2026-04-22T19:00:00Z', who: 'op-alex', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-04-23T12:00:00Z', who: 'op-alex', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
+    ],
+  },
+  {
+    id: 'C-1017',
+    caseLink: 'https://case-center.example/CC-58360',
+    subject: 'Weekend: APAC mass SSO failures',
+    requester: 'Hiro Sato',
+    fitId: 'fit-apac', hqId: 'hq-identity', currentOwner: null,
+    status: 'closed', flags: ['weekend'], priority: 'high', caseType: 'access',
+    weekId: 'W17-2026',
+    slaStartedAt: '2026-04-25T07:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 14 * 3600 * 1000,
+    holdMs: { fit: 3 * 3600 * 1000, hq: 9 * 3600 * 1000 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-25T20:00:00Z', channel: 'JIRA' },
+    handover: null,
+    notes: 'Identity issued cert refresh; closed Sat night.',
+    closedAt: '2026-04-25T21:00:00Z', resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-25T07:00:00Z', createdBy: 'op-sam',
+    history: [
+      { at: '2026-04-25T07:00:00Z', who: 'op-sam', kind: 'created' },
+      { at: '2026-04-25T21:00:00Z', who: 'op-sam', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+
+  // ---- W16 closed case ----
+  {
+    id: 'C-0998',
+    caseLink: 'https://case-center.example/CC-58100',
+    subject: 'Office printer queue stuck — EMEA',
+    requester: 'Ronan Doyle',
+    fitId: 'fit-emea', hqId: null, currentOwner: null,
+    status: 'closed', flags: [], priority: 'low', caseType: 'productivity',
+    weekId: 'W16-2026',
+    slaStartedAt: '2026-04-15T11:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 4 * 3600 * 1000,
+    holdMs: { fit: 3 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: { at: '2026-04-15T14:00:00Z', channel: 'Slack' },
+    handover: null,
+    notes: 'Restarted print spooler.',
+    closedAt: '2026-04-15T15:00:00Z', resolutionCode: 'fixed_by_owner',
+    createdAt: '2026-04-15T11:00:00Z', createdBy: 'op-jordan',
+    history: [
+      { at: '2026-04-15T11:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-04-15T15:00:00Z', who: 'op-jordan', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  },
+
+  // ---- Carried-over from W18 → W19 (still open) ----
+  {
+    id: 'C-1029',
+    caseLink: 'https://case-center.example/CC-58475',
+    subject: 'Intermittent push notification delays — multi-week',
+    requester: 'Alicia Romero',
+    fitId: 'fit-amer', hqId: null, currentOwner: 'fit',
+    status: 'with_fit', flags: [], priority: 'medium', caseType: 'mobile',
+    weekId: 'W19-2026',
+    carriedFrom: 'W18-2026',
+    slaStartedAt: '2026-04-30T10:00:00Z', slaPaused: false,
+    slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 }, holdStartedAt: '2026-04-30T11:00:00Z',
+    lastOwnerContact: { at: '2026-05-08T09:00:00Z', channel: 'Slack' },
+    handover: { note: 'Carried over from W18. FIT-AMER still investigating; suspect APNs throttling.', author: 'op-alex', from: 'Day', to: 'Day', at: '2026-05-08T11:00:00Z' },
+    notes: 'Reproducible only intermittently; FIT collecting client logs.',
+    createdAt: '2026-04-30T10:00:00Z', createdBy: 'op-jordan',
+    history: [
+      { at: '2026-04-30T10:00:00Z', who: 'op-jordan', kind: 'created' },
+      { at: '2026-04-30T11:00:00Z', who: 'op-jordan', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-05-04T08:00:00Z', who: 'op-alex', kind: 'rolled_over', detail: 'Carried W18 → W19 (manual rollover)' },
+    ],
+  },
+];
+
+
+// Case Tracker prototype — single-file SPA.
+// Renders four views (Action Queue, Cases, Case Detail, Shift Handover)
+// against the seed data in data.js. State is in-memory; reload resets.
+
+const STATE = {
+  cases: window.CASES.map(c => structuredClone(c)),
+  operatorId: window.CURRENT_OPERATOR_ID,
+};
+
+const HOUR = 3600 * 1000;
+const NOW = window.NOW;
+
+/* ---------- Helpers ---------- */
+
+function getOperator(id) { return window.OPERATORS.find(o => o.id === id); }
+function getOwner(type, id) {
+  if (!id) return null;
+  return (type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq).find(o => o.id === id) || null;
+}
+function caseById(id) { return STATE.cases.find(c => c.id === id); }
+
+function caseSlaMs(c) {
+  // Total accumulated SLA time, including the running segment if currently running.
+  let total = c.slaAccumulatedMs || 0;
+  if (!c.slaPaused && !['resolved', 'closed', 'cancelled'].includes(c.status)) {
+    const start = new Date(c.slaStartedAt).getTime();
+    total += Math.max(0, NOW.getTime() - start);
+  }
+  return total;
+}
+function caseHoldMs(c, kind /* 'fit' | 'hq' */) {
+  let total = c.holdMs?.[kind] || 0;
+  if (c.currentOwner === kind && c.holdStartedAt) {
+    total += Math.max(0, NOW.getTime() - new Date(c.holdStartedAt).getTime());
+  }
+  return total;
+}
+
+function fmtDuration(ms) {
+  if (ms == null) return '—';
+  const totalMin = Math.floor(ms / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h < 24) return m ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh ? `${d}d ${rh}h` : `${d}d`;
+}
+function fmtRelative(iso) {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  const diff = NOW.getTime() - then;
+  if (diff < 0) return 'in the future';
+  if (diff < 60_000) return 'just now';
+  return `${fmtDuration(diff)} ago`;
+}
+function fmtAbsolute(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const date = d.toISOString().slice(0, 10);
+  const time = d.toISOString().slice(11, 16);
+  return `${date} ${time}Z`;
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
+function ownerLocalNow(owner) {
+  if (!owner) return null;
+  try {
+    const fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: owner.tz, hour: '2-digit', minute: '2-digit', hour12: false,
+    });
+    return fmt.format(NOW);
+  } catch (e) { return null; }
+}
+function ownerInOfficeHours(owner) {
+  if (!owner || !owner.office) return null;
+  const local = ownerLocalNow(owner);
+  if (!local) return null;
+  const [start, end] = owner.office.split('–').map(s => s.trim());
+  if (!start || !end) return null;
+  return local >= start && local <= end;
+}
+
+function statusLabel(s) {
+  return ({
+    new: 'New',
+    with_fit: 'With Local FIT',
+    with_hq: 'With HQ Product Team',
+    sanity_check: 'Sanity Check',
+    returned_to_requester: 'Returned to Requester',
+    resolved: 'Resolved',
+    closed: 'Closed',
+    cancelled: 'Cancelled',
+  })[s] || s;
+}
+
+/* ---------- Action queue derivation ---------- */
+
+function deriveQueue() {
+  const op = getOperator(STATE.operatorId);
+  const shiftEndsSoon =
+    (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
+    window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
+
+  const items = [];
+  for (const c of STATE.cases) {
+    if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
+
+    const onUsHrs = caseSlaMs(c) / HOUR;
+    const ownerIdleHrs = c.lastOwnerContact
+      ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
+      : Infinity;
+
+    if (c.status === 'new' && !c.fitId) {
+      items.push({ caseId: c.id, kind: 'assign_fit' });
+    }
+    if (c.status === 'with_fit' && c.fitCannotResolve) {
+      items.push({ caseId: c.id, kind: 'escalate_to_hq' });
+    } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
+      items.push({ caseId: c.id, kind: 'chase_fit' });
+    }
+    if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
+      items.push({ caseId: c.id, kind: 'chase_hq' });
+    }
+    if (c.status === 'sanity_check') {
+      items.push({ caseId: c.id, kind: 'verify_fix' });
+    }
+    if (onUsHrs > window.THRESHOLDS.approachingSlaHours && !c.slaPaused) {
+      items.push({ caseId: c.id, kind: 'approaching_sla' });
+    }
+    if (c.flags?.includes('escalated') && !['sanity_check'].includes(c.status)) {
+      items.push({ caseId: c.id, kind: 'watch_escalated' });
+    }
+    if (shiftEndsSoon && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)) {
+      // Surface only for cases the current operator is coordinating (proxy: open & not new-unassigned)
+      if (c.status !== 'new') {
+        items.push({ caseId: c.id, kind: 'end_of_shift_handover' });
+      }
+    }
+  }
+
+  // Group by case for display.
+  const byCase = new Map();
+  for (const it of items) {
+    if (!byCase.has(it.caseId)) byCase.set(it.caseId, []);
+    byCase.get(it.caseId).push(it);
+  }
+
+  // Order: high priority first, then oldest case.
+  const groups = [...byCase.entries()].map(([caseId, prompts]) => {
+    const c = caseById(caseId);
+    return { case: c, prompts };
+  });
+  const pri = { high: 0, medium: 1, low: 2 };
+  groups.sort((a, b) => {
+    const p = pri[a.case.priority] - pri[b.case.priority];
+    if (p !== 0) return p;
+    return new Date(a.case.slaStartedAt) - new Date(b.case.slaStartedAt);
+  });
+  return groups;
+}
+
+const PROMPT_DEFS = {
+  assign_fit:           { label: 'Assign to Local FIT',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
+  chase_fit:            { label: 'Chase Local FIT — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
+  chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  verify_fix:           { label: 'Verify reported fix (Sanity Check)',   icon: 'V', cls: 'icon-verify',   action: 'Verify & close' },
+  approaching_sla:      { label: 'Approaching SLA — consider returning', icon: 'S', cls: 'icon-sla',      action: 'Return to requester' },
+  watch_escalated:      { label: 'Watch escalated case',                 icon: 'W', cls: 'icon-watch',    action: 'Open case' },
+  end_of_shift_handover:{ label: 'End-of-shift handover note required',  icon: 'H', cls: 'icon-handover', action: 'Write handover' },
+};
+
+/* ---------- Router ---------- */
+
+function navigate(hash) {
+  if (location.hash !== hash) location.hash = hash;
+  else render();
+}
+
+function currentRoute() {
+  const h = location.hash || '#/queue';
+  if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
+  if (h.startsWith('#/cases')) return { name: 'cases' };
+  if (h.startsWith('#/handover')) return { name: 'handover' };
+  if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
+  if (h.startsWith('#/archive')) return { name: 'archive' };
+  if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
+  if (h.startsWith('#/shifts')) return { name: 'shifts' };
+  return { name: 'queue' };
+}
+
+window.addEventListener('hashchange', render);
+
+/* ---------- Render dispatch ---------- */
+
+function render() {
+  renderSidebar();
+  const route = currentRoute();
+  const main = document.getElementById('main');
+  document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+  const active = ({
+    queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover',
+    archive: 'archive', archiveWeek: 'archive',
+    shifts: 'shifts', shiftDetail: 'shifts',
+  })[route.name];
+  document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
+
+  if (route.name === 'queue') main.innerHTML = renderQueue();
+  else if (route.name === 'cases') main.innerHTML = renderCaseList();
+  else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
+  else if (route.name === 'handover') main.innerHTML = renderHandover();
+  else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
+  else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
+  else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
+  else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
+  bindHandlers();
+}
+
+function renderSidebar() {
+  const op = getOperator(STATE.operatorId);
+  // Operator switcher
+  const sw = document.getElementById('op-switcher');
+  if (sw && sw.dataset.populated !== '1') {
+    sw.innerHTML = window.OPERATORS
+      .map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
+      .join('');
+    sw.addEventListener('change', () => {
+      STATE.operatorId = sw.value;
+      render();
+    });
+    sw.dataset.populated = '1';
+  }
+  if (sw) sw.value = STATE.operatorId;
+
+  document.getElementById('op-shift').textContent = op.shift;
+  document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
+  document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
+
+  const queueGroups = deriveQueue();
+  const promptCount = queueGroups.reduce((n, g) => n + g.prompts.length, 0);
+  document.getElementById('nav-queue-count').textContent = promptCount;
+  document.getElementById('nav-cases-count').textContent =
+    STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
+  document.getElementById('nav-handover-count').textContent =
+    STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status)
+      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)
+    ).length;
+  const navShifts = document.getElementById('nav-shifts-count');
+  if (navShifts) navShifts.textContent = window.SHIFTS.length;
+  const navArchive = document.getElementById('nav-archive-count');
+  if (navArchive) navArchive.textContent = window.WEEKS.length;
+}
+
+/* ---------- Action Queue view ---------- */
+
+function renderQueue() {
+  const groups = deriveQueue();
+  if (groups.length === 0) {
+    return `
+      <div class="page-header">
+        <div>
+          <h1>Action Queue</h1>
+          <div class="subtitle">Your prioritized to-do list, derived from open cases.</div>
+        </div>
+      </div>
+      <div class="queue-empty">All clear — no action prompts right now.</div>
+    `;
+  }
+  const cards = groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Action Queue</h1>
+        <div class="subtitle">${groups.length} case${groups.length === 1 ? '' : 's'} need attention.</div>
+      </div>
+      <div class="toolbar">
+        <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
+      </div>
+    </div>
+    ${cards}
+  `;
+}
+
+function renderQueueCard(c, prompts) {
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const onUs = fmtDuration(caseSlaMs(c));
+  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+  const ownerLine = owner ? `
+    Owner: <strong>${escapeHtml(owner.name)}</strong>
+    ${renderTzHint(owner)}
+    · last contact ${fmtRelative(c.lastOwnerContact?.at)}
+  ` : `<span class="muted">Unassigned</span>`;
+
+  const promptRows = prompts.map(p => {
+    const def = PROMPT_DEFS[p.kind];
+    return `
+      <div class="prompt">
+        <div class="label">
+          <span class="prompt-icon ${def.cls}">${def.icon}</span>
+          ${escapeHtml(def.label)}
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="${p.kind}">${escapeHtml(def.action)}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="card queue-card">
+      <div class="queue-row">
+        <div>
+          <div class="row-flex">
+            <a href="#/cases/${c.id}" class="mono muted">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+            <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
+            ${flags}
+          </div>
+          <div style="margin-top:6px; font-weight:500; font-size:14px;">${escapeHtml(c.subject)}</div>
+          <div class="queue-meta">
+            ${ownerLine}
+            <span>·</span>
+            <span>On us: <strong>${onUs}</strong></span>
+            <span>·</span>
+            <a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">case-center ↗</a>
+          </div>
+          <div class="prompts">${promptRows}</div>
+        </div>
+        <div>
+          <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTzHint(owner) {
+  if (!owner) return '';
+  const local = ownerLocalNow(owner);
+  const inHours = ownerInOfficeHours(owner);
+  if (!local) return '';
+  const cls = inHours == null ? '' : (inHours ? 'in-hours' : 'out-of-hours');
+  return `<span class="tz-hint ${cls}" title="${escapeHtml(owner.tz)} · office ${escapeHtml(owner.office)}">${escapeHtml(local)} ${escapeHtml(owner.tz.split('/').pop())}</span>`;
+}
+
+/* ---------- Case List view ---------- */
+
+function renderCaseList() {
+  const cases = [...STATE.cases]
+    .filter(c => c.weekId === window.CURRENT_WEEK.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const rows = cases.map(c => {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+    return `
+      <tr data-href="#/cases/${c.id}">
+        <td class="col-id">${c.id}</td>
+        <td>
+          <div class="subject">${escapeHtml(c.subject)}</div>
+          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
+        </td>
+        <td>${escapeHtml(c.requester)}</td>
+        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}</td>
+        <td><span class="priority-${c.priority}">${escapeHtml(c.priority)}</span></td>
+        <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
+        <td class="muted tiny">${fmtRelative(c.createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
+        <div class="subtitle">${cases.length} cases this week. Click a row for full detail.</div>
+      </div>
+      <div class="toolbar">
+        <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
+      </div>
+    </div>
+    <table class="case-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Subject / Case Link</th>
+          <th>Requester</th>
+          <th>Local FIT</th>
+          <th>HQ Product Team</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Process Time</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+/* ---------- Case Detail view ---------- */
+
+function renderCaseDetail(id) {
+  const c = caseById(id);
+  if (!c) {
+    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
+      <a class="btn" href="#/cases">← Back to cases</a>`;
+  }
+  const fit = getOwner('fit', c.fitId);
+  const hq = getOwner('hq', c.hqId);
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+
+  const slaMs = caseSlaMs(c);
+  const fitMs = caseHoldMs(c, 'fit');
+  const hqMs = caseHoldMs(c, 'hq');
+
+  const handoverHtml = c.handover ? `
+    <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
+      ${escapeHtml(c.handover.note)}
+      <div class="meta">
+        ${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)} ·
+        ${escapeHtml(c.handover.author)} · ${fmtAbsolute(c.handover.at)}
+        ${c.handover.staleForCurrentShift ? ' · <strong>stale for current shift</strong>' : ''}
+      </div>
+    </div>
+  ` : `<div class="muted tiny">No handover note.</div>`;
+
+  const history = (c.history || []).slice().reverse().map(h => `
+    <li>
+      <span class="when">${fmtAbsolute(h.at)}</span>
+      <span><strong>${escapeHtml(h.kind)}</strong> by ${escapeHtml(h.who)}${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span>
+    </li>
+  `).join('');
+
+  const actions = renderDetailActions(c);
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/cases">← cases</a>
+          <span class="mono muted">${c.id}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
+          ${flags}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
+        <div class="subtitle"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+      </div>
+      <div class="toolbar">${actions}</div>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <div class="card"><div class="card-body">
+          <div class="detail-section">
+            <h3>Two clocks</h3>
+            <div class="clock-grid">
+              <div class="clock">
+                <div class="label">SLA clock (time on us)</div>
+                <div class="value">${fmtDuration(slaMs)}</div>
+                <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
+              </div>
+              <div class="clock">
+                <div class="label">Owner-hold totals</div>
+                <div class="value mono" style="font-size:13px;">FIT ${fmtDuration(fitMs)} · HQ ${fmtDuration(hqMs)}</div>
+                <div class="state ${c.currentOwner ? 'running' : ''}">${c.currentOwner ? `Active: ${c.currentOwner.toUpperCase()}` : 'No active owner'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h3>Handover (latest)</h3>
+            ${handoverHtml}
+          </div>
+          <div class="detail-section">
+            <h3>Notes</h3>
+            <div>${escapeHtml(c.notes || '—')}</div>
+          </div>
+          <div class="detail-section">
+            <h3>History</h3>
+            <ul class="history">${history || '<li class="muted">No history.</li>'}</ul>
+          </div>
+        </div></div>
+      </div>
+
+      <div>
+        <div class="card"><div class="card-body">
+          <div class="detail-section">
+            <h3>Routing</h3>
+            <div class="detail-row"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
+            <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
+            <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
+          </div>
+          <div class="detail-section">
+            <h3>Filing</h3>
+            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(statusLabel(c.status))}</span></div>
+            <div class="detail-row"><span class="k">Case type</span><span class="v">${escapeHtml(c.caseType)}</span></div>
+            <div class="detail-row"><span class="k">Week</span><span class="v">${escapeHtml(c.weekId)}</span></div>
+            <div class="detail-row"><span class="k">Created</span><span class="v">${fmtAbsolute(c.createdAt)} · ${escapeHtml(c.createdBy)}</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderDetailActions(c) {
+  const buttons = [];
+  if (c.status === 'new' && !c.fitId) {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="assign_fit">Assign to Local FIT</button>`);
+  }
+  if (c.status === 'with_fit') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="escalate_to_hq">Escalate to HQ</button>`);
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder</button>`);
+  }
+  if (c.status === 'with_hq') {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder</button>`);
+    buttons.push(`<button class="btn" data-action="status" data-case-id="${c.id}" data-to="sanity_check">Move to Sanity Check</button>`);
+  }
+  if (c.status === 'sanity_check') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="verify_fix">Verify & close</button>`);
+  }
+  if (c.status === 'returned_to_requester') {
+    buttons.push(`<button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="resume">Requester replied — resume</button>`);
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="close_resolved">Close as resolved</button>`);
+  }
+  if (!['closed', 'cancelled', 'returned_to_requester', 'resolved'].includes(c.status)) {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="approaching_sla">Return to requester</button>`);
+  }
+  if (!['closed', 'cancelled'].includes(c.status)) {
+    buttons.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
+    buttons.push(`<button class="btn btn-danger" data-action="prompt" data-case-id="${c.id}" data-kind="cancel">Cancel</button>`);
+  }
+  return buttons.join(' ');
+}
+
+/* ---------- Shift Handover view ---------- */
+
+function renderHandover() {
+  const op = getOperator(STATE.operatorId);
+  const open = STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status));
+  const fresh = open.filter(c => c.handover && !c.handover.staleForCurrentShift && c.handover.author === op.id);
+  const stale = open.filter(c => c.handover && (c.handover.staleForCurrentShift || c.handover.author !== op.id));
+  const missing = open.filter(c => !c.handover);
+
+  const rows = [...missing, ...stale, ...fresh].map(c => {
+    let status = '<span class="note-status fresh">Note current</span>';
+    if (!c.handover) status = '<span class="note-status missing">No note</span>';
+    else if (c.handover.staleForCurrentShift || c.handover.author !== op.id) {
+      status = `<span class="note-status stale">Stale (${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)})</span>`;
+    }
+    return `
+      <div class="case-row">
+        <div>
+          <div class="row-flex">
+            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          </div>
+          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
+          <div class="meta">On us: ${fmtDuration(caseSlaMs(c))} · last contact ${fmtRelative(c.lastOwnerContact?.at)}</div>
+        </div>
+        <div>${status}</div>
+        <div>
+          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write note</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const blockers = missing.length + stale.length;
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Shift Handover</h1>
+        <div class="subtitle">Manual cutover. Every open case must have a note authored during this shift.</div>
+      </div>
+    </div>
+    <div class="handover-bar">
+      <div class="progress-text">
+        <strong>${fresh.length}</strong> of <strong>${open.length}</strong> open cases have a current ${op.shift}-shift note.
+        ${blockers > 0 ? `<span class="muted"> · ${blockers} pending.</span>` : ''}
+      </div>
+      <div>
+        <button class="btn btn-primary" id="complete-handover" ${blockers > 0 ? 'disabled' : ''}>Complete handover</button>
+      </div>
+    </div>
+    <div class="handover-list">${rows || '<div class="queue-empty">No open cases requiring handover.</div>'}</div>
+  `;
+}
+
+/* ---------- Weekly Archive ---------- */
+
+function weekStats(weekId) {
+  const cases = STATE.cases.filter(c => c.weekId === weekId);
+  const total = cases.length;
+  const open = cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
+  const closed = cases.filter(c => c.status === 'closed').length;
+  const cancelled = cases.filter(c => c.status === 'cancelled').length;
+  const carriedIn = cases.filter(c => c.carriedFrom).length;
+  const bounces = cases.filter(c => (c.history || []).some(h => h.kind === 'returned')).length;
+  const closedCases = cases.filter(c => c.status === 'closed');
+  const medianOnUsHrs = (() => {
+    if (closedCases.length === 0) return null;
+    const v = closedCases.map(c => (c.slaAccumulatedMs || 0) / HOUR).sort((a, b) => a - b);
+    return v[Math.floor(v.length / 2)];
+  })();
+  return { total, open, closed, cancelled, carriedIn, bounces, medianOnUsHrs };
+}
+
+function renderArchiveIndex() {
+  const cards = window.WEEKS.map(w => {
+    const s = weekStats(w.id);
+    const current = w.isCurrent ? '<span class="badge-current">Current</span>' : '';
+    return `
+      <a class="archive-card" href="#/archive/${encodeURIComponent(w.id)}">
+        <div class="week-label">${escapeHtml(w.label)} ${current}</div>
+        <div class="week-meta">${s.total} case${s.total === 1 ? '' : 's'} filed</div>
+        <div class="week-stats">
+          <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
+          <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
+          <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
+          <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
+          <div class="stat"><div class="v">${s.bounces}</div><div class="k">Bounces</div></div>
+          <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us</div></div>
+        </div>
+      </a>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Weekly Archive</h1>
+        <div class="subtitle">Browse past weekly workbooks. Each week is a snapshot — cases that carried over move to the next week's filing.</div>
+      </div>
+    </div>
+    <div class="archive-grid">${cards}</div>
+  `;
+}
+
+function renderArchiveWeek(weekId) {
+  const week = window.WEEKS.find(w => w.id === weekId);
+  if (!week) {
+    return `<div class="page-header"><div><h1>Week not found</h1><div class="subtitle">No such week: ${escapeHtml(weekId)}</div></div></div>
+      <a class="btn" href="#/archive">← Back to archive</a>`;
+  }
+  const s = weekStats(weekId);
+  const cases = STATE.cases
+    .filter(c => c.weekId === weekId)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const rows = cases.length === 0 ? '' : cases.map(c => {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+    const carry = c.carriedFrom ? ` <span class="flag" title="Carried from ${escapeHtml(c.carriedFrom)}">↩ ${escapeHtml(c.carriedFrom)}</span>` : '';
+    return `
+      <tr data-href="#/cases/${c.id}">
+        <td class="col-id">${c.id}</td>
+        <td>
+          <div class="subject">${escapeHtml(c.subject)}</div>
+          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
+        </td>
+        <td>${escapeHtml(c.requester)}</td>
+        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}${carry}</td>
+        <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
+        <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const currentLink = week.isCurrent
+    ? `<a class="btn btn-link" href="#/cases">Open in live Cases view →</a>`
+    : '';
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/archive">← archive</a>
+          <span class="mono muted">${escapeHtml(week.id)}</span>
+          ${week.isCurrent ? '<span class="badge-current">Current</span>' : ''}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(week.label)}</h1>
+        <div class="subtitle">${fmtAbsolute(week.startsAt)} → ${fmtAbsolute(week.endsAt)}</div>
+      </div>
+      <div class="toolbar">${currentLink}</div>
+    </div>
+
+    <div class="summary-bar">
+      <div class="stat"><div class="v">${s.total}</div><div class="k">Total cases</div></div>
+      <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
+      <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
+      <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
+      <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
+      <div class="stat"><div class="v">${s.bounces}</div><div class="k">Returned to requester</div></div>
+      <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us (closed)</div></div>
+    </div>
+
+    ${cases.length === 0 ? '<div class="queue-empty">No cases filed in this week.</div>' : `
+      <table class="case-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Subject / Case Link</th>
+            <th>Requester</th>
+            <th>Local FIT</th>
+            <th>HQ Product Team</th>
+            <th>Status</th>
+            <th>Process Time</th>
+            <th>${week.isCurrent ? 'Created' : 'Closed'}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `}
+  `;
+}
+
+/* ---------- Shifts ---------- */
+
+function shiftStats(shiftName) {
+  const opIds = window.SHIFTS.find(s => s.name === shiftName)?.operatorIds || [];
+  const open = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const handedTo = open.filter(c => c.handover?.to === shiftName);
+  const handedFrom = open.filter(c => c.handover?.from === shiftName);
+  const writtenByShift = open.filter(c => c.handover && opIds.includes(c.handover.author));
+  const missingForShift = open.filter(c => c.status !== 'new' && (!c.handover || c.handover.to !== shiftName));
+  return { handedTo, handedFrom, writtenByShift, missingForShift, opIds };
+}
+
+function renderShiftsIndex() {
+  const cards = window.SHIFTS.map(sh => {
+    const s = shiftStats(sh.name);
+    const ops = sh.operatorIds.map(id => {
+      const o = getOperator(id);
+      const isYou = id === STATE.operatorId;
+      return `<span class="op ${isYou ? 'is-you' : ''}">${escapeHtml(o.name)}${isYou ? ' (you)' : ''}</span>`;
+    }).join('');
+    const isCurrent = sh.name === window.CURRENT_SHIFT.name;
+    return `
+      <a class="shift-card ${isCurrent ? 'is-current' : ''}" href="#/shifts/${encodeURIComponent(sh.name)}">
+        <div class="shift-name">${escapeHtml(sh.name)} shift ${isCurrent ? '<span class="badge-current">On now</span>' : ''}</div>
+        <div class="shift-hours">${escapeHtml(sh.hoursUtc)}</div>
+        <div class="roster">${ops}</div>
+        <div class="stats">
+          <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Handed to</div></div>
+          <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes by shift</div></div>
+          <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Missing for shift</div></div>
+        </div>
+      </a>
+    `;
+  }).join('');
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Shifts</h1>
+        <div class="subtitle">Coverage map for the current week. Click a shift for its handover view and roster.</div>
+      </div>
+    </div>
+    <div class="shift-grid">${cards}</div>
+  `;
+}
+
+function renderShiftDetail(shiftName) {
+  const sh = window.SHIFTS.find(s => s.name === shiftName);
+  if (!sh) {
+    return `<div class="page-header"><div><h1>Shift not found</h1></div></div>
+      <a class="btn" href="#/shifts">← Back to shifts</a>`;
+  }
+  const s = shiftStats(shiftName);
+  const isCurrent = sh.name === window.CURRENT_SHIFT.name;
+  const otherShift = window.SHIFTS.find(o => o.name !== shiftName)?.name || '';
+  const tabs = window.SHIFTS.map(o => `<a href="#/shifts/${encodeURIComponent(o.name)}" class="${o.name === shiftName ? 'active' : ''}">${escapeHtml(o.name)} shift</a>`).join('');
+
+  const renderCaseRow = (c) => {
+    const status = c.handover
+      ? `<span class="note-status ${c.handover.staleForCurrentShift ? 'stale' : 'fresh'}">${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)}${c.handover.staleForCurrentShift ? ' (stale)' : ''}</span>`
+      : '<span class="note-status missing">No note</span>';
+    return `
+      <div class="case-row">
+        <div>
+          <div class="row-flex">
+            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          </div>
+          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
+        </div>
+        <div>${status}</div>
+        <div class="muted tiny">${c.handover ? fmtRelative(c.handover.at) : '—'}</div>
+      </div>
+    `;
+  };
+
+  // Recent handover activity from history across all open cases.
+  const allOpen = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const activity = [];
+  for (const c of allOpen) {
+    for (const h of (c.history || [])) {
+      if (h.kind === 'handover' && sh.operatorIds.includes(h.who)) {
+        activity.push({ at: h.at, who: h.who, caseId: c.id, detail: h.detail });
+      }
+    }
+  }
+  activity.sort((a, b) => new Date(b.at) - new Date(a.at));
+  const activityHtml = activity.slice(0, 10).map(a => `
+    <li>
+      <span class="when">${fmtAbsolute(a.at)}</span>
+      <span><a class="mono" href="#/cases/${a.caseId}">${a.caseId}</a> · <strong>${escapeHtml(getOperator(a.who)?.name || a.who)}</strong> — ${escapeHtml(a.detail || 'wrote handover')}</span>
+    </li>
+  `).join('') || '<li class="muted">No recent handover activity recorded by this shift.</li>';
+
+  const ops = sh.operatorIds.map(id => {
+    const o = getOperator(id);
+    const isYou = id === STATE.operatorId;
+    const switchBtn = isYou ? '' : `<button class="btn btn-link" data-action="switch-op" data-op-id="${id}">View as ${escapeHtml(o.name)}</button>`;
+    return `<div class="kv" style="padding:6px 0;"><span class="v">${escapeHtml(o.name)}${isYou ? ' (you)' : ''}</span><span>${switchBtn}</span></div>`;
+  }).join('');
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link mono" href="#/shifts">← shifts</a>
+          ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(sh.name)} shift</h1>
+        <div class="subtitle">${escapeHtml(sh.hoursUtc)} · handover boundary with ${escapeHtml(otherShift)} shift</div>
+      </div>
+    </div>
+
+    <div class="tabs">${tabs}</div>
+
+    <div class="summary-bar">
+      <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Cases handed to ${escapeHtml(sh.name)}</div></div>
+      <div class="stat"><div class="v">${s.handedFrom.length}</div><div class="k">Cases handed from ${escapeHtml(sh.name)}</div></div>
+      <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes authored by shift</div></div>
+      <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Open cases missing a note for ${escapeHtml(sh.name)}</div></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header"><span>Roster</span></div>
+      <div style="padding: 8px 16px;">${ops}</div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header">
+        <span>Cases handed to ${escapeHtml(sh.name)} shift</span>
+        <span class="muted tiny">${s.handedTo.length} case${s.handedTo.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="section-block-body">
+        ${s.handedTo.length === 0 ? '<div class="section-block-empty">No fresh handover notes addressed to this shift.</div>' : s.handedTo.map(renderCaseRow).join('')}
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header">
+        <span>Open cases missing a note for ${escapeHtml(sh.name)} shift</span>
+        <span class="muted tiny">${s.missingForShift.length} case${s.missingForShift.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="section-block-body">
+        ${s.missingForShift.length === 0 ? '<div class="section-block-empty">All open cases have a current note for this shift.</div>' : s.missingForShift.map(renderCaseRow).join('')}
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-block-header"><span>Recent handover activity by this shift</span></div>
+      <ul class="activity-list">${activityHtml}</ul>
+    </div>
+  `;
+}
+
+/* ---------- Modal ---------- */
+
+function showModal(html, onSubmit) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
+  const close = () => { root.innerHTML = ''; };
+  root.querySelector('[data-modal-cancel]')?.addEventListener('click', close);
+  root.querySelector('[data-modal-submit]')?.addEventListener('click', () => {
+    if (onSubmit(root.querySelector('.modal'))) close();
+  });
+  root.querySelector('.modal-backdrop')?.addEventListener('click', e => {
+    if (e.target.classList.contains('modal-backdrop')) close();
+  });
+}
+
+/* ---------- Action handlers ---------- */
+
+function handlePrompt(caseId, kind) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+
+  if (kind === 'assign_fit') {
+    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
+    showModal(`
+      <h3>Assign to Local FIT</h3>
+      <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
+      <label>FIT desk</label>
+      <select data-field="fitId">${opts}</select>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Assign</button>
+      </div>
+    `, (modal) => {
+      const fitId = modal.querySelector('[data-field="fitId"]').value;
+      c.fitId = fitId;
+      c.currentOwner = 'fit';
+      c.status = 'with_fit';
+      c.holdStartedAt = new Date(NOW).toISOString();
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'assigned', detail: `Local FIT — ${getOwner('fit', fitId).name}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'escalate_to_hq') {
+    const opts = window.OWNERS.hq.map(h => `<option value="${h.id}">${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
+    showModal(`
+      <h3>Escalate to HQ Product Team</h3>
+      <div class="modal-sub">FIT can't resolve. Pick the HQ team that owns this area.</div>
+      <label>HQ team</label>
+      <select data-field="hqId">${opts}</select>
+      <label>Reason (optional)</label>
+      <textarea data-field="reason" placeholder="What did FIT find?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Escalate</button>
+      </div>
+    `, (modal) => {
+      const hqId = modal.querySelector('[data-field="hqId"]').value;
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      // stop FIT clock, start HQ clock
+      if (c.currentOwner === 'fit' && c.holdStartedAt) {
+        c.holdMs.fit += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      c.hqId = hqId;
+      c.currentOwner = 'hq';
+      c.status = 'with_hq';
+      c.holdStartedAt = new Date(NOW).toISOString();
+      c.fitCannotResolve = false;
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'escalated', detail: `FIT → ${getOwner('hq', hqId).name}${reason ? ' · ' + reason : ''}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'chase_fit' || kind === 'chase_hq') {
+    const owner = c.currentOwner === 'fit' ? getOwner('fit', c.fitId) : getOwner('hq', c.hqId);
+    const channel = c.currentOwner === 'fit' ? 'Slack' : 'JIRA';
+    showModal(`
+      <h3>Send reminder to ${escapeHtml(owner?.name || 'owner')}</h3>
+      <div class="modal-sub">Channel: ${escapeHtml(channel)} · ${renderTzHint(owner)}</div>
+      <label>Reminder message</label>
+      <textarea data-field="msg" placeholder="Quick nudge — any update on this?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Send reminder</button>
+      </div>
+    `, (modal) => {
+      const msg = modal.querySelector('[data-field="msg"]').value.trim();
+      c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder', detail: `Reminder via ${channel}${msg ? ': ' + msg : ''}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'verify_fix') {
+    showModal(`
+      <h3>Verify reported fix and close</h3>
+      <div class="modal-sub">Confirm the fix with the requester before closing.</div>
+      <label>Resolution code</label>
+      <select data-field="code">
+        <option value="fixed_by_owner">fixed_by_owner</option>
+        <option value="fixed_with_workaround">fixed_with_workaround</option>
+        <option value="not_a_bug">not_a_bug</option>
+      </select>
+      <label>Resolution note</label>
+      <textarea data-field="note" placeholder="What was the fix? Was it confirmed?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Close case</button>
+      </div>
+    `, (modal) => {
+      const code = modal.querySelector('[data-field="code"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Resolution note is required.'); return false; }
+      // stop active clocks
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'closed';
+      c.closedAt = new Date(NOW).toISOString();
+      c.resolutionCode = code;
+      c.currentOwner = null;
+      c.holdStartedAt = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'approaching_sla') {
+    showModal(`
+      <h3>Return to requester</h3>
+      <div class="modal-sub">This pauses the SLA clock until the requester responds.</div>
+      <label>Reason / what we need from them</label>
+      <textarea data-field="reason" placeholder="Need repro steps / awaiting confirmation / …"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Return to requester</button>
+      </div>
+    `, (modal) => {
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      if (!reason) { alert('A reason is required.'); return false; }
+      // stop owner clock, freeze SLA
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+      }
+      c.slaAccumulatedMs = caseSlaMs(c);
+      c.slaPaused = true;
+      c.currentOwner = null;
+      c.holdStartedAt = null;
+      c.status = 'returned_to_requester';
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'returned', detail: `Returned to requester · ${reason}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'watch_escalated') {
+    navigate(`#/cases/${c.id}`);
+    return;
+  }
+
+  if (kind === 'end_of_shift_handover') {
+    showModal(`
+      <h3>Handover note</h3>
+      <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(op.shift === 'Day' ? 'Night' : 'Day')} · case ${escapeHtml(c.id)}</div>
+      <label>Note for the next shift</label>
+      <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Save note</button>
+      </div>
+    `, (modal) => {
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Handover note is required.'); return false; }
+      const target = op.shift === 'Day' ? 'Night' : 'Day';
+      c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'resume') {
+    const fit = getOwner('fit', c.fitId);
+    const hq = getOwner('hq', c.hqId);
+    const opts = [];
+    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Local FIT)</option>`);
+    if (c.hqId) opts.push(`<option value="hq">Resume with ${escapeHtml(hq.name)} (HQ Product Team)</option>`);
+    opts.push(`<option value="sanity_check">Move to Sanity Check (requester says it's fixed)</option>`);
+    opts.push(`<option value="new">Resume unassigned (status: New)</option>`);
+    showModal(`
+      <h3>Requester replied — resume case</h3>
+      <div class="modal-sub">SLA clock will resume. Pick where to route the case next.</div>
+      <label>Destination</label>
+      <select data-field="dest">${opts.join('')}</select>
+      <label>What did the requester say? (optional)</label>
+      <textarea data-field="note" placeholder="Summary of the reply / what changes…"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Resume</button>
+      </div>
+    `, (modal) => {
+      const dest = modal.querySelector('[data-field="dest"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+
+      // Resume SLA clock: open a new running segment from NOW.
+      c.slaPaused = false;
+      c.slaStartedAt = new Date(NOW).toISOString();
+
+      let detail;
+      if (dest === 'fit') {
+        c.currentOwner = 'fit';
+        c.status = 'with_fit';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
+        detail = `Requester replied · resumed to Local FIT (${getOwner('fit', c.fitId).name})`;
+      } else if (dest === 'hq') {
+        c.currentOwner = 'hq';
+        c.status = 'with_hq';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
+        detail = `Requester replied · resumed to HQ Product Team (${getOwner('hq', c.hqId).name})`;
+      } else if (dest === 'sanity_check') {
+        c.status = 'sanity_check';
+        c.currentOwner = null;
+        c.holdStartedAt = null;
+        detail = `Requester replied · moved to Sanity Check`;
+      } else {
+        c.currentOwner = null;
+        c.status = 'new';
+        c.holdStartedAt = null;
+        c.lastOwnerContact = null;
+        detail = `Requester replied · resumed unassigned`;
+      }
+      if (note) detail += ` · ${note}`;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'resumed', detail });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'close_resolved') {
+    showModal(`
+      <h3>Close case</h3>
+      <div class="modal-sub">Close directly without further owner work (e.g., requester resolved it themselves, no longer needed).</div>
+      <label>Resolution code</label>
+      <select data-field="code">
+        <option value="fixed_by_requester">fixed_by_requester</option>
+        <option value="fixed_by_owner">fixed_by_owner</option>
+        <option value="fixed_with_workaround">fixed_with_workaround</option>
+        <option value="not_a_bug">not_a_bug</option>
+        <option value="no_response">no_response</option>
+      </select>
+      <label>Resolution note</label>
+      <textarea data-field="note" placeholder="What was the outcome?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn btn-primary" data-modal-submit>Close case</button>
+      </div>
+    `, (modal) => {
+      const code = modal.querySelector('[data-field="code"]').value;
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      if (!note) { alert('Resolution note is required.'); return false; }
+
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+        c.holdStartedAt = null;
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'closed';
+      c.closedAt = new Date(NOW).toISOString();
+      c.resolutionCode = code;
+      c.currentOwner = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      render();
+      return true;
+    });
+    return;
+  }
+
+  if (kind === 'cancel') {
+    showModal(`
+      <h3>Cancel case</h3>
+      <div class="modal-sub">Mark this case as cancelled (duplicate, withdrawn, out of scope, etc.). Different from closing — no resolution code.</div>
+      <label>Reason</label>
+      <textarea data-field="reason" placeholder="Why is this being cancelled?"></textarea>
+      <div class="modal-actions">
+        <button class="btn" data-modal-cancel>Keep open</button>
+        <button class="btn btn-danger" data-modal-submit>Confirm cancel</button>
+      </div>
+    `, (modal) => {
+      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      if (!reason) { alert('A reason is required.'); return false; }
+
+      if (c.currentOwner && c.holdStartedAt) {
+        c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
+        c.holdStartedAt = null;
+      }
+      if (!c.slaPaused) {
+        c.slaAccumulatedMs = caseSlaMs(c);
+      }
+      c.status = 'cancelled';
+      c.currentOwner = null;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'cancelled', detail: reason });
+      render();
+      return true;
+    });
+    return;
+  }
+}
+
+function handleStatusChange(caseId, to) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+  if (to === 'sanity_check') {
+    c.status = 'sanity_check';
+    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'status', detail: `→ Sanity Check` });
+    render();
+  }
+}
+
+function handleReassign(caseId, type) {
+  const c = caseById(caseId);
+  if (!c) return;
+  const op = getOperator(STATE.operatorId);
+  const dir = type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq;
+  const currentId = type === 'fit' ? c.fitId : c.hqId;
+  const typeLabel = type === 'fit' ? 'Local FIT' : 'HQ Product Team';
+  const detailLabel = type === 'fit' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
+
+  const opts = [
+    `<option value="">— Unassign —</option>`,
+    ...dir.map(o => `<option value="${o.id}" ${o.id === currentId ? 'selected' : ''}>${detailLabel(o)}</option>`),
+  ].join('');
+
+  showModal(`
+    <h3>${currentId ? 'Change' : 'Assign'} ${escapeHtml(typeLabel)} contact</h3>
+    <div class="modal-sub">${currentId ? 'Pick a different desk or unassign. If this is the active owner, the hold clock segment will reset to the new owner.' : 'Pick a desk for this case.'}</div>
+    <label>${escapeHtml(typeLabel)}</label>
+    <select data-field="ownerId">${opts}</select>
+    <label>Reason (optional)</label>
+    <textarea data-field="reason" placeholder="Why is the assignment changing?"></textarea>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Save</button>
+    </div>
+  `, (modal) => {
+    const newId = modal.querySelector('[data-field="ownerId"]').value || null;
+    const reason = modal.querySelector('[data-field="reason"]').value.trim();
+    if (newId === currentId) return true;
+
+    const oldOwner = currentId ? getOwner(type, currentId) : null;
+    const newOwner = newId ? getOwner(type, newId) : null;
+
+    // Stop the active hold-clock segment if currentOwner === type.
+    if (c.currentOwner === type && c.holdStartedAt) {
+      c.holdMs[type] = (c.holdMs[type] || 0) + (NOW.getTime() - new Date(c.holdStartedAt).getTime());
+      c.holdStartedAt = null;
+    }
+
+    // Update the contact pointer.
+    if (type === 'fit') c.fitId = newId;
+    else c.hqId = newId;
+
+    // Decide currentOwner / status / new clock segment.
+    if (newId) {
+      const wasActive = c.currentOwner === type;
+      const wasNew = c.status === 'new';
+      const wasReturned = c.status === 'returned_to_requester';
+      if (wasActive || wasNew) {
+        c.currentOwner = type;
+        c.status = type === 'fit' ? 'with_fit' : 'with_hq';
+        c.holdStartedAt = new Date(NOW).toISOString();
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'fit' ? 'Slack' : 'JIRA' };
+      } else if (wasReturned) {
+        // Just updating the contact for when SLA resumes; don't restart the clock.
+      }
+      // else: case is with the other owner — just updated the inactive contact, no other changes.
+    } else {
+      // Unassigning.
+      if (c.currentOwner === type) {
+        c.currentOwner = null;
+        c.lastOwnerContact = null;
+        const otherType = type === 'fit' ? 'hq' : 'fit';
+        const otherId = otherType === 'fit' ? c.fitId : c.hqId;
+        if (otherId) {
+          c.currentOwner = otherType;
+          c.status = otherType === 'fit' ? 'with_fit' : 'with_hq';
+          c.holdStartedAt = new Date(NOW).toISOString();
+        } else {
+          c.status = 'new';
+        }
+      }
+    }
+
+    if (type === 'fit') c.fitCannotResolve = false;
+
+    const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${reason ? ' · ' + reason : ''}`;
+    c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: currentId ? 'reassigned' : 'assigned', detail });
+    render();
+    return true;
+  });
+}
+
+function handleCompleteHandover() {
+  alert('Handover marked complete. (Prototype: in a real build this would notify the incoming shift.)');
+}
+
+/* ---------- Bind handlers after render ---------- */
+
+function bindHandlers() {
+  document.querySelectorAll('[data-action="prompt"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handlePrompt(el.dataset.caseId, el.dataset.kind);
+    });
+  });
+  document.querySelectorAll('[data-action="status"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handleStatusChange(el.dataset.caseId, el.dataset.to);
+    });
+  });
+  document.querySelectorAll('[data-action="reassign"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      handleReassign(el.dataset.caseId, el.dataset.type);
+    });
+  });
+  document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => { location.hash = tr.dataset.href; });
+  });
+  document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
+  document.querySelectorAll('[data-action="switch-op"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      STATE.operatorId = el.dataset.opId;
+      render();
+    });
+  });
+  const filter = document.getElementById('case-filter');
+  if (filter) {
+    filter.addEventListener('input', () => {
+      const q = filter.value.toLowerCase();
+      document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+}
+
+/* ---------- Boot ---------- */
+
+if (!location.hash) location.hash = '#/queue';
+render();
+
+
+// Interactive product tour for the Case Tracker prototype.
+// Renders an overlay tooltip anchored to live UI elements, navigating
+// between SPA routes as needed. State is read-only; the tour points at
+// things rather than clicking buttons for the user.
+
+(function () {
+  const STORAGE_KEY = 'case-tracker-tour-seen-v1';
+
+  const STEPS = [
+    {
+      kind: 'modal',
+      title: 'Welcome to the Case Tracker prototype',
+      body: 'A click-through demo of the Excel replacement. This tour walks through the main features in about 10 steps. You can skip anytime, and re-launch later from the "Take the tour" link in the sidebar.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/queue',
+      selector: '#op-switcher',
+      placement: 'right',
+      title: "You're viewing as Alex (Day shift)",
+      body: 'This dropdown switches the active operator. Choose Sam (Night) or Jordan (Day) and the Action Queue, Shift Handover, and shift status will all re-derive from that operator\'s perspective.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/queue',
+      selector: '.queue-card',
+      placement: 'bottom',
+      title: 'Action Queue — your home',
+      body: 'A per-operator to-do list derived from open cases. Each card is a case that needs your attention, sorted by priority and age.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/queue',
+      selector: '.queue-card .prompt',
+      placement: 'right',
+      title: 'Action prompts',
+      body: 'Eight prompt types fire automatically based on case state — assign FIT, chase FIT, escalate to HQ, chase HQ, verify a reported fix, return to requester, watch escalated, end-of-shift handover. Thresholds (FIT idle > 4h, HQ > 8h, approaching SLA > 20h) are configurable.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/queue',
+      selector: '.queue-card .tz-hint',
+      placement: 'bottom',
+      title: 'Owner office hours',
+      body: 'When a prompt involves contacting an owner, you see their current local time and posted office hours. Green = in-hours, amber = out-of-hours. The system never blocks a prompt — you decide whether to act now or defer.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/cases',
+      selector: '.case-table',
+      placement: 'top',
+      title: 'Cases — current week',
+      body: 'The Excel-replacement table view, scoped to this week. Columns mirror the legacy 8-column layout (Subject, Case Link, Process Time, Status, Handover, FIT, HQ, Note) plus the v1 status / flag split. Click any row for the full detail.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/cases/C-1044',
+      selector: '.clock-grid',
+      placement: 'bottom',
+      title: 'Two clocks per case',
+      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by FIT vs HQ — so we can answer "how much time is each owner consuming?" This case escalated FIT → HQ, so both accumulators have value.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/cases/C-1044',
+      selector: '.handover-note',
+      placement: 'top',
+      title: 'Latest handover note',
+      body: 'Each open case carries one current handover note labelled Day → Night (or vice versa). It\'s a structured field, not a comment. Yellow background means it\'s stale for the current shift and needs a fresh write.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/handover',
+      selector: '.handover-bar',
+      placement: 'bottom',
+      title: 'Manual shift cutover',
+      body: 'Before passing the watch, every open case must have a fresh note authored during the current shift. The Complete-handover button stays disabled until that\'s true — enforcing the URD\'s "no handover without a note" rule.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/shifts',
+      selector: '.shift-grid',
+      placement: 'bottom',
+      title: 'Shifts — Day vs Night coverage',
+      body: 'Side-by-side view of both shifts with rosters and handover counts. Click into a shift for its detail page, where a "View as <operator>" button lets you see what the other shift sees without leaving the screen.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/archive',
+      selector: '.archive-grid',
+      placement: 'bottom',
+      title: 'Weekly Archive',
+      body: 'Browse past weekly workbooks (W16 through current W19). Each card shows totals, carry-overs, bounces (returned to requester), and median time-on-us. Click a week for its filtered case table.',
+    },
+    {
+      kind: 'modal',
+      title: 'That\'s the tour',
+      body: 'Re-launch any time from "Take the tour" in the sidebar. State resets on reload, so click around freely. The README at the repo root has a full feature reference, and docs/URD.md is the spec the prototype is built from.',
+    },
+  ];
+
+  let currentStep = 0;
+  let active = false;
+  let lastHighlight = null;
+  let resizeHandler = null;
+
+  function escape(s) {
+    return String(s ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
+  }
+
+  function start() {
+    active = true;
+    currentStep = 0;
+    showStep();
+  }
+
+  function stop(complete) {
+    active = false;
+    cleanup();
+    if (complete) {
+      try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) { /* ignore */ }
+    }
+  }
+
+  function cleanup() {
+    document.querySelector('.tour-overlay')?.remove();
+    if (lastHighlight) {
+      lastHighlight.classList.remove('tour-highlight');
+      lastHighlight = null;
+    }
+    if (resizeHandler) {
+      window.removeEventListener('resize', resizeHandler);
+      resizeHandler = null;
+    }
+  }
+
+  function next() {
+    if (currentStep < STEPS.length - 1) { currentStep++; showStep(); }
+    else stop(true);
+  }
+  function prev() {
+    if (currentStep > 0) { currentStep--; showStep(); }
+  }
+
+  function showStep() {
+    cleanup();
+    const step = STEPS[currentStep];
+    const needsNav = step.route && location.hash !== step.route;
+    if (needsNav) location.hash = step.route;
+    // Defer to let the SPA re-render before we query selectors.
+    setTimeout(() => renderStep(step), needsNav ? 90 : 20);
+  }
+
+  function renderStep(step) {
+    if (!active) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+
+    const counter = `<div class="tour-step-counter">${currentStep + 1} / ${STEPS.length}</div>`;
+    const isLast = currentStep === STEPS.length - 1;
+    const actions = `
+      <div class="tour-actions">
+        ${currentStep > 0
+          ? '<button class="tour-btn" data-tour-action="prev">Back</button>'
+          : '<span></span>'}
+        <div class="tour-actions-right">
+          ${!isLast ? '<button class="tour-btn tour-btn-link" data-tour-action="skip">Skip tour</button>' : ''}
+          <button class="tour-btn tour-btn-primary" data-tour-action="next">${isLast ? 'Finish' : 'Next →'}</button>
+        </div>
+      </div>
+    `;
+
+    if (step.kind === 'modal') {
+      overlay.innerHTML = `
+        <div class="tour-backdrop"></div>
+        <div class="tour-tooltip tour-modal">
+          ${counter}
+          <h3 class="tour-title">${escape(step.title)}</h3>
+          <p class="tour-body">${escape(step.body)}</p>
+          ${actions}
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    } else {
+      const target = document.querySelector(step.selector);
+      if (target) {
+        target.classList.add('tour-highlight');
+        lastHighlight = target;
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      overlay.innerHTML = `
+        <div class="tour-tooltip" data-placement="${step.placement || 'bottom'}">
+          ${counter}
+          <h3 class="tour-title">${escape(step.title)}</h3>
+          <p class="tour-body">${escape(step.body)}</p>
+          ${actions}
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const tooltip = overlay.querySelector('.tour-tooltip');
+      const place = () => {
+        if (target) {
+          positionTooltip(tooltip, target.getBoundingClientRect(), step.placement || 'bottom');
+        } else {
+          tooltip.style.position = 'fixed';
+          tooltip.style.left = '50%';
+          tooltip.style.top = '50%';
+          tooltip.style.transform = 'translate(-50%, -50%)';
+        }
+      };
+      // Two ticks so smooth-scroll has settled.
+      requestAnimationFrame(() => requestAnimationFrame(place));
+      resizeHandler = place;
+      window.addEventListener('resize', resizeHandler);
+      window.addEventListener('scroll', resizeHandler, { passive: true });
+    }
+
+    overlay.querySelectorAll('[data-tour-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.tourAction;
+        if (action === 'next') next();
+        else if (action === 'prev') prev();
+        else if (action === 'skip') stop(false);
+      });
+    });
+    overlay.querySelector('.tour-backdrop')?.addEventListener('click', () => stop(false));
+    document.addEventListener('keydown', keyHandler);
+  }
+
+  function keyHandler(e) {
+    if (!active) return;
+    if (e.key === 'Escape') { stop(false); document.removeEventListener('keydown', keyHandler); }
+    else if (e.key === 'ArrowRight' || e.key === 'Enter') { next(); }
+    else if (e.key === 'ArrowLeft') { prev(); }
+  }
+
+  function positionTooltip(tt, rect, placement) {
+    const margin = 14;
+    const ttRect = tt.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top, left;
+
+    // Auto-flip if not enough space.
+    const space = {
+      top: rect.top,
+      bottom: vh - rect.bottom,
+      left: rect.left,
+      right: vw - rect.right,
+    };
+    let p = placement;
+    if (p === 'bottom' && space.bottom < ttRect.height + margin && space.top > space.bottom) p = 'top';
+    if (p === 'top' && space.top < ttRect.height + margin && space.bottom > space.top) p = 'bottom';
+    if (p === 'right' && space.right < ttRect.width + margin && space.left > space.right) p = 'left';
+    if (p === 'left' && space.left < ttRect.width + margin && space.right > space.left) p = 'right';
+
+    if (p === 'right') {
+      top = rect.top + rect.height / 2 - ttRect.height / 2;
+      left = rect.right + margin;
+    } else if (p === 'left') {
+      top = rect.top + rect.height / 2 - ttRect.height / 2;
+      left = rect.left - ttRect.width - margin;
+    } else if (p === 'top') {
+      top = rect.top - ttRect.height - margin;
+      left = rect.left + rect.width / 2 - ttRect.width / 2;
+    } else {
+      top = rect.bottom + margin;
+      left = rect.left + rect.width / 2 - ttRect.width / 2;
+    }
+
+    top = Math.max(8, Math.min(vh - ttRect.height - 8, top));
+    left = Math.max(8, Math.min(vw - ttRect.width - 8, left));
+
+    tt.style.position = 'fixed';
+    tt.style.top = top + 'px';
+    tt.style.left = left + 'px';
+    tt.style.transform = 'none';
+    tt.dataset.placement = p;
+  }
+
+  // Public API.
+  window.Tour = { start, stop };
+
+  // Auto-start on first visit.
+  function maybeAutoStart() {
+    let seen = false;
+    try { seen = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { /* ignore */ }
+    if (!seen) setTimeout(start, 600);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', maybeAutoStart);
+  } else {
+    maybeAutoStart();
+  }
+
+  // Wire up the "Take the tour" launcher in the sidebar.
+  document.addEventListener('click', e => {
+    const launcher = e.target.closest('#launch-tour');
+    if (launcher) {
+      e.preventDefault();
+      start();
+    }
+  });
+})();
+
+</script>
+</body>
+</html>
