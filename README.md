@@ -143,9 +143,9 @@ The **Operator** row in the sidebar is a dropdown — switch between Alex (Day),
 - **Mocked**: all data (operators, owner directory, cases, history). Persistence — state is in-memory only and resets on reload. Notifications, email, Slack. Authentication. The "Complete handover" button just shows an alert. Process Time is computed locally; v2 will source it from the case-center API.
 - **Real**: the lifecycle rules, action-queue derivation thresholds, FIT-then-HQ flow, two-clock arithmetic, and shift-handover gating logic. These are the design decisions worth reviewing.
 
-## Resetting
+## Persistence and resetting
 
-Reload the page. There's no persistence, so any modals you submitted (assignments, closes, handover notes) revert to the seed.
+Your changes (assignments, status moves, handover notes, operator switches) are saved to the browser's `localStorage` and survive reload. To start fresh, click **Reset to seed** in the sidebar footer — it clears the saved state and restores the original seed data. Storage is scoped per file path / origin, so opening `standalone.html` from a different folder gets its own state.
 
 ## Repo layout
 

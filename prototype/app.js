@@ -9,6 +9,43 @@ const STATE = {
   lastListLabel: 'Action Queue',
 };
 
+const STORAGE_KEY = 'case-tracker-state-v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      v: 1,
+      cases: STATE.cases,
+      operatorId: STATE.operatorId,
+    }));
+  } catch (e) { /* SecurityError on some file:// origins, ignore */ }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (parsed.v !== 1 || !Array.isArray(parsed.cases)) return false;
+    STATE.cases = parsed.cases;
+    if (parsed.operatorId) STATE.operatorId = parsed.operatorId;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function resetState() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  STATE.cases = window.CASES.map(c => structuredClone(c));
+  STATE.operatorId = window.CURRENT_OPERATOR_ID;
+  STATE.lastListRoute = '#/queue';
+  STATE.lastListLabel = 'Action Queue';
+  render();
+}
+
+loadState();
+
 const HOUR = 3600 * 1000;
 const NOW = window.NOW;
 
@@ -243,6 +280,7 @@ function render() {
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   bindHandlers();
+  saveState();
 }
 
 function renderSidebar() {
@@ -1383,6 +1421,16 @@ function bindHandlers() {
     tr.addEventListener('click', () => { location.hash = tr.dataset.href; });
   });
   document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
+  const resetLink = document.getElementById('reset-state');
+  if (resetLink && resetLink.dataset.bound !== '1') {
+    resetLink.addEventListener('click', e => {
+      e.preventDefault();
+      if (confirm('Reset all cases and operator selection to the original seed? This clears every change you have made.')) {
+        resetState();
+      }
+    });
+    resetLink.dataset.bound = '1';
+  }
   document.querySelectorAll('[data-action="switch-op"]').forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();

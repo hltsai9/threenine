@@ -95,7 +95,7 @@
     {
       kind: 'modal',
       title: 'That\'s the tour',
-      body: 'Re-launch any time from "Take the tour" in the sidebar. State resets on reload, so click around freely. The README at the repo root has a full feature reference, and docs/URD.md is the spec the prototype is built from.',
+      body: 'Re-launch any time from "Take the tour" in the sidebar. Your changes persist in the browser (localStorage) — click "Reset to seed" in the sidebar footer to start fresh. The README at the repo root has a full feature reference, and docs/URD.md is the spec the prototype is built from.',
     },
   ];
 

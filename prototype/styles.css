@@ -654,8 +654,12 @@ table.case-table {
   text-decoration: none;
   font-size: 12px;
   font-weight: 500;
+  display: inline-block;
+  margin-right: 12px;
 }
 .footer-tour-link a:hover { color: #bfdbfe; text-decoration: underline; }
+.footer-tour-link a.reset-link { color: #fca5a5; }
+.footer-tour-link a.reset-link:hover { color: #fecaca; }
 
 .tour-overlay {
   position: fixed;
