@@ -31,10 +31,10 @@
     {
       kind: 'pointer',
       route: '#/queue',
-      selector: '.queue-card .prompt',
-      placement: 'right',
-      title: 'Action prompts',
-      body: 'Eight prompt types fire automatically based on case state — assign FIT, chase FIT, escalate to HQ, chase HQ, verify a reported fix, return to requester, watch escalated, end-of-shift handover. Thresholds (FIT idle > 4h, HQ > 8h, approaching SLA > 20h) are configurable.',
+      selector: '.queue-primary-btn',
+      placement: 'left',
+      title: 'One primary action per case',
+      body: 'Five prompt types fire as per-case actions: assign FIT, chase FIT, escalate to HQ, chase HQ, verify a reported fix. Each card surfaces exactly one — the most urgent next step. Cross-cutting concerns (approaching SLA, escalated watch, end-of-shift handover) live in the banner and watchlists rather than cluttering cards.',
     },
     {
       kind: 'pointer',

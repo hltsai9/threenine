@@ -141,16 +141,13 @@ function statusLabel(s) {
 /* ---------- Action queue derivation ---------- */
 
 function deriveQueue() {
-  const op = getOperator(STATE.operatorId);
-  const shiftEndsSoon =
-    (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
-    window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
-
+  // Per-case actionable prompts. Cross-cutting concerns (approaching SLA,
+  // escalated-watch, end-of-shift handover) are surfaced via separate
+  // banners/watchlists in renderQueue(), not as per-card prompts.
   const items = [];
   for (const c of STATE.cases) {
     if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
 
-    const onUsHrs = caseSlaMs(c) / HOUR;
     const ownerIdleHrs = c.lastOwnerContact
       ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
       : Infinity;
@@ -168,18 +165,6 @@ function deriveQueue() {
     }
     if (c.status === 'sanity_check') {
       items.push({ caseId: c.id, kind: 'verify_fix' });
-    }
-    if (onUsHrs > window.THRESHOLDS.approachingSlaHours && !c.slaPaused) {
-      items.push({ caseId: c.id, kind: 'approaching_sla' });
-    }
-    if (c.flags?.includes('escalated') && !['sanity_check'].includes(c.status)) {
-      items.push({ caseId: c.id, kind: 'watch_escalated' });
-    }
-    if (shiftEndsSoon && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)) {
-      // Surface only for cases the current operator is coordinating (proxy: open & not new-unassigned)
-      if (c.status !== 'new') {
-        items.push({ caseId: c.id, kind: 'end_of_shift_handover' });
-      }
     }
   }
 
@@ -322,30 +307,99 @@ function renderSidebar() {
 
 function renderQueue() {
   const groups = deriveQueue();
-  if (groups.length === 0) {
-    return `
-      <div class="page-header">
-        <div>
-          <h1>Action Queue</h1>
-          <div class="subtitle">Your prioritized to-do list, derived from open cases.</div>
-        </div>
+  const sla = approachingSlaCases();
+  const escalated = escalatedCases();
+  const handoverPending = handoverPendingCases();
+
+  const banner = handoverPending.length > 0 ? `
+    <div class="queue-banner">
+      <div>
+        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} need a handover note for ${escapeHtml(getOperator(STATE.operatorId).shift)} shift before cutover.
       </div>
-      <div class="queue-empty">All clear — no action prompts right now.</div>
-    `;
-  }
-  const cards = groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
+      <a href="#/handover" class="btn btn-primary">Open Shift Handover →</a>
+    </div>
+  ` : '';
+
+  const cards = groups.length === 0
+    ? '<div class="queue-empty">No immediate per-case actions. Watchlists below show cases to monitor.</div>'
+    : groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
+
+  const watchlist = renderWatchlists(sla, escalated);
+
+  const subtitleParts = [];
+  if (groups.length > 0) subtitleParts.push(`${groups.length} action${groups.length === 1 ? '' : 's'} to take`);
+  if (sla.length > 0) subtitleParts.push(`${sla.length} approaching SLA`);
+  if (escalated.length > 0) subtitleParts.push(`${escalated.length} escalated`);
+
   return `
     <div class="page-header">
       <div>
         <h1>Action Queue</h1>
-        <div class="subtitle">${groups.length} case${groups.length === 1 ? '' : 's'} need attention.</div>
+        <div class="subtitle">${subtitleParts.join(' · ') || 'All clear.'}</div>
       </div>
       <div class="toolbar">
         <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
       </div>
     </div>
+    ${banner}
     ${cards}
+    ${watchlist}
   `;
+}
+
+function approachingSlaCases() {
+  return STATE.cases.filter(c => {
+    if (['closed', 'cancelled', 'resolved'].includes(c.status)) return false;
+    if (c.slaPaused) return false;
+    return caseSlaMs(c) / HOUR > window.THRESHOLDS.approachingSlaHours;
+  }).sort((a, b) => caseSlaMs(b) - caseSlaMs(a));
+}
+
+function escalatedCases() {
+  return STATE.cases.filter(c => {
+    if (['closed', 'cancelled', 'resolved'].includes(c.status)) return false;
+    return c.flags?.includes('escalated');
+  });
+}
+
+function handoverPendingCases() {
+  const op = getOperator(STATE.operatorId);
+  const shiftEndsSoon =
+    (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
+    window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
+  if (!shiftEndsSoon) return [];
+  return STATE.cases.filter(c => {
+    if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
+    return !c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift;
+  });
+}
+
+function renderWatchlists(sla, escalated) {
+  if (sla.length === 0 && escalated.length === 0) return '';
+  const row = c => {
+    const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+    return `
+      <a class="watch-row" href="#/cases/${c.id}">
+        <span class="mono muted">${c.id}</span>
+        <span class="watch-subject">${escapeHtml(c.subject)}</span>
+        <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+        <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
+      </a>
+    `;
+  };
+  const slaSection = sla.length > 0 ? `
+    <div class="watchlist-section">
+      <div class="watchlist-header">Approaching SLA <span class="muted">(${sla.length})</span></div>
+      ${sla.map(row).join('')}
+    </div>
+  ` : '';
+  const escSection = escalated.length > 0 ? `
+    <div class="watchlist-section">
+      <div class="watchlist-header">Escalated — keep an eye <span class="muted">(${escalated.length})</span></div>
+      ${escalated.map(row).join('')}
+    </div>
+  ` : '';
+  return `<div class="watchlist">${slaSection}${escSection}</div>`;
 }
 
 function renderQueueCard(c, prompts) {
@@ -358,20 +412,9 @@ function renderQueueCard(c, prompts) {
     · last contact ${fmtRelative(c.lastOwnerContact?.at)}
   ` : `<span class="muted">Unassigned</span>`;
 
-  const promptRows = prompts.map(p => {
-    const def = PROMPT_DEFS[p.kind];
-    return `
-      <div class="prompt">
-        <div class="label">
-          <span class="prompt-icon ${def.cls}">${def.icon}</span>
-          ${escapeHtml(def.label)}
-        </div>
-        <div class="actions">
-          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="${p.kind}">${escapeHtml(def.action)}</button>
-        </div>
-      </div>
-    `;
-  }).join('');
+  // After filtering, each case has exactly one primary prompt.
+  const primary = prompts[0];
+  const def = PROMPT_DEFS[primary.kind];
 
   return `
     <div class="card queue-card">
@@ -383,7 +426,7 @@ function renderQueueCard(c, prompts) {
             <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
             ${flags}
           </div>
-          <div style="margin-top:6px; font-weight:500; font-size:14px;">${escapeHtml(c.subject)}</div>
+          <div class="queue-subject">${escapeHtml(c.subject)}</div>
           <div class="queue-meta">
             ${ownerLine}
             <span>·</span>
@@ -391,9 +434,12 @@ function renderQueueCard(c, prompts) {
             <span>·</span>
             <a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">case-center ↗</a>
           </div>
-          <div class="prompts">${promptRows}</div>
         </div>
-        <div>
+        <div class="queue-action">
+          <button class="btn btn-primary queue-primary-btn" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}">
+            <span class="prompt-icon ${def.cls}">${def.icon}</span>
+            ${escapeHtml(def.label)}
+          </button>
           <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
         </div>
       </div>
