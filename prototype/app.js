@@ -577,18 +577,7 @@ function renderCaseDetail(id) {
 function renderDetailActions(c) {
   const items = [];
 
-  // Non-status actions stay as buttons.
-  if (c.status === 'with_fit') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to FIT</button>`);
-  }
-  if (c.status === 'with_hq') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
-  }
-  if (!['closed', 'cancelled'].includes(c.status)) {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
-  }
-
-  // Status transitions consolidated into a dropdown.
+  // Status transitions consolidated into a dropdown — primary CTA, listed first.
   const transitions = statusTransitions(c);
   if (transitions.length > 0) {
     const opts = transitions.map(t =>
@@ -600,6 +589,17 @@ function renderDetailActions(c) {
         ${opts}
       </select>
     `);
+  }
+
+  // Non-status actions stay as buttons.
+  if (c.status === 'with_fit') {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to FIT</button>`);
+  }
+  if (c.status === 'with_hq') {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
+  }
+  if (!['closed', 'cancelled'].includes(c.status)) {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
   }
 
   return items.join(' ');

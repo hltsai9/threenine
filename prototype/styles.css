@@ -178,19 +178,19 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
 }
 .queue-meta a { color: var(--accent); text-decoration: none; }
 .queue-meta a:hover { text-decoration: underline; }
-.prompts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .prompt {
-  display: flex;
-  justify-content: space-between;
+  display: inline-flex;
   align-items: center;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 6px 10px;
   background: #f9fafb;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
 }
-.prompt .label { display: flex; gap: 8px; align-items: center; }
-.prompt .actions { display: flex; gap: 6px; }
+.prompt .label { display: inline-flex; gap: 6px; align-items: center; }
+.prompt .actions { display: inline-flex; gap: 6px; }
 .prompt-icon {
   width: 18px;
   height: 18px;
