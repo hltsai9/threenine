@@ -1504,6 +1504,8 @@ window.CASES = [
 const STATE = {
   cases: window.CASES.map(c => structuredClone(c)),
   operatorId: window.CURRENT_OPERATOR_ID,
+  lastListRoute: '#/queue',
+  lastListLabel: 'Action Queue',
 };
 
 const HOUR = 3600 * 1000;
@@ -1698,9 +1700,30 @@ window.addEventListener('hashchange', render);
 
 /* ---------- Render dispatch ---------- */
 
+function labelForRoute(route) {
+  switch (route.name) {
+    case 'queue': return 'Action Queue';
+    case 'cases': return 'Cases';
+    case 'handover': return 'Shift Handover';
+    case 'shifts': return 'Shifts';
+    case 'shiftDetail': return `${route.shift} shift`;
+    case 'archive': return 'Weekly Archive';
+    case 'archiveWeek': {
+      const w = window.WEEKS.find(w => w.id === route.id);
+      return w ? w.label : 'Archive';
+    }
+    default: return 'Back';
+  }
+}
+
 function render() {
   renderSidebar();
   const route = currentRoute();
+  // Remember the last list-style view so the case detail can offer a contextual back link.
+  if (route.name !== 'detail') {
+    STATE.lastListRoute = location.hash || '#/queue';
+    STATE.lastListLabel = labelForRoute(route);
+  }
   const main = document.getElementById('main');
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const active = ({
@@ -1910,7 +1933,7 @@ function renderCaseDetail(id) {
   const c = caseById(id);
   if (!c) {
     return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
-      <a class="btn" href="#/cases">← Back to cases</a>`;
+      <a class="btn" href="${escapeHtml(STATE.lastListRoute)}">← Back to ${escapeHtml(STATE.lastListLabel)}</a>`;
   }
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
@@ -1944,7 +1967,7 @@ function renderCaseDetail(id) {
     <div class="page-header">
       <div>
         <div class="row-flex">
-          <a class="btn-link mono" href="#/cases">← cases</a>
+          <a class="btn-link" href="${escapeHtml(STATE.lastListRoute)}">← ${escapeHtml(STATE.lastListLabel)}</a>
           <span class="mono muted">${c.id}</span>
           <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
