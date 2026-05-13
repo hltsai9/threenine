@@ -86,6 +86,27 @@ function fmtDuration(ms) {
   const rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
 }
+// Reminders use real wall-clock time (vs. frozen NOW used for case state).
+function realNow() { return new Date(); }
+function fmtUntil(iso) {
+  const diff = new Date(iso).getTime() - realNow().getTime();
+  if (diff <= 0) return 'due now';
+  const min = Math.round(diff / 60000);
+  if (min < 1) return 'in <1m';
+  if (min < 60) return `in ${min}m`;
+  const hr = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `in ${hr}h ${m}m` : `in ${hr}h`;
+}
+function fmtOverdue(iso) {
+  const diff = realNow().getTime() - new Date(iso).getTime();
+  if (diff < 60000) return 'just now';
+  const min = Math.round(diff / 60000);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ago`;
+}
+
 function fmtRelative(iso) {
   if (!iso) return '—';
   const then = new Date(iso).getTime();
@@ -310,6 +331,36 @@ function renderQueue() {
   const sla = approachingSlaCases();
   const escalated = escalatedCases();
   const handoverPending = handoverPendingCases();
+  const dueReminders = STATE.cases.filter(c =>
+    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
+  );
+  const pendingReminders = STATE.cases.filter(c =>
+    c.reminder && !c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
+  );
+
+  const remindersSection = dueReminders.length > 0 ? `
+    <div class="reminders-due">
+      <div class="reminders-due-header">${BELL_SVG} Reminders due <span class="muted">(${dueReminders.length})</span></div>
+      ${dueReminders.map(c => `
+        <div class="reminder-row">
+          <div>
+            <div class="row-flex">
+              <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+              <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+              <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
+            </div>
+            <div class="reminder-subject">${escapeHtml(c.subject)}</div>
+            ${c.reminder.note ? `<div class="reminder-note">"${escapeHtml(c.reminder.note)}"</div>` : ''}
+          </div>
+          <div class="reminder-actions">
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="snooze_reminder">Snooze 5m</button>
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="dismiss_reminder">Dismiss</button>
+            <a class="btn btn-primary" href="#/cases/${c.id}">Open case →</a>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
 
   const banner = handoverPending.length > 0 ? `
     <div class="queue-banner">
@@ -327,7 +378,9 @@ function renderQueue() {
   const watchlist = renderWatchlists(sla, escalated);
 
   const subtitleParts = [];
+  if (dueReminders.length > 0) subtitleParts.push(`${dueReminders.length} reminder${dueReminders.length === 1 ? '' : 's'} due`);
   if (groups.length > 0) subtitleParts.push(`${groups.length} action${groups.length === 1 ? '' : 's'} to take`);
+  if (pendingReminders.length > 0) subtitleParts.push(`${pendingReminders.length} reminder${pendingReminders.length === 1 ? '' : 's'} scheduled`);
   if (sla.length > 0) subtitleParts.push(`${sla.length} approaching SLA`);
   if (escalated.length > 0) subtitleParts.push(`${escalated.length} escalated`);
 
@@ -341,10 +394,31 @@ function renderQueue() {
         <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
       </div>
     </div>
+    ${remindersSection}
     ${banner}
     ${cards}
     ${watchlist}
   `;
+}
+
+const BELL_SVG = `<svg class="bell-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
+
+function renderBellButton(c, ctx) {
+  if (['closed', 'cancelled'].includes(c.status)) return '';
+  const r = c.reminder;
+  let cls = 'btn bell-btn';
+  let label = 'Remind me';
+  let title = 'Set a reminder for this case';
+  if (r && !r.fired) {
+    cls += ' bell-set';
+    label = fmtUntil(r.fireAt);
+    title = `Reminder ${fmtUntil(r.fireAt)}${r.note ? ' · ' + r.note : ''}`;
+  } else if (r && r.fired) {
+    cls += ' bell-due';
+    label = 'Reminder due';
+    title = `Due ${fmtOverdue(r.fireAt)}${r.note ? ' · ' + r.note : ''}`;
+  }
+  return `<button class="${cls}" data-action="prompt" data-case-id="${c.id}" data-kind="set_reminder" title="${escapeHtml(title)}">${BELL_SVG} <span>${escapeHtml(label)}</span></button>`;
 }
 
 function approachingSlaCases() {
@@ -440,6 +514,7 @@ function renderQueueCard(c, prompts) {
             <span class="prompt-icon ${def.cls}">${def.icon}</span>
             ${escapeHtml(def.label)}
           </button>
+          ${renderBellButton(c, 'queue')}
           <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
         </div>
       </div>
@@ -647,6 +722,8 @@ function renderDetailActions(c) {
   if (!['closed', 'cancelled'].includes(c.status)) {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
   }
+
+  items.push(renderBellButton(c, 'detail'));
 
   return items.join(' ');
 }
@@ -1383,6 +1460,86 @@ function handlePrompt(caseId, kind) {
     });
     return;
   }
+
+  if (kind === 'set_reminder') {
+    const existing = c.reminder;
+    const presets = [
+      { value: '1',    label: 'In 1 minute' },
+      { value: '5',    label: 'In 5 minutes' },
+      { value: '30',   label: 'In 30 minutes' },
+      { value: '60',   label: 'In 1 hour' },
+      { value: '240',  label: 'In 4 hours' },
+      { value: '1440', label: 'In 24 hours' },
+    ];
+    showModal(`
+      <h3>${existing ? 'Update' : 'Set'} reminder on ${escapeHtml(c.id)}</h3>
+      <div class="modal-sub">${existing
+        ? 'Reminder is currently set for ' + fmtUntil(existing.fireAt) + '.'
+        : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC FIT come online before assigning).'}</div>
+      <label>Remind me</label>
+      <select data-field="when">${presets.map(p => `<option value="${p.value}">${escapeHtml(p.label)}</option>`).join('')}</select>
+      <label>Note (optional)</label>
+      <textarea data-field="note" placeholder="Why are you deferring this?">${escapeHtml(existing?.note || '')}</textarea>
+      <div class="modal-actions">
+        ${existing ? '<button class="btn btn-danger" data-action="reminder-clear" data-case-id="' + escapeHtml(c.id) + '">Clear reminder</button>' : '<span></span>'}
+        <div style="display:flex; gap:8px;">
+          <button class="btn" data-modal-cancel>Cancel</button>
+          <button class="btn btn-primary" data-modal-submit>Save</button>
+        </div>
+      </div>
+    `, (modal) => {
+      const minutes = parseInt(modal.querySelector('[data-field="when"]').value, 10);
+      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const fireAt = new Date(realNow().getTime() + minutes * 60000).toISOString();
+      c.reminder = {
+        fireAt,
+        note,
+        setBy: op.id,
+        setAt: realNow().toISOString(),
+        fired: false,
+      };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder_set', detail: `Reminder ${fmtUntil(fireAt)}${note ? ' · ' + note : ''}` });
+      showToast(`Reminder set for ${c.id} ${fmtUntil(fireAt)}.`, 'success');
+      render();
+      return true;
+    });
+    // Wire up the in-modal Clear button (not a normal submit).
+    const clearBtn = document.querySelector('.modal [data-action="reminder-clear"]');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', e => {
+        e.preventDefault();
+        if (c.reminder) {
+          c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder_dismissed', detail: 'Cleared via modal' });
+          c.reminder = null;
+          showToast(`Reminder cleared for ${c.id}.`, 'info');
+          document.getElementById('modal-root').innerHTML = '';
+          render();
+        }
+      });
+    }
+    return;
+  }
+
+  if (kind === 'dismiss_reminder') {
+    if (c.reminder) {
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder_dismissed', detail: c.reminder.note || 'Dismissed' });
+      c.reminder = null;
+      showToast(`Reminder dismissed for ${c.id}.`, 'info');
+      render();
+    }
+    return;
+  }
+
+  if (kind === 'snooze_reminder') {
+    if (c.reminder) {
+      const fireAt = new Date(realNow().getTime() + 5 * 60000).toISOString();
+      c.reminder = { ...c.reminder, fireAt, fired: false };
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder_snoozed', detail: 'Snoozed 5m' });
+      showToast(`${c.id} reminder snoozed 5 minutes.`, 'info');
+      render();
+    }
+    return;
+  }
 }
 
 function handleReassign(caseId, type) {
@@ -1526,6 +1683,26 @@ function bindHandlers() {
     });
   }
 }
+
+/* ---------- Reminders polling ---------- */
+
+function checkReminders() {
+  const now = realNow().getTime();
+  let firedAny = false;
+  for (const c of STATE.cases) {
+    if (!c.reminder || c.reminder.fired) continue;
+    if (['closed', 'cancelled'].includes(c.status)) continue;
+    if (new Date(c.reminder.fireAt).getTime() <= now) {
+      c.reminder.fired = true;
+      firedAny = true;
+      showToast(`Reminder due: ${c.id} — ${c.subject}${c.reminder.note ? ' · ' + c.reminder.note : ''}`, 'warn');
+    }
+  }
+  if (firedAny) render();
+}
+
+setInterval(checkReminders, 10000);
+setTimeout(checkReminders, 200);
 
 /* ---------- Boot ---------- */
 

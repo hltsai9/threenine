@@ -712,6 +712,75 @@ table.case-table {
 .activity-list li:last-child { border-bottom: none; }
 .activity-list .when { color: var(--text-muted); font-family: ui-monospace, monospace; font-size: 11px; }
 
+/* ---------- Reminders / bell ---------- */
+.bell-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text-muted);
+}
+.bell-btn:hover { background: #f3f4f6; color: var(--text); }
+.bell-btn.bell-set {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
+.bell-btn.bell-set:hover { background: #e0e7ff; }
+.bell-btn.bell-due {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+  animation: bell-pulse 1.4s ease-in-out infinite;
+}
+.bell-btn .bell-svg { flex-shrink: 0; }
+@keyframes bell-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .4); }
+  50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+
+.reminders-due {
+  background: var(--panel);
+  border: 1px solid #fca5a5;
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.reminders-due-header {
+  padding: 10px 16px;
+  background: #fef2f2;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #fecaca;
+}
+.reminders-due-header .muted { color: var(--danger); opacity: .7; font-weight: 400; text-transform: none; }
+.reminder-row {
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.reminder-row:last-child { border-bottom: none; }
+.reminder-subject { font-weight: 500; margin-top: 4px; font-size: 14px; }
+.reminder-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.reminder-actions { display: flex; gap: 6px; align-items: center; }
+
 /* ---------- Toasts ---------- */
 #toast-root {
   position: fixed;
