@@ -1019,6 +1019,25 @@ function renderShiftDetail(shiftName) {
 
 /* ---------- Modal ---------- */
 
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toast-root');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-root';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span class="toast-msg">${escapeHtml(message)}</span><button class="toast-close" aria-label="dismiss">×</button>`;
+  const dismiss = () => {
+    toast.classList.add('toast-leaving');
+    setTimeout(() => toast.remove(), 200);
+  };
+  toast.querySelector('.toast-close').addEventListener('click', dismiss);
+  container.appendChild(toast);
+  setTimeout(dismiss, 5000);
+}
+
 function showModal(html, onSubmit) {
   const root = document.getElementById('modal-root');
   root.innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
@@ -1057,7 +1076,9 @@ function handlePrompt(caseId, kind) {
       c.status = 'with_fit';
       c.holdStartedAt = new Date(NOW).toISOString();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'assigned', detail: `Local FIT — ${getOwner('fit', fitId).name}` });
+      const fitName = getOwner('fit', fitId).name;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'assigned', detail: `Local FIT — ${fitName}` });
+      showToast(`${c.id} assigned to ${fitName}. Status is now With Local FIT.`, 'success');
       render();
       return true;
     });
@@ -1090,7 +1111,9 @@ function handlePrompt(caseId, kind) {
       c.holdStartedAt = new Date(NOW).toISOString();
       c.fitCannotResolve = false;
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
-      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'escalated', detail: `FIT → ${getOwner('hq', hqId).name}${reason ? ' · ' + reason : ''}` });
+      const hqName = getOwner('hq', hqId).name;
+      c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'escalated', detail: `FIT → ${hqName}${reason ? ' · ' + reason : ''}` });
+      showToast(`${c.id} escalated to ${hqName}. FIT clock stopped, HQ clock running.`, 'success');
       render();
       return true;
     });
@@ -1113,6 +1136,8 @@ function handlePrompt(caseId, kind) {
       const msg = modal.querySelector('[data-field="msg"]').value.trim();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder', detail: `Reminder via ${channel}${msg ? ': ' + msg : ''}` });
+      const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
+      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'FIT' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
       render();
       return true;
     });
@@ -1152,6 +1177,7 @@ function handlePrompt(caseId, kind) {
       c.currentOwner = null;
       c.holdStartedAt = null;
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      showToast(`${c.id} closed (${code}). Moved out of the Action Queue.`, 'success');
       render();
       return true;
     });
@@ -1181,6 +1207,7 @@ function handlePrompt(caseId, kind) {
       c.holdStartedAt = null;
       c.status = 'returned_to_requester';
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'returned', detail: `Returned to requester · ${reason}` });
+      showToast(`${c.id} returned to ${c.requester}. SLA clock paused. Resume from the case detail when they reply.`, 'success');
       render();
       return true;
     });
@@ -1208,6 +1235,7 @@ function handlePrompt(caseId, kind) {
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
+      showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
       render();
       return true;
     });
@@ -1268,6 +1296,7 @@ function handlePrompt(caseId, kind) {
       }
       if (note) detail += ` · ${note}`;
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'resumed', detail });
+      showToast(`${c.id} resumed. SLA clock running again; status is ${statusLabel(c.status)}.`, 'success');
       render();
       return true;
     });
@@ -1309,6 +1338,7 @@ function handlePrompt(caseId, kind) {
       c.resolutionCode = code;
       c.currentOwner = null;
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'closed', detail: `Resolution: ${code} · ${note}` });
+      showToast(`${c.id} closed (${code}).`, 'success');
       render();
       return true;
     });
@@ -1318,6 +1348,7 @@ function handlePrompt(caseId, kind) {
   if (kind === 'move_to_sanity_check') {
     c.status = 'sanity_check';
     c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'status', detail: '→ Sanity Check' });
+    showToast(`${c.id} moved to Sanity Check. Verify with the requester before closing.`, 'success');
     render();
     return;
   }
@@ -1346,6 +1377,7 @@ function handlePrompt(caseId, kind) {
       c.status = 'cancelled';
       c.currentOwner = null;
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'cancelled', detail: reason });
+      showToast(`${c.id} cancelled.`, 'warn');
       render();
       return true;
     });
