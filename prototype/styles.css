@@ -159,7 +159,9 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   background: var(--panel);
   border: 1px dashed var(--border);
   border-radius: 8px;
+  margin-bottom: 12px;
 }
+.queue-empty a { color: var(--accent); }
 .queue-card { padding: 14px 16px; }
 .queue-row {
   display: grid;
@@ -315,6 +317,19 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   font-family: inherit;
 }
 .btn-tiny:hover { background: #eef2ff; border-color: var(--accent); }
+
+.queue-toggle {
+  white-space: nowrap;
+}
+.queue-toggle.in-queue {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: var(--good);
+}
+.queue-toggle.in-queue:hover {
+  background: #d1fae5;
+  border-color: var(--good);
+}
 
 .status-dropdown {
   padding: 6px 10px;

@@ -162,47 +162,43 @@ function statusLabel(s) {
 /* ---------- Action queue derivation ---------- */
 
 function deriveQueue() {
-  // Per-case actionable prompts. Cross-cutting concerns (approaching SLA,
-  // escalated-watch, end-of-shift handover) are surfaced via separate
-  // banners/watchlists in renderQueue(), not as per-card prompts.
-  const items = [];
+  // Operator-curated: only cases the operator has explicitly added (c.queue = true).
+  // For each queued case we still derive the primary action (chase, escalate, etc.)
+  // so the card has a one-click CTA where one applies.
+  const groups = [];
   for (const c of STATE.cases) {
+    if (!c.queue) continue;
     if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
 
     const ownerIdleHrs = c.lastOwnerContact
       ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
       : Infinity;
 
+    const prompts = [];
     if (c.status === 'new' && !c.fitId) {
-      items.push({ caseId: c.id, kind: 'assign_fit' });
+      prompts.push({ caseId: c.id, kind: 'assign_fit' });
     }
     if (c.status === 'with_fit' && c.fitCannotResolve) {
-      items.push({ caseId: c.id, kind: 'escalate_to_hq' });
+      prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
     } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
-      items.push({ caseId: c.id, kind: 'chase_fit' });
+      prompts.push({ caseId: c.id, kind: 'chase_fit' });
     }
     if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
-      items.push({ caseId: c.id, kind: 'chase_hq' });
+      prompts.push({ caseId: c.id, kind: 'chase_hq' });
     }
     if (c.status === 'sanity_check') {
-      items.push({ caseId: c.id, kind: 'verify_fix' });
+      prompts.push({ caseId: c.id, kind: 'verify_fix' });
     }
+
+    groups.push({ case: c, prompts });
   }
 
-  // Group by case for display.
-  const byCase = new Map();
-  for (const it of items) {
-    if (!byCase.has(it.caseId)) byCase.set(it.caseId, []);
-    byCase.get(it.caseId).push(it);
-  }
-
-  // Order: high priority first, then oldest case.
-  const groups = [...byCase.entries()].map(([caseId, prompts]) => {
-    const c = caseById(caseId);
-    return { case: c, prompts };
-  });
+  // Cases with an action come first, then by priority, then by age.
   const pri = { high: 0, medium: 1, low: 2 };
   groups.sort((a, b) => {
+    const hasA = a.prompts.length > 0 ? 0 : 1;
+    const hasB = b.prompts.length > 0 ? 0 : 1;
+    if (hasA !== hasB) return hasA - hasB;
     const p = pri[a.case.priority] - pri[b.case.priority];
     if (p !== 0) return p;
     return new Date(a.case.slaStartedAt) - new Date(b.case.slaStartedAt);
@@ -310,8 +306,7 @@ function renderSidebar() {
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
 
   const queueGroups = deriveQueue();
-  const promptCount = queueGroups.reduce((n, g) => n + g.prompts.length, 0);
-  document.getElementById('nav-queue-count').textContent = promptCount;
+  document.getElementById('nav-queue-count').textContent = queueGroups.length;
   document.getElementById('nav-cases-count').textContent =
     STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
   document.getElementById('nav-handover-count').textContent =
@@ -372,14 +367,20 @@ function renderQueue() {
   ` : '';
 
   const cards = groups.length === 0
-    ? '<div class="queue-empty">No immediate per-case actions. Watchlists below show cases to monitor.</div>'
+    ? `<div class="queue-empty">
+        <div style="font-weight:500; margin-bottom:6px;">Your queue is empty.</div>
+        <div style="font-size:13px;">Add cases from the <a href="#/cases">Cases page</a> using the <span class="mono">+ Queue</span> button to track them here.</div>
+      </div>`
     : groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
 
   const watchlist = renderWatchlists(sla, escalated);
 
+  const actionable = groups.filter(g => g.prompts.length > 0).length;
   const subtitleParts = [];
   if (dueReminders.length > 0) subtitleParts.push(`${dueReminders.length} reminder${dueReminders.length === 1 ? '' : 's'} due`);
-  if (groups.length > 0) subtitleParts.push(`${groups.length} action${groups.length === 1 ? '' : 's'} to take`);
+  if (groups.length > 0) {
+    subtitleParts.push(`${groups.length} case${groups.length === 1 ? '' : 's'} in your queue${actionable > 0 ? ` (${actionable} actionable)` : ''}`);
+  }
   if (pendingReminders.length > 0) subtitleParts.push(`${pendingReminders.length} reminder${pendingReminders.length === 1 ? '' : 's'} scheduled`);
   if (sla.length > 0) subtitleParts.push(`${sla.length} approaching SLA`);
   if (escalated.length > 0) subtitleParts.push(`${escalated.length} escalated`);
@@ -402,6 +403,17 @@ function renderQueue() {
 }
 
 const BELL_SVG = `<svg class="bell-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
+
+function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
+  if (['closed', 'cancelled'].includes(c.status)) return '';
+  const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
+  const inQ = c.queue;
+  const label = size === 'tiny'
+    ? (inQ ? '✓ Queued' : '+ Queue')
+    : (inQ ? '✓ Remove from queue' : '+ Add to queue');
+  const title = inQ ? 'Remove from your Action Queue' : 'Add to your Action Queue';
+  return `<button class="${cls} queue-toggle${inQ ? ' in-queue' : ''}" data-action="prompt" data-case-id="${c.id}" data-kind="toggle_queue" title="${escapeHtml(title)}" onclick="event.stopPropagation()">${escapeHtml(label)}</button>`;
+}
 
 function renderBellButton(c, ctx) {
   if (['closed', 'cancelled'].includes(c.status)) return '';
@@ -486,9 +498,13 @@ function renderQueueCard(c, prompts) {
     · last contact ${fmtRelative(c.lastOwnerContact?.at)}
   ` : `<span class="muted">Unassigned</span>`;
 
-  // After filtering, each case has exactly one primary prompt.
   const primary = prompts[0];
-  const def = PROMPT_DEFS[primary.kind];
+  const primaryBtn = primary ? `
+    <button class="btn btn-primary queue-primary-btn" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}">
+      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
+      ${escapeHtml(PROMPT_DEFS[primary.kind].label)}
+    </button>
+  ` : `<span class="muted tiny" style="text-align:center;">No immediate action.</span>`;
 
   return `
     <div class="card queue-card">
@@ -510,11 +526,9 @@ function renderQueueCard(c, prompts) {
           </div>
         </div>
         <div class="queue-action">
-          <button class="btn btn-primary queue-primary-btn" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}">
-            <span class="prompt-icon ${def.cls}">${def.icon}</span>
-            ${escapeHtml(def.label)}
-          </button>
+          ${primaryBtn}
           ${renderBellButton(c, 'queue')}
+          ${renderQueueToggleButton(c, 'tiny')}
           <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
         </div>
       </div>
@@ -555,6 +569,7 @@ function renderCaseList() {
         <td><span class="priority-${c.priority}">${escapeHtml(c.priority)}</span></td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
         <td class="muted tiny">${fmtRelative(c.createdAt)}</td>
+        <td>${renderQueueToggleButton(c, 'tiny')}</td>
       </tr>
     `;
   }).join('');
@@ -562,7 +577,7 @@ function renderCaseList() {
     <div class="page-header">
       <div>
         <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
-        <div class="subtitle">${cases.length} cases this week. Click a row for full detail.</div>
+        <div class="subtitle">${cases.length} cases this week. Click a row for full detail; use <span class="mono">+ Queue</span> to add a case to your Action Queue.</div>
       </div>
       <div class="toolbar">
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
@@ -580,6 +595,7 @@ function renderCaseList() {
           <th>Priority</th>
           <th>Process Time</th>
           <th>Created</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -724,6 +740,7 @@ function renderDetailActions(c) {
   }
 
   items.push(renderBellButton(c, 'detail'));
+  items.push(renderQueueToggleButton(c, 'normal'));
 
   return items.join(' ');
 }
@@ -1458,6 +1475,19 @@ function handlePrompt(caseId, kind) {
       render();
       return true;
     });
+    return;
+  }
+
+  if (kind === 'toggle_queue') {
+    c.queue = !c.queue;
+    c.history.push({
+      at: new Date(NOW).toISOString(),
+      who: op.id,
+      kind: c.queue ? 'queue_added' : 'queue_removed',
+      detail: c.queue ? 'Added to Action Queue' : 'Removed from Action Queue',
+    });
+    showToast(c.queue ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
+    render();
     return;
   }
 
