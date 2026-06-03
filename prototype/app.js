@@ -821,7 +821,7 @@ function statusTransitions(c) {
   const t = [];
   switch (c.status) {
     case 'new':
-      if (!c.fitId) t.push({ kind: 'assign_fit', label: 'Assign to Local FIT' });
+      t.push({ kind: 'assign_fit', label: c.fitId ? 'Re-assign to Local FIT' : 'Assign to Local FIT' });
       break;
     case 'with_fit':
       t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
@@ -1593,7 +1593,10 @@ function handlePrompt(caseId, kind) {
         c.status = 'new';
         c.holdStartedAt = null;
         c.lastOwnerContact = null;
-        detail = `Requester replied · resumed unassigned`;
+        c.fitId = null;
+        c.hqId = null;
+        c.fitCannotResolve = false;
+        detail = `Requester replied · resumed unassigned (FIT/HQ cleared)`;
       }
       if (note) detail += ` · ${note}`;
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'resumed', detail });
