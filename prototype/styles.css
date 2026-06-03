@@ -740,6 +740,15 @@ table.case-table {
   font-size: 13px;
 }
 .modal textarea { min-height: 80px; resize: vertical; }
+.modal input[type="checkbox"] { margin-right: 6px; }
+.modal label.inline-check {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  cursor: pointer;
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;

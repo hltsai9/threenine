@@ -601,6 +601,7 @@ function renderCaseList() {
       </div>
       <div class="toolbar">
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
+        <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
     </div>
     <div class="kanban">${kanban}</div>
@@ -1343,9 +1344,15 @@ function showModal(html, onSubmit) {
 /* ---------- Action handlers ---------- */
 
 function handlePrompt(caseId, kind) {
+  const op = getOperator(STATE.operatorId);
+
+  if (kind === 'new_case') {
+    handleNewCase(op);
+    return;
+  }
+
   const c = caseById(caseId);
   if (!c) return;
-  const op = getOperator(STATE.operatorId);
 
   if (kind === 'assign_fit') {
     const opts = window.OWNERS.fit.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
@@ -1765,6 +1772,101 @@ function handlePrompt(caseId, kind) {
     }
     return;
   }
+}
+
+function handleNewCase(op) {
+  showModal(`
+    <h3>Create a new case</h3>
+    <div class="modal-sub">Starts in <span class="pill pill-new">New</span>. Use the Change status… dropdown to assign it to Local FIT once created.</div>
+    <label>Subject *</label>
+    <input type="text" data-field="subject" placeholder="What's the issue?">
+    <label>Requester *</label>
+    <input type="text" data-field="requester" placeholder="Name of the person / team who reported it">
+    <label>Case-center link</label>
+    <input type="text" data-field="caseLink" placeholder="https://case-center.example/CC-…">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <label>Priority</label>
+        <select data-field="priority">
+          <option value="low">low</option>
+          <option value="medium" selected>medium</option>
+          <option value="high">high</option>
+        </select>
+      </div>
+      <div>
+        <label>Case type</label>
+        <select data-field="caseType">
+          <option value="access">access</option>
+          <option value="data">data</option>
+          <option value="network">network</option>
+          <option value="mobile">mobile</option>
+          <option value="productivity">productivity</option>
+          <option value="service">service</option>
+          <option value="other">other</option>
+        </select>
+      </div>
+    </div>
+    <label>Flags</label>
+    <div style="display:flex; gap:14px; padding:4px 0;">
+      <label class="inline-check"><input type="checkbox" data-field="weekend"> Weekend case</label>
+      <label class="inline-check"><input type="checkbox" data-field="escalated"> Escalated (watch)</label>
+    </div>
+    <label>Notes</label>
+    <textarea data-field="notes" placeholder="Anything important to capture upfront…"></textarea>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Create case</button>
+    </div>
+  `, (modal) => {
+    const subject = modal.querySelector('[data-field="subject"]').value.trim();
+    const requester = modal.querySelector('[data-field="requester"]').value.trim();
+    if (!subject || !requester) { alert('Subject and Requester are required.'); return false; }
+
+    const nums = STATE.cases
+      .map(c => parseInt((c.id || '').replace(/^C-/, ''), 10))
+      .filter(n => !isNaN(n));
+    const newId = `C-${Math.max(1040, ...nums) + 1}`;
+    const nowIso = new Date(NOW).toISOString().replace('.000Z', 'Z');
+
+    const flags = [];
+    if (modal.querySelector('[data-field="weekend"]').checked) flags.push('weekend');
+    if (modal.querySelector('[data-field="escalated"]').checked) flags.push('escalated');
+
+    const newCase = {
+      id: newId,
+      caseLink: modal.querySelector('[data-field="caseLink"]').value.trim() || `https://case-center.example/CC-${newId.replace('C-', '')}`,
+      subject,
+      requester,
+      fitId: null,
+      hqId: null,
+      currentOwner: null,
+      status: 'new',
+      flags,
+      priority: modal.querySelector('[data-field="priority"]').value,
+      caseType: modal.querySelector('[data-field="caseType"]').value,
+      weekId: window.CURRENT_WEEK.id,
+      slaStartedAt: nowIso,
+      slaPaused: false,
+      slaAccumulatedMs: 0,
+      holdMs: { fit: 0, hq: 0 },
+      holdStartedAt: null,
+      lastOwnerContact: null,
+      handover: null,
+      notes: modal.querySelector('[data-field="notes"]').value.trim(),
+      createdAt: nowIso,
+      createdBy: op.id,
+      history: [
+        { at: nowIso, who: op.id, kind: 'created', detail: 'Case created manually' },
+      ],
+    };
+
+    STATE.cases.unshift(newCase);
+    STATE.kanbanSelected = newId;
+    showToast(`Created ${newId}. It's in the New column on the Cases page.`, 'success');
+    if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
+    render();
+    return true;
+  });
 }
 
 function handleReassign(caseId, type) {
