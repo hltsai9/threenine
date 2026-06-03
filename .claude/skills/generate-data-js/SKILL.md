@@ -41,6 +41,11 @@ The file must define these globals, in this order:
   - `status: 'sanity_check'` ⇒ owner stays whoever pushed the resolution (`'hq'` for escalated cases, `'fit'` for FIT-resolved ones).
   - `status: 'returned_to_requester'` ⇒ `slaPaused: true`, `currentOwner: null`, `holdStartedAt: null`.
   - `status: 'closed' | 'cancelled'` ⇒ `currentOwner: null`, `holdStartedAt: null`.
+- **`agentStatus`** on every active-week case (`'queued' | 'unqueued'`). Independent of
+  `status`: it is the first-line agent's handling state and drives the top/bottom band
+  split on the board. Seed a few active cases (ideally one per column — a `new`, a
+  `with_fit`, a `with_hq`, a `sanity_check`) as `'queued'` so each column's top band is
+  populated on first load. Terminal/historical cases can omit it (treated as unqueued).
 
 ## Case schema
 
@@ -53,7 +58,11 @@ The file must define these globals, in this order:
   fitId: 'fit-apac' | null,             // must match OWNERS.fit[].id
   hqId: 'hq-identity' | null,           // must match OWNERS.hq[].id
   currentOwner: 'fit' | 'hq' | null,
-  status: 'with_fit',                   // see enum above
+  status: 'with_fit',                   // Case Center status — drives kanban COLUMNS; see enum above
+  agentStatus: 'unqueued',              // first-line agent status — 'queued' | 'unqueued'.
+                                        //   'queued' = in the agent's active top band; drives the
+                                        //   top/bottom row split inside each column. Active-week
+                                        //   cases carry it; seed a few as 'queued'.
   flags: [],                            // 'weekend' | 'escalated' | 'scheduled_ooc'
   priority: 'low' | 'medium' | 'high',
   caseType: 'access' | 'data' | 'mobile' | 'network' | 'service' | 'productivity',
@@ -129,7 +138,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
    ```bash
    node prototype/bundle.mjs
    ```
-7. **Sanity-check in the browser**: open `prototype/index.html`, verify the operator dropdown is populated, kanban shows cases in expected columns, and the Action Queue is empty (queue is operator-curated).
+7. **Sanity-check in the browser**: open `prototype/index.html`, verify the operator dropdown is populated, the board shows cases in expected columns (Case Center status), and each column's top band ("My queue") holds the cases you seeded as `agentStatus: 'queued'`.
 
 ## Common mistakes to avoid
 
@@ -139,7 +148,8 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 - `weekId` that doesn't match a `WEEKS[].id` — case won't appear in Weekly Archive.
 - Using local time instead of UTC `Z` suffix — SLA math is off by the TZ offset.
 - Forgetting to rerun `bundle.mjs` — GitHub Pages serves stale `standalone.html` but local `file://` users see the old data.
-- Bumping the case schema without bumping `STORAGE_KEY` in `app.js` — returning users get stuck with stale localStorage. If you add/remove top-level fields on `CASES`, change the key (e.g. `case-tracker-state-v2` → `v3`).
+- Bumping the case schema without bumping `STORAGE_KEY` in `app.js` — returning users get stuck with stale localStorage. If you add/remove top-level fields on `CASES`, change the key. Precedent: adding `agentStatus` bumped `case-tracker-state-v2` → `v3` (also bump the `v:` value in `saveState`/`loadState`).
+- Forgetting `agentStatus` on active-week cases, or seeding none as `'queued'` — every column's top band renders empty and the board looks half-broken.
 
 ## Quick reference: seed checklist
 
@@ -151,6 +161,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 [ ] WEEKS: current + 3 prior, ids match what cases reference
 [ ] SHIFTS: Day + Night with operatorIds
 [ ] CASES covers: new, with_fit, with_hq, sanity_check, returned_to_requester, closed, cancelled
+[ ] agentStatus on active-week cases; a few 'queued' (ideally one per column)
 [ ] At least one weekend flag, one escalated flag
 [ ] One stale handover, one carried-over case
 [ ] All FIT/HQ ids reference OWNERS

@@ -1,20 +1,25 @@
 // Case Tracker prototype — single-file SPA.
-// Renders four views (Action Queue, Cases, Case Detail, Shift Handover)
+// Renders the kanban board (Cases), Case Detail, Shifts and Archive views
 // against the seed data in data.js. State is in-memory; reload resets.
+//
+// Two statuses per case:
+//   c.status      = Case Center status (real external status; drives kanban columns).
+//   c.agentStatus = first-line agent status ('queued' | 'unqueued'; drives the
+//                   top/bottom band split inside each column).
 
 const STATE = {
   cases: window.CASES.map(c => structuredClone(c)),
   operatorId: window.CURRENT_OPERATOR_ID,
-  lastListRoute: '#/queue',
-  lastListLabel: 'Action Queue',
+  lastListRoute: '#/cases',
+  lastListLabel: 'Cases',
 };
 
-const STORAGE_KEY = 'case-tracker-state-v2';
+const STORAGE_KEY = 'case-tracker-state-v3';
 
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 2,
+      v: 3,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
     }));
@@ -26,7 +31,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 2 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 3 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
       STATE.operatorId = parsed.operatorId;
@@ -41,8 +46,8 @@ function resetState() {
   try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
   STATE.cases = window.CASES.map(c => structuredClone(c));
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
-  STATE.lastListRoute = '#/queue';
-  STATE.lastListLabel = 'Action Queue';
+  STATE.lastListRoute = '#/cases';
+  STATE.lastListLabel = 'Cases';
   render();
 }
 
@@ -161,51 +166,37 @@ function statusLabel(s) {
   })[s] || s;
 }
 
-/* ---------- Action queue derivation ---------- */
+// Agent status: has the first-line agent pulled this case into their active queue?
+// Drives the top (queued) vs bottom (rest) band split inside each kanban column.
+function isQueued(c) { return c.agentStatus === 'queued'; }
 
-function deriveQueue() {
-  // Operator-curated: only cases the operator has explicitly added (c.queue = true).
-  // For each queued case we still derive the primary action (chase, escalate, etc.)
-  // so the card has a one-click CTA where one applies.
-  const groups = [];
-  for (const c of STATE.cases) {
-    if (!c.queue) continue;
-    if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
+/* ---------- Action derivation ---------- */
 
-    const ownerIdleHrs = c.lastOwnerContact
-      ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
-      : Infinity;
+// Derive the one-click actions that apply to a single case, given its status and how
+// long the current owner has been idle. Used to put a primary CTA on kanban cards.
+function derivePromptsForCase(c) {
+  if (['closed', 'cancelled', 'resolved'].includes(c.status)) return [];
 
-    const prompts = [];
-    if (c.status === 'new' && !c.fitId) {
-      prompts.push({ caseId: c.id, kind: 'assign_fit' });
-    }
-    if (c.status === 'with_fit' && c.fitCannotResolve) {
-      prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
-    } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
-      prompts.push({ caseId: c.id, kind: 'chase_fit' });
-    }
-    if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
-      prompts.push({ caseId: c.id, kind: 'chase_hq' });
-    }
-    if (c.status === 'sanity_check') {
-      prompts.push({ caseId: c.id, kind: 'verify_fix' });
-    }
+  const ownerIdleHrs = c.lastOwnerContact
+    ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
+    : Infinity;
 
-    groups.push({ case: c, prompts });
+  const prompts = [];
+  if (c.status === 'new' && !c.fitId) {
+    prompts.push({ caseId: c.id, kind: 'assign_fit' });
   }
-
-  // Cases with an action come first, then by priority, then by age.
-  const pri = { high: 0, medium: 1, low: 2 };
-  groups.sort((a, b) => {
-    const hasA = a.prompts.length > 0 ? 0 : 1;
-    const hasB = b.prompts.length > 0 ? 0 : 1;
-    if (hasA !== hasB) return hasA - hasB;
-    const p = pri[a.case.priority] - pri[b.case.priority];
-    if (p !== 0) return p;
-    return new Date(a.case.slaStartedAt) - new Date(b.case.slaStartedAt);
-  });
-  return groups;
+  if (c.status === 'with_fit' && c.fitCannotResolve) {
+    prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
+  } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_fit' });
+  }
+  if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_hq' });
+  }
+  if (c.status === 'sanity_check') {
+    prompts.push({ caseId: c.id, kind: 'verify_fix' });
+  }
+  return prompts;
 }
 
 const PROMPT_DEFS = {
@@ -227,16 +218,15 @@ function navigate(hash) {
 }
 
 function currentRoute() {
-  const h = location.hash || '#/queue';
+  const h = location.hash || '#/cases';
   if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
   if (h.startsWith('#/cases')) return { name: 'cases' };
-  if (h.startsWith('#/handover')) return { name: 'handover' };
   if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
   if (h.startsWith('#/archive')) return { name: 'archive' };
   if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
-  return { name: 'queue' };
+  return { name: 'cases' };
 }
 
 window.addEventListener('hashchange', render);
@@ -245,9 +235,7 @@ window.addEventListener('hashchange', render);
 
 function labelForRoute(route) {
   switch (route.name) {
-    case 'queue': return 'Action Queue';
     case 'cases': return 'Cases';
-    case 'handover': return 'Shift Handover';
     case 'shifts': return 'Shifts';
     case 'shiftDetail': return `${route.shift} shift`;
     case 'archive': return 'Weekly Archive';
@@ -265,23 +253,21 @@ function render() {
   const route = currentRoute();
   // Remember the last list-style view so the case detail can offer a contextual back link.
   if (route.name !== 'detail') {
-    STATE.lastListRoute = location.hash || '#/queue';
+    STATE.lastListRoute = location.hash || '#/cases';
     STATE.lastListLabel = labelForRoute(route);
   }
   const main = document.getElementById('main');
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const active = ({
-    queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover',
+    cases: 'cases', detail: 'cases',
     archive: 'archive', archiveWeek: 'archive',
     shifts: 'shifts', shiftDetail: 'shifts',
     flow: 'flow',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
-  if (route.name === 'queue') main.innerHTML = renderQueue();
-  else if (route.name === 'cases') main.innerHTML = renderCaseList();
+  if (route.name === 'cases') main.innerHTML = renderCaseList();
   else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
-  else if (route.name === 'handover') main.innerHTML = renderHandover();
   else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
   else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
@@ -314,113 +300,26 @@ function renderSidebar() {
   document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
 
-  const queueGroups = deriveQueue();
-  document.getElementById('nav-queue-count').textContent = queueGroups.length;
   document.getElementById('nav-cases-count').textContent =
     STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
-  document.getElementById('nav-handover-count').textContent =
-    STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status)
-      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)
-    ).length;
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
   const navArchive = document.getElementById('nav-archive-count');
   if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
 
-/* ---------- Action Queue view ---------- */
-
-function renderQueue() {
-  const groups = deriveQueue();
-  const sla = approachingSlaCases();
-  const escalated = escalatedCases();
-  const handoverPending = handoverPendingCases();
-  const dueReminders = STATE.cases.filter(c =>
-    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
-  );
-  const pendingReminders = STATE.cases.filter(c =>
-    c.reminder && !c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
-  );
-
-  const remindersSection = dueReminders.length > 0 ? `
-    <div class="reminders-due">
-      <div class="reminders-due-header">${BELL_SVG} Reminders due <span class="muted">(${dueReminders.length})</span></div>
-      ${dueReminders.map(c => `
-        <div class="reminder-row">
-          <div>
-            <div class="row-flex">
-              <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-              <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-              <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
-            </div>
-            <div class="reminder-subject">${escapeHtml(c.subject)}</div>
-            ${c.reminder.note ? `<div class="reminder-note">"${escapeHtml(c.reminder.note)}"</div>` : ''}
-          </div>
-          <div class="reminder-actions">
-            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="snooze_reminder">Snooze 5m</button>
-            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="dismiss_reminder">Dismiss</button>
-            <a class="btn btn-primary" href="#/cases/${c.id}">Open case →</a>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  ` : '';
-
-  const banner = handoverPending.length > 0 ? `
-    <div class="queue-banner">
-      <div>
-        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} need a handover note for ${escapeHtml(getOperator(STATE.operatorId).shift)} shift before cutover.
-      </div>
-      <a href="#/handover" class="btn btn-primary">Open Shift Handover →</a>
-    </div>
-  ` : '';
-
-  const cards = groups.length === 0
-    ? `<div class="queue-empty">
-        <div style="font-weight:500; margin-bottom:6px;">Your queue is empty.</div>
-        <div style="font-size:13px;">Add cases from the <a href="#/cases">Cases page</a> using the <span class="mono">+ Queue</span> button to track them here.</div>
-      </div>`
-    : groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
-
-  const watchlist = renderWatchlists(sla, escalated);
-
-  const actionable = groups.filter(g => g.prompts.length > 0).length;
-  const subtitleParts = [];
-  if (dueReminders.length > 0) subtitleParts.push(`${dueReminders.length} reminder${dueReminders.length === 1 ? '' : 's'} due`);
-  if (groups.length > 0) {
-    subtitleParts.push(`${groups.length} case${groups.length === 1 ? '' : 's'} in your queue${actionable > 0 ? ` (${actionable} actionable)` : ''}`);
-  }
-  if (pendingReminders.length > 0) subtitleParts.push(`${pendingReminders.length} reminder${pendingReminders.length === 1 ? '' : 's'} scheduled`);
-  if (sla.length > 0) subtitleParts.push(`${sla.length} approaching SLA`);
-  if (escalated.length > 0) subtitleParts.push(`${escalated.length} escalated`);
-
-  return `
-    <div class="page-header">
-      <div>
-        <h1>Action Queue</h1>
-        <div class="subtitle">${subtitleParts.join(' · ') || 'All clear.'}</div>
-      </div>
-      <div class="toolbar">
-        <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
-      </div>
-    </div>
-    ${remindersSection}
-    ${banner}
-    ${cards}
-    ${watchlist}
-  `;
-}
+/* ---------- Shared action helpers ---------- */
 
 const BELL_SVG = `<svg class="bell-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
 
 function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
   if (['closed', 'cancelled'].includes(c.status)) return '';
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
-  const inQ = c.queue;
+  const inQ = isQueued(c);
   const label = size === 'tiny'
     ? (inQ ? '✓ Queued' : '+ Queue')
     : (inQ ? '✓ Remove from queue' : '+ Add to queue');
-  const title = inQ ? 'Remove from your Action Queue' : 'Add to your Action Queue';
+  const title = inQ ? 'Remove from your queue (move to bottom band)' : 'Add to your queue (move to top band)';
   return `<button class="${cls} queue-toggle${inQ ? ' in-queue' : ''}" data-action="prompt" data-case-id="${c.id}" data-kind="toggle_queue" title="${escapeHtml(title)}" onclick="event.stopPropagation()">${escapeHtml(label)}</button>`;
 }
 
@@ -457,16 +356,24 @@ function escalatedCases() {
   });
 }
 
-function handoverPendingCases() {
+// True when an open case lacks a fresh handover note authored during the current shift.
+// Mirrors the rule from the old Shift Handover page: every open case must carry a note
+// written by someone on the current shift. Writing one (from a card or the reading panel)
+// clears the indicator.
+function needsHandoverNote(c) {
+  if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
+  if (!c.handover || c.handover.staleForCurrentShift) return true;
   const op = getOperator(STATE.operatorId);
+  const author = getOperator(c.handover.author);
+  return !author || author.shift !== op.shift;
+}
+
+function handoverPendingCases() {
   const shiftEndsSoon =
     (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
     window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
   if (!shiftEndsSoon) return [];
-  return STATE.cases.filter(c => {
-    if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
-    return !c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift;
-  });
+  return STATE.cases.filter(needsHandoverNote);
 }
 
 function renderWatchlists(sla, escalated) {
@@ -497,54 +404,6 @@ function renderWatchlists(sla, escalated) {
   return `<div class="watchlist">${slaSection}${escSection}</div>`;
 }
 
-function renderQueueCard(c, prompts) {
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
-  const onUs = fmtDuration(caseSlaMs(c));
-  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
-  const ownerLine = owner ? `
-    Owner: <strong>${escapeHtml(owner.name)}</strong>
-    ${renderTzHint(owner)}
-    · last contact ${fmtRelative(c.lastOwnerContact?.at)}
-  ` : `<span class="muted">Unassigned</span>`;
-
-  const primary = prompts[0];
-  const primaryBtn = primary ? `
-    <button class="btn btn-primary queue-primary-btn" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}">
-      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
-      ${escapeHtml(PROMPT_DEFS[primary.kind].label)}
-    </button>
-  ` : `<span class="muted tiny" style="text-align:center;">No immediate action.</span>`;
-
-  return `
-    <div class="card queue-card">
-      <div class="queue-row">
-        <div>
-          <div class="row-flex">
-            <a href="#/cases/${c.id}" class="mono muted">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-            <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
-            ${flags}
-          </div>
-          <div class="queue-subject">${escapeHtml(c.subject)}</div>
-          <div class="queue-meta">
-            ${ownerLine}
-            <span>·</span>
-            <span>On us: <strong>${onUs}</strong></span>
-            <span>·</span>
-            <a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">case-center ↗</a>
-          </div>
-        </div>
-        <div class="queue-action">
-          ${primaryBtn}
-          ${renderBellButton(c, 'queue')}
-          ${renderQueueToggleButton(c, 'tiny')}
-          <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function renderTzHint(owner) {
   if (!owner) return '';
   const local = ownerLocalNow(owner);
@@ -562,6 +421,9 @@ function renderCaseList() {
   const closedCount = STATE.cases
     .filter(c => c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
 
+  // Columns = Case Center status (the real external status). Each column splits into a
+  // top band (cases the first-line agent has queued / is actively working) and a bottom
+  // band (everything else in that status) — the row dimension is the agent status.
   const columns = [
     { id: 'new',    label: 'New',                              statuses: ['new'] },
     { id: 'fit',    label: 'With Local FIT',                   statuses: ['with_fit'] },
@@ -569,15 +431,29 @@ function renderCaseList() {
     { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
   ];
 
+  const sortCases = (a, b) => {
+    const pri = { high: 0, medium: 1, low: 2 };
+    const p = pri[a.priority] - pri[b.priority];
+    if (p !== 0) return p;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  };
+
+  const band = (cases, cls, header, emptyText) => `
+    <div class="kanban-band ${cls}">
+      <div class="kanban-band-header">
+        <span>${escapeHtml(header)}</span>
+        <span class="kanban-band-count">${cases.length}</span>
+      </div>
+      ${cases.length === 0
+        ? `<div class="kanban-empty">${escapeHtml(emptyText)}</div>`
+        : cases.map(renderKanbanCard).join('')}
+    </div>
+  `;
+
   const kanban = columns.map(col => {
-    const colCases = allCases
-      .filter(c => col.statuses.includes(c.status))
-      .sort((a, b) => {
-        const pri = { high: 0, medium: 1, low: 2 };
-        const p = pri[a.priority] - pri[b.priority];
-        if (p !== 0) return p;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
+    const colCases = allCases.filter(c => col.statuses.includes(c.status)).sort(sortCases);
+    const top = colCases.filter(isQueued);
+    const bottom = colCases.filter(c => !isQueued(c));
     return `
       <div class="kanban-column" data-col-id="${col.id}">
         <div class="kanban-col-header">
@@ -585,9 +461,8 @@ function renderCaseList() {
           <span class="kanban-count">${colCases.length}</span>
         </div>
         <div class="kanban-col-body">
-          ${colCases.length === 0
-            ? '<div class="kanban-empty">No cases.</div>'
-            : colCases.map(renderKanbanCard).join('')}
+          ${band(top, 'kanban-band-top', 'My queue', 'Nothing queued.')}
+          ${band(bottom, 'kanban-band-bottom', 'Backlog', 'No cases.')}
         </div>
       </div>
     `;
@@ -598,19 +473,64 @@ function renderCaseList() {
   const validSelection = selected && selected.weekId === window.CURRENT_WEEK.id;
   const readingPanel = renderReadingPanel(validSelection ? selected : null);
 
+  const queuedCount = allCases.filter(isQueued).length;
+
+  // Handover awareness — replaces the old standalone Shift Handover page. When the shift
+  // is ending, surface how many open cases still need a fresh note; the agent writes them
+  // straight from the cards / reading panel below.
+  const handoverPending = handoverPendingCases();
+  const handoverBanner = handoverPending.length > 0 ? `
+    <div class="kanban-handover-banner">
+      <div>
+        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note. Write each from its card or the reading panel.
+      </div>
+    </div>
+  ` : '';
+
+  const dueReminders = STATE.cases.filter(c =>
+    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
+  );
+  const remindersBanner = dueReminders.length > 0 ? `
+    <div class="reminders-due">
+      <div class="reminders-due-header">${BELL_SVG} Reminders due <span class="muted">(${dueReminders.length})</span></div>
+      ${dueReminders.map(c => `
+        <div class="reminder-row">
+          <div>
+            <div class="row-flex">
+              <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+              <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+              <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
+            </div>
+            <div class="reminder-subject">${escapeHtml(c.subject)}</div>
+            ${c.reminder.note ? `<div class="reminder-note">"${escapeHtml(c.reminder.note)}"</div>` : ''}
+          </div>
+          <div class="reminder-actions">
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="snooze_reminder">Snooze 5m</button>
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="dismiss_reminder">Dismiss</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const watchlist = renderWatchlists(approachingSlaCases(), escalatedCases());
+
   return `
     <div class="page-header">
       <div>
-        <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
-        <div class="subtitle">${allCases.length} open · ${closedCount} closed/cancelled this week. Click a card to read; use <span class="mono">+ Queue</span> to track it.</div>
+        <h1>Board · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
+        <div class="subtitle">${allCases.length} open · ${queuedCount} in your queue · ${closedCount} closed/cancelled this week. Columns are the Case Center status; <span class="mono">+ Queue</span> lifts a card into your top band.</div>
       </div>
       <div class="toolbar">
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
     </div>
+    ${remindersBanner}
+    ${handoverBanner}
     <div class="kanban">${kanban}</div>
     <div class="reading-panel">${readingPanel}</div>
+    ${watchlist}
   `;
 }
 
@@ -621,6 +541,21 @@ function renderKanbanCard(c) {
   const bellState = c.reminder
     ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
     : '';
+
+  // Primary one-click action for this case, if one applies (assign / chase / escalate / verify).
+  const primary = derivePromptsForCase(c)[0];
+  const primaryBtn = primary ? `
+    <button class="btn-tiny kanban-cta" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}" title="${escapeHtml(PROMPT_DEFS[primary.kind].label)}" onclick="event.stopPropagation()">
+      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
+      ${escapeHtml(PROMPT_DEFS[primary.kind].action)}
+    </button>
+  ` : '';
+
+  // Handover affordance — write a fresh shift note straight from the card.
+  const handoverBtn = needsHandoverNote(c) ? `
+    <button class="btn-tiny kanban-handover-btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover" title="Write a handover note for this shift" onclick="event.stopPropagation()">⚠ Note</button>
+  ` : '';
+
   return `
     <div class="kanban-card ${isSel ? 'is-selected' : ''}" data-action="kanban-select" data-case-id="${c.id}">
       <div class="kanban-card-head">
@@ -628,7 +563,7 @@ function renderKanbanCard(c) {
         <div class="kanban-card-head-right">
           <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
           ${bellState}
-          ${c.queue ? '<span class="kanban-queued" title="In your Action Queue">★</span>' : ''}
+          ${isQueued(c) ? '<span class="kanban-queued" title="In your queue">★</span>' : ''}
         </div>
       </div>
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
@@ -638,6 +573,8 @@ function renderKanbanCard(c) {
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
+        ${primaryBtn}
+        ${handoverBtn}
         ${renderQueueToggleButton(c, 'tiny')}
       </div>
     </div>
@@ -843,61 +780,6 @@ function statusTransitions(c) {
     t.push({ kind: 'cancel', label: 'Cancel case', danger: true });
   }
   return t;
-}
-
-/* ---------- Shift Handover view ---------- */
-
-function renderHandover() {
-  const op = getOperator(STATE.operatorId);
-  const open = STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status));
-  const fresh = open.filter(c => c.handover && !c.handover.staleForCurrentShift && c.handover.author === op.id);
-  const stale = open.filter(c => c.handover && (c.handover.staleForCurrentShift || c.handover.author !== op.id));
-  const missing = open.filter(c => !c.handover);
-
-  const rows = [...missing, ...stale, ...fresh].map(c => {
-    let status = '<span class="note-status fresh">Note current</span>';
-    if (!c.handover) status = '<span class="note-status missing">No note</span>';
-    else if (c.handover.staleForCurrentShift || c.handover.author !== op.id) {
-      status = `<span class="note-status stale">Stale (${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)})</span>`;
-    }
-    return `
-      <div class="case-row">
-        <div>
-          <div class="row-flex">
-            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-          </div>
-          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
-          <div class="meta">On us: ${fmtDuration(caseSlaMs(c))} · last contact ${fmtRelative(c.lastOwnerContact?.at)}</div>
-        </div>
-        <div>${status}</div>
-        <div>
-          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write note</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const blockers = missing.length + stale.length;
-
-  return `
-    <div class="page-header">
-      <div>
-        <h1>Shift Handover</h1>
-        <div class="subtitle">Manual cutover. Every open case must have a note authored during this shift.</div>
-      </div>
-    </div>
-    <div class="handover-bar">
-      <div class="progress-text">
-        <strong>${fresh.length}</strong> of <strong>${open.length}</strong> open cases have a current ${op.shift}-shift note.
-        ${blockers > 0 ? `<span class="muted"> · ${blockers} pending.</span>` : ''}
-      </div>
-      <div>
-        <button class="btn btn-primary" id="complete-handover" ${blockers > 0 ? 'disabled' : ''}>Complete handover</button>
-      </div>
-    </div>
-    <div class="handover-list">${rows || '<div class="queue-empty">No open cases requiring handover.</div>'}</div>
-  `;
 }
 
 /* ---------- Weekly Archive ---------- */
@@ -1689,14 +1571,15 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'toggle_queue') {
-    c.queue = !c.queue;
+    const nowQueued = !isQueued(c);
+    c.agentStatus = nowQueued ? 'queued' : 'unqueued';
     c.history.push({
       at: new Date(NOW).toISOString(),
       who: op.id,
-      kind: c.queue ? 'queue_added' : 'queue_removed',
-      detail: c.queue ? 'Added to Action Queue' : 'Removed from Action Queue',
+      kind: nowQueued ? 'queue_added' : 'queue_removed',
+      detail: nowQueued ? 'Added to agent queue (top band)' : 'Removed from agent queue (back to backlog)',
     });
-    showToast(c.queue ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
+    showToast(nowQueued ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
     render();
     return;
   }
@@ -1960,10 +1843,6 @@ function handleReassign(caseId, type) {
   });
 }
 
-function handleCompleteHandover() {
-  alert('Handover marked complete. (Prototype: in a real build this would notify the incoming shift.)');
-}
-
 /* ---------- Bind handlers after render ---------- */
 
 function bindHandlers() {
@@ -1997,7 +1876,6 @@ function bindHandlers() {
       render();
     });
   });
-  document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
   const resetLink = document.getElementById('reset-state');
   if (resetLink && resetLink.dataset.bound !== '1') {
     resetLink.addEventListener('click', e => {
@@ -2051,5 +1929,5 @@ setTimeout(checkReminders, 200);
 
 /* ---------- Boot ---------- */
 
-if (!location.hash) location.hash = '#/queue';
+if (!location.hash) location.hash = '#/cases';
 render();
