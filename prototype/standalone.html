@@ -1936,12 +1936,12 @@ const STATE = {
   lastListLabel: 'Action Queue',
 };
 
-const STORAGE_KEY = 'case-tracker-state-v1';
+const STORAGE_KEY = 'case-tracker-state-v2';
 
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 1,
+      v: 2,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
     }));
@@ -1953,9 +1953,11 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 1 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 2 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
-    if (parsed.operatorId) STATE.operatorId = parsed.operatorId;
+    if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
+      STATE.operatorId = parsed.operatorId;
+    }
     return true;
   } catch (e) {
     return false;
@@ -2217,6 +2219,9 @@ function render() {
 }
 
 function renderSidebar() {
+  if (!getOperator(STATE.operatorId)) {
+    STATE.operatorId = window.CURRENT_OPERATOR_ID;
+  }
   const op = getOperator(STATE.operatorId);
   // Operator switcher
   const sw = document.getElementById('op-switcher');
