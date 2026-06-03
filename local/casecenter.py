@@ -51,39 +51,69 @@ def _load_secrets():
     return api_key, cookie
 
 
-# ---- 2a. Map Case Center status strings to the board's status enum --------------------
-# Fill in the left-hand keys with YOUR Case Center status values.
+# ---- 2a. Map Case Center status -> the board's status enum ---------------------------
+# The board column for a case is its Case Center status. You have BOTH caseStatus and
+# caseSubstatus, so map on the (caseStatus, caseSubstatus) pair first, then fall back to
+# caseStatus alone. Board enum values:
+#   new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
+#
+# >>> TODO: replace the example keys below with YOUR real caseStatus / caseSubstatus
+#     strings. I still need the list of possible values to finish this. <<<
 STATUS_MAP = {
-    # "Open":               "new",
-    # "Assigned":           "with_fit",
-    # "Escalated":          "with_hq",
-    # "Pending Validation": "sanity_check",
-    # "Awaiting Customer":  "returned_to_requester",
-    # "Resolved":           "resolved",
-    # "Closed":             "closed",
-    # "Cancelled":          "cancelled",
+    # (caseStatus, caseSubstatus): board_status
+    # ("Open",       "New"):              "new",
+    # ("Open",       "Local FIT"):        "with_fit",
+    # ("Open",       "HQ Product Team"):  "with_hq",
+    # ("Open",       "Validation"):       "sanity_check",
+    # ("Pending",    "Awaiting Customer"):"returned_to_requester",
+}
+STATUS_MAP_BY_STATUS = {
+    # caseStatus alone (used when the (status, substatus) pair isn't listed above)
+    # "Open":      "new",
+    # "Resolved":  "resolved",
+    # "Closed":    "closed",
+    # "Cancelled": "cancelled",
 }
 
 
-def map_status(cc_status):
-    return STATUS_MAP.get(cc_status, "new")
+def map_status(case_status, case_substatus):
+    if (case_status, case_substatus) in STATUS_MAP:
+        return STATUS_MAP[(case_status, case_substatus)]
+    if case_status in STATUS_MAP_BY_STATUS:
+        return STATUS_MAP_BY_STATUS[case_status]
+    return "new"  # safe default so an unmapped case still shows up (in the New column)
 
 
-# ---- 2b. Map one Case Center record to a board case ----------------------------------
+# ---- 2b. Map caseLevel -> board priority (low | medium | high) ------------------------
+# >>> TODO: replace with YOUR real caseLevel values. <<<
+LEVEL_MAP = {
+    # "P1": "high", "P2": "high", "P3": "medium", "P4": "low",
+    # "1": "high", "2": "medium", "3": "low",
+}
+
+
+def map_priority(case_level):
+    return LEVEL_MAP.get(str(case_level), "medium")
+
+
+# ---- 2c. Map one Case Center record to a board case ----------------------------------
 def map_record(r):
-    """Translate a single Case Center record (dict) into a board case dict.
-    Adjust the r.get(...) keys to match YOUR Case Center field names."""
+    """Translate a single Case Center record (one element of x_json['data']) into a
+    board case dict. Field names below match what you provided."""
+    assignee = r.get("assignee") or {}
     return {
-        "id": str(r.get("id") or r.get("caseId") or r.get("number") or ""),
-        "caseLink": r.get("url") or r.get("link") or "",
-        "subject": r.get("subject") or r.get("title") or "(no subject)",
-        "requester": r.get("requester") or r.get("reporter") or "",
-        "status": map_status(r.get("status")),
-        "priority": (r.get("priority") or "medium").lower(),
-        "caseType": r.get("type") or "access",
-        "slaStartedAt": r.get("createdAt") or r.get("opened_at"),
-        "createdAt": r.get("createdAt") or r.get("opened_at"),
-        "notes": r.get("description") or r.get("summary") or "",
+        "id": str(r.get("caseId") or ""),
+        "subject": r.get("subject") or "(no subject)",
+        "status": map_status(r.get("caseStatus"), r.get("caseSubstatus")),
+        "priority": map_priority(r.get("caseLevel")),
+        "createdAt": r.get("createDateTime"),
+        "slaStartedAt": r.get("createDateTime"),
+        # Case Center assignee account id. The board's visible "owner" is a FIT/HQ desk
+        # from data.js, so this id is stored for reference but won't resolve to a name
+        # unless you add an accountId -> owner lookup (tell me if you want that).
+        "assigneeId": assignee.get("accountId"),
+        # Not provided by Case Center in your field list — left at board defaults:
+        # caseLink, requester, caseType, notes.
     }
 
 
@@ -91,20 +121,21 @@ def map_record(r):
 def fetch_raw():
     """PASTE YOUR EXISTING SCRIPT'S REQUEST LOGIC HERE.
 
-    Use api_key + cookie from _load_secrets() and return a LIST of raw record dicts.
-    A stdlib (urllib) example is shown commented-out; if your script already uses
-    `requests`, just use that instead — whatever you already have working.
+    Use api_key + cookie from _load_secrets(), perform the request, parse the JSON into
+    `x_json`, and return `x_json["data"]` (the case records). fetch_cases() handles both a
+    list of records and a single record.
     """
     api_key, cookie = _load_secrets()  # noqa: F841 (used by your request below)
 
     raise NotImplementedError(
-        "Add your Case Center request in fetch_raw() (local/casecenter.py)."
+        "Add your Case Center request in fetch_raw() (local/casecenter.py), "
+        "then `return x_json['data']`."
     )
 
     # --- Example with stdlib only (no pip install) -----------------------------------
     # import urllib.request
     # req = urllib.request.Request(
-    #     "https://case-center.internal/api/cases?status=open",
+    #     "https://case-center.internal/api/cases",
     #     headers={
     #         "Authorization": f"Bearer {api_key}",
     #         "Cookie": cookie,
@@ -112,8 +143,8 @@ def fetch_raw():
     #     },
     # )
     # with urllib.request.urlopen(req, timeout=30) as resp:
-    #     body = json.load(resp)
-    # return body["items"]            # <- return the list of records
+    #     x_json = json.load(resp)
+    # return x_json["data"]
 
     # --- Example if you use requests --------------------------------------------------
     # import requests
@@ -124,9 +155,12 @@ def fetch_raw():
     #     timeout=30,
     # )
     # resp.raise_for_status()
-    # return resp.json()["items"]
+    # x_json = resp.json()
+    # return x_json["data"]
 
 
 def fetch_cases():
     """Called by serve.py for GET /api/cases. Returns board-shaped case dicts."""
-    return [map_record(r) for r in fetch_raw()]
+    data = fetch_raw()                       # expected: x_json["data"]
+    records = data if isinstance(data, list) else [data]
+    return [map_record(r) for r in records]
