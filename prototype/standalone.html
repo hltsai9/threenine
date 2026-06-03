@@ -2748,7 +2748,7 @@ function statusTransitions(c) {
   const t = [];
   switch (c.status) {
     case 'new':
-      t.push({ kind: 'assign_fit', label: c.fitId ? 'Re-assign to Local FIT' : 'Assign to Local FIT' });
+      t.push({ kind: 'assign_fit', label: 'Assign to Local FIT' });
       break;
     case 'with_fit':
       t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
@@ -3287,7 +3287,7 @@ function handlePrompt(caseId, kind) {
   if (!c) return;
 
   if (kind === 'assign_fit') {
-    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
+    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
       <h3>Assign to Local FIT</h3>
       <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
@@ -3314,7 +3314,7 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'escalate_to_hq') {
-    const opts = window.OWNERS.hq.map(h => `<option value="${h.id}">${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
+    const opts = window.OWNERS.hq.map(h => `<option value="${h.id}"${h.id === c.hqId ? ' selected' : ''}>${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
     showModal(`
       <h3>Escalate to HQ Product Team</h3>
       <div class="modal-sub">FIT can't resolve. Pick the HQ team that owns this area.</div>
