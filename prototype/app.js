@@ -548,58 +548,159 @@ function renderTzHint(owner) {
 /* ---------- Case List view ---------- */
 
 function renderCaseList() {
-  const cases = [...STATE.cases]
-    .filter(c => c.weekId === window.CURRENT_WEEK.id)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const rows = cases.map(c => {
-    const fit = getOwner('fit', c.fitId);
-    const hq = getOwner('hq', c.hqId);
-    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const allCases = STATE.cases
+    .filter(c => c.weekId === window.CURRENT_WEEK.id && !['closed', 'cancelled'].includes(c.status));
+  const closedCount = STATE.cases
+    .filter(c => c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
+
+  const columns = [
+    { id: 'new',    label: 'New',                              statuses: ['new'] },
+    { id: 'fit',    label: 'With Local FIT',                   statuses: ['with_fit'] },
+    { id: 'hq',     label: 'With HQ Product Team',             statuses: ['with_hq'] },
+    { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
+  ];
+
+  const kanban = columns.map(col => {
+    const colCases = allCases
+      .filter(c => col.statuses.includes(c.status))
+      .sort((a, b) => {
+        const pri = { high: 0, medium: 1, low: 2 };
+        const p = pri[a.priority] - pri[b.priority];
+        if (p !== 0) return p;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
     return `
-      <tr data-href="#/cases/${c.id}">
-        <td class="col-id">${c.id}</td>
-        <td>
-          <div class="subject">${escapeHtml(c.subject)}</div>
-          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
-        </td>
-        <td>${escapeHtml(c.requester)}</td>
-        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
-        <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
-        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}</td>
-        <td><span class="priority-${c.priority}">${escapeHtml(c.priority)}</span></td>
-        <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
-        <td class="muted tiny">${fmtRelative(c.createdAt)}</td>
-        <td>${renderQueueToggleButton(c, 'tiny')}</td>
-      </tr>
+      <div class="kanban-column" data-col-id="${col.id}">
+        <div class="kanban-col-header">
+          <span>${escapeHtml(col.label)}</span>
+          <span class="kanban-count">${colCases.length}</span>
+        </div>
+        <div class="kanban-col-body">
+          ${colCases.length === 0
+            ? '<div class="kanban-empty">No cases.</div>'
+            : colCases.map(renderKanbanCard).join('')}
+        </div>
+      </div>
     `;
   }).join('');
+
+  const selected = STATE.kanbanSelected ? caseById(STATE.kanbanSelected) : null;
+  // Auto-clear if selected case no longer exists or moved out of this week.
+  const validSelection = selected && selected.weekId === window.CURRENT_WEEK.id;
+  const readingPanel = renderReadingPanel(validSelection ? selected : null);
+
   return `
     <div class="page-header">
       <div>
         <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
-        <div class="subtitle">${cases.length} cases this week. Click a row for full detail; use <span class="mono">+ Queue</span> to add a case to your Action Queue.</div>
+        <div class="subtitle">${allCases.length} open · ${closedCount} closed/cancelled this week. Click a card to read; use <span class="mono">+ Queue</span> to track it.</div>
       </div>
       <div class="toolbar">
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
       </div>
     </div>
-    <table class="case-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Subject / Case Link</th>
-          <th>Requester</th>
-          <th>Local FIT</th>
-          <th>HQ Product Team</th>
-          <th>Status</th>
-          <th>Priority</th>
-          <th>Process Time</th>
-          <th>Created</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
+    <div class="kanban">${kanban}</div>
+    <div class="reading-panel">${readingPanel}</div>
+  `;
+}
+
+function renderKanbanCard(c) {
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+  const isSel = STATE.kanbanSelected === c.id;
+  const bellState = c.reminder
+    ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
+    : '';
+  return `
+    <div class="kanban-card ${isSel ? 'is-selected' : ''}" data-action="kanban-select" data-case-id="${c.id}">
+      <div class="kanban-card-head">
+        <span class="mono muted">${c.id}</span>
+        <div class="kanban-card-head-right">
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
+          ${bellState}
+          ${c.queue ? '<span class="kanban-queued" title="In your Action Queue">★</span>' : ''}
+        </div>
+      </div>
+      ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
+      <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
+      <div class="kanban-card-meta">
+        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : '<span class="muted">unassigned</span>'}</span>
+        <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
+      </div>
+      <div class="kanban-card-actions">
+        ${renderQueueToggleButton(c, 'tiny')}
+      </div>
+    </div>
+  `;
+}
+
+function renderReadingPanel(c) {
+  if (!c) {
+    return `<div class="reading-empty">Click a case above to read its details here.</div>`;
+  }
+  const fit = getOwner('fit', c.fitId);
+  const hq = getOwner('hq', c.hqId);
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const slaMs = caseSlaMs(c);
+  const fitMs = caseHoldMs(c, 'fit');
+  const hqMs = caseHoldMs(c, 'hq');
+
+  const handoverHtml = c.handover
+    ? `<div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
+        ${escapeHtml(c.handover.note)}
+        <div class="meta">${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)} · ${escapeHtml(c.handover.author)} · ${fmtRelative(c.handover.at)}</div>
+       </div>`
+    : '<div class="muted tiny">No handover note.</div>';
+
+  const recentHistory = (c.history || []).slice(-3).reverse().map(h => `
+    <li><span class="when">${fmtAbsolute(h.at)}</span><span><strong>${escapeHtml(h.kind)}</strong>${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span></li>
+  `).join('');
+
+  return `
+    <div class="reading-header">
+      <div>
+        <div class="row-flex">
+          <a class="mono muted" href="#/cases/${c.id}">${c.id}</a>
+          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
+          ${flags}
+        </div>
+        <h2>${escapeHtml(c.subject)}</h2>
+        <div class="muted tiny"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+      </div>
+      <div class="reading-actions">
+        ${renderQueueToggleButton(c, 'normal')}
+        ${renderBellButton(c, 'reading')}
+        <a class="btn btn-primary" href="#/cases/${c.id}">Open full case →</a>
+      </div>
+    </div>
+    <div class="reading-body">
+      <div class="reading-section">
+        <h3>Routing</h3>
+        <div class="kv-line"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
+        <div class="kv-line"><span class="k">Local FIT</span><span class="v">${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</span></div>
+        <div class="kv-line"><span class="k">HQ Team</span><span class="v">${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</span></div>
+        <div class="kv-line"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? escapeHtml(c.lastOwnerContact.channel) + ' · ' + fmtRelative(c.lastOwnerContact.at) : '<span class="muted">—</span>'}</span></div>
+      </div>
+      <div class="reading-section">
+        <h3>Clocks</h3>
+        <div class="kv-line"><span class="k">SLA (on us)</span><span class="v"><strong>${fmtDuration(slaMs)}</strong>${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</span></div>
+        <div class="kv-line"><span class="k">FIT hold</span><span class="v">${fmtDuration(fitMs)}</span></div>
+        <div class="kv-line"><span class="k">HQ hold</span><span class="v">${fmtDuration(hqMs)}</span></div>
+      </div>
+      <div class="reading-section">
+        <h3>Latest handover</h3>
+        ${handoverHtml}
+      </div>
+      <div class="reading-section">
+        <h3>Notes</h3>
+        <div>${escapeHtml(c.notes || '—')}</div>
+      </div>
+      <div class="reading-section reading-section-wide">
+        <h3>Recent history</h3>
+        <ul class="history">${recentHistory || '<li class="muted">No history.</li>'}</ul>
+      </div>
+    </div>
   `;
 }
 
@@ -1685,6 +1786,13 @@ function bindHandlers() {
   document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
     tr.addEventListener('click', () => { location.hash = tr.dataset.href; });
   });
+  document.querySelectorAll('[data-action="kanban-select"]').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('button, a')) return;
+      STATE.kanbanSelected = card.dataset.caseId;
+      render();
+    });
+  });
   document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
   const resetLink = document.getElementById('reset-state');
   if (resetLink && resetLink.dataset.bound !== '1') {
@@ -1709,6 +1817,9 @@ function bindHandlers() {
       const q = filter.value.toLowerCase();
       document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
         tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+      document.querySelectorAll('.kanban-card').forEach(card => {
+        card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
       });
     });
   }
