@@ -2492,25 +2492,10 @@ function renderKanbanCard(c) {
 
 function renderReadingPanel(c) {
   if (!c) {
-    return `<div class="reading-empty">Click a case above to read its details here.</div>`;
+    return `<div class="reading-empty">Click a case above to read its full detail here.</div>`;
   }
-  const fit = getOwner('fit', c.fitId);
-  const hq = getOwner('hq', c.hqId);
   const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
-  const slaMs = caseSlaMs(c);
-  const fitMs = caseHoldMs(c, 'fit');
-  const hqMs = caseHoldMs(c, 'hq');
-
-  const handoverHtml = c.handover
-    ? `<div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
-        ${escapeHtml(c.handover.note)}
-        <div class="meta">${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)} · ${escapeHtml(c.handover.author)} · ${fmtRelative(c.handover.at)}</div>
-       </div>`
-    : '<div class="muted tiny">No handover note.</div>';
-
-  const recentHistory = (c.history || []).slice(-3).reverse().map(h => `
-    <li><span class="when">${fmtAbsolute(h.at)}</span><span><strong>${escapeHtml(h.kind)}</strong>${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span></li>
-  `).join('');
+  const actions = renderDetailActions(c);
 
   return `
     <div class="reading-header">
@@ -2518,59 +2503,23 @@ function renderReadingPanel(c) {
         <div class="row-flex">
           <a class="mono muted" href="#/cases/${c.id}">${c.id}</a>
           <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-          <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
           ${flags}
         </div>
-        <h2>${escapeHtml(c.subject)}</h2>
+        <h2 style="margin-top:6px;">${escapeHtml(c.subject)}</h2>
         <div class="muted tiny"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
       </div>
-      <div class="reading-actions">
-        ${renderQueueToggleButton(c, 'normal')}
-        ${renderBellButton(c, 'reading')}
-        <a class="btn btn-primary" href="#/cases/${c.id}">Open full case →</a>
-      </div>
+      <div class="reading-actions">${actions}</div>
     </div>
-    <div class="reading-body">
-      <div class="reading-section">
-        <h3>Routing</h3>
-        <div class="kv-line"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
-        <div class="kv-line"><span class="k">Local FIT</span><span class="v">${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</span></div>
-        <div class="kv-line"><span class="k">HQ Team</span><span class="v">${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</span></div>
-        <div class="kv-line"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? escapeHtml(c.lastOwnerContact.channel) + ' · ' + fmtRelative(c.lastOwnerContact.at) : '<span class="muted">—</span>'}</span></div>
-      </div>
-      <div class="reading-section">
-        <h3>Clocks</h3>
-        <div class="kv-line"><span class="k">SLA (on us)</span><span class="v"><strong>${fmtDuration(slaMs)}</strong>${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</span></div>
-        <div class="kv-line"><span class="k">FIT hold</span><span class="v">${fmtDuration(fitMs)}</span></div>
-        <div class="kv-line"><span class="k">HQ hold</span><span class="v">${fmtDuration(hqMs)}</span></div>
-      </div>
-      <div class="reading-section">
-        <h3>Latest handover</h3>
-        ${handoverHtml}
-      </div>
-      <div class="reading-section">
-        <h3>Notes</h3>
-        <div>${escapeHtml(c.notes || '—')}</div>
-      </div>
-      <div class="reading-section reading-section-wide">
-        <h3>Recent history</h3>
-        <ul class="history">${recentHistory || '<li class="muted">No history.</li>'}</ul>
-      </div>
-    </div>
+    ${renderCaseDetailBody(c)}
   `;
 }
 
 /* ---------- Case Detail view ---------- */
 
-function renderCaseDetail(id) {
-  const c = caseById(id);
-  if (!c) {
-    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
-      <a class="btn" href="${escapeHtml(STATE.lastListRoute)}">← Back to ${escapeHtml(STATE.lastListLabel)}</a>`;
-  }
+function renderCaseDetailBody(c) {
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
 
   const slaMs = caseSlaMs(c);
   const fitMs = caseHoldMs(c, 'fit');
@@ -2594,24 +2543,7 @@ function renderCaseDetail(id) {
     </li>
   `).join('');
 
-  const actions = renderDetailActions(c);
-
   return `
-    <div class="page-header">
-      <div>
-        <div class="row-flex">
-          <a class="btn-link" href="${escapeHtml(STATE.lastListRoute)}">← ${escapeHtml(STATE.lastListLabel)}</a>
-          <span class="mono muted">${c.id}</span>
-          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-          <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
-          ${flags}
-        </div>
-        <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
-        <div class="subtitle"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
-      </div>
-      <div class="toolbar">${actions}</div>
-    </div>
-
     <div class="detail-grid">
       <div>
         <div class="card"><div class="card-body">
@@ -2665,6 +2597,35 @@ function renderCaseDetail(id) {
         </div></div>
       </div>
     </div>
+  `;
+}
+
+function renderCaseDetail(id) {
+  const c = caseById(id);
+  if (!c) {
+    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
+      <a class="btn" href="${escapeHtml(STATE.lastListRoute)}">← Back to ${escapeHtml(STATE.lastListLabel)}</a>`;
+  }
+  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+  const actions = renderDetailActions(c);
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex">
+          <a class="btn-link" href="${escapeHtml(STATE.lastListRoute)}">← ${escapeHtml(STATE.lastListLabel)}</a>
+          <span class="mono muted">${c.id}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
+          ${flags}
+        </div>
+        <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
+        <div class="subtitle"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+      </div>
+      <div class="toolbar">${actions}</div>
+    </div>
+
+    ${renderCaseDetailBody(c)}
   `;
 }
 
