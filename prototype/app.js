@@ -233,6 +233,7 @@ function currentRoute() {
   if (h.startsWith('#/archive')) return { name: 'archive' };
   if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
+  if (h.startsWith('#/flow')) return { name: 'flow' };
   return { name: 'queue' };
 }
 
@@ -252,6 +253,7 @@ function labelForRoute(route) {
       const w = window.WEEKS.find(w => w.id === route.id);
       return w ? w.label : 'Archive';
     }
+    case 'flow': return 'Status Flow';
     default: return 'Back';
   }
 }
@@ -270,6 +272,7 @@ function render() {
     queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover',
     archive: 'archive', archiveWeek: 'archive',
     shifts: 'shifts', shiftDetail: 'shifts',
+    flow: 'flow',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
@@ -281,6 +284,7 @@ function render() {
   else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
+  else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
   bindHandlers();
   saveState();
 }
@@ -1170,6 +1174,135 @@ function renderShiftDetail(shiftName) {
       <div class="section-block-header"><span>Recent handover activity by this shift</span></div>
       <ul class="activity-list">${activityHtml}</ul>
     </div>
+  `;
+}
+
+/* ---------- Status Flow ---------- */
+
+function renderStatusFlow() {
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Status Flow</h1>
+        <div class="subtitle">How a case moves through the lifecycle. Each arrow corresponds to a single option in the Change status… dropdown.</div>
+      </div>
+    </div>
+
+    <div class="flow-container">
+      <svg class="status-flow-svg" viewBox="0 0 980 580" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr-forward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+          </marker>
+          <marker id="arr-pause" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#0891b2"/>
+          </marker>
+          <marker id="arr-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/>
+          </marker>
+        </defs>
+
+        <g class="flow-node">
+          <rect x="40" y="40" width="120" height="60" rx="8" fill="#e0e7ff" stroke="#3730a3" stroke-width="2"/>
+          <text x="100" y="76" text-anchor="middle" font-weight="600" font-size="13">New</text>
+        </g>
+        <g class="flow-node">
+          <rect x="220" y="40" width="160" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <text x="300" y="76" text-anchor="middle" font-weight="600" font-size="13">With Local FIT</text>
+        </g>
+        <g class="flow-node">
+          <rect x="440" y="40" width="180" height="60" rx="8" fill="#fee2e2" stroke="#991b1b" stroke-width="2"/>
+          <text x="530" y="68" text-anchor="middle" font-weight="600" font-size="13">With HQ</text>
+          <text x="530" y="86" text-anchor="middle" font-size="11">Product Team</text>
+        </g>
+        <g class="flow-node">
+          <rect x="680" y="40" width="160" height="60" rx="8" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <text x="760" y="76" text-anchor="middle" font-weight="600" font-size="13">Sanity Check</text>
+        </g>
+
+        <g class="flow-node">
+          <rect x="300" y="250" width="240" height="60" rx="8" fill="#cffafe" stroke="#155e75" stroke-width="2"/>
+          <text x="420" y="278" text-anchor="middle" font-weight="600" font-size="13">Returned to Requester</text>
+          <text x="420" y="296" text-anchor="middle" font-size="11" fill="#155e75">SLA clock paused</text>
+        </g>
+
+        <g class="flow-node">
+          <rect x="680" y="450" width="160" height="60" rx="8" fill="#e5e7eb" stroke="#4b5563" stroke-width="2"/>
+          <text x="760" y="486" text-anchor="middle" font-weight="600" font-size="13">Closed</text>
+        </g>
+
+        <g class="flow-node">
+          <rect x="40" y="450" width="160" height="60" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="120" y="486" text-anchor="middle" font-weight="600" font-size="13" fill="#6b7280">Cancelled</text>
+        </g>
+
+        <g stroke="#2563eb" stroke-width="2" fill="none">
+          <path d="M160,70 L218,70" marker-end="url(#arr-forward)"/>
+          <path d="M380,70 L438,70" marker-end="url(#arr-forward)"/>
+          <path d="M620,70 L678,70" marker-end="url(#arr-forward)"/>
+          <path d="M760,100 L760,448" marker-end="url(#arr-forward)"/>
+        </g>
+        <g font-size="11" fill="#2563eb" font-weight="500">
+          <text x="189" y="34" text-anchor="middle">Assign FIT</text>
+          <text x="409" y="34" text-anchor="middle">Escalate to HQ</text>
+          <text x="649" y="34" text-anchor="middle">Move to Sanity</text>
+          <text x="772" y="280" text-anchor="start">Verify &amp; close</text>
+        </g>
+
+        <g stroke="#0891b2" stroke-width="2" fill="none">
+          <path d="M260,100 L340,248" marker-end="url(#arr-pause)"/>
+          <path d="M520,100 L470,248" marker-end="url(#arr-pause)"/>
+        </g>
+        <g font-size="11" fill="#0891b2" font-weight="500">
+          <text x="248" y="180" text-anchor="end">Return to requester</text>
+          <text x="540" y="180" text-anchor="start">Return to requester</text>
+        </g>
+
+        <g stroke="#0891b2" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
+          <path d="M360,250 Q310,180 290,100" marker-end="url(#arr-pause)"/>
+          <path d="M490,250 Q500,180 520,100" marker-end="url(#arr-pause)"/>
+          <path d="M540,275 Q650,210 740,102" marker-end="url(#arr-pause)"/>
+          <path d="M300,275 Q200,210 110,102" marker-end="url(#arr-pause)"/>
+        </g>
+        <g font-size="11" fill="#0891b2" font-style="italic">
+          <text x="610" y="220" text-anchor="middle">Resume (requester replied)</text>
+          <text x="200" y="220" text-anchor="middle">Resume (requester replied)</text>
+        </g>
+
+        <path d="M540,300 L678,460" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arr-forward)"/>
+        <text x="640" y="395" font-size="11" fill="#2563eb" text-anchor="middle" font-weight="500">Close as resolved</text>
+
+        <path d="M100,100 Q40,280 120,448" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-danger)"/>
+        <g font-size="11" fill="#dc2626" font-style="italic">
+          <text x="14" y="285">Cancel — from</text>
+          <text x="14" y="299">any open state</text>
+        </g>
+      </svg>
+
+      <div class="flow-legend">
+        <div class="legend-item"><span class="legend-swatch legend-forward"></span><span><strong>Forward</strong> — primary lifecycle path</span></div>
+        <div class="legend-item"><span class="legend-swatch legend-pause"></span><span><strong>Pause / resume</strong> — SLA clock pauses on return</span></div>
+        <div class="legend-item"><span class="legend-swatch legend-danger"></span><span><strong>Cancel</strong> — terminal, no resolution code</span></div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:24px;">Transitions reference</h2>
+    <table class="transition-table">
+      <thead>
+        <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Local FIT</td><td><span class="pill pill-with_fit">With Local FIT</span></td><td>FIT hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
+        <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
+        <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
+        <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
+        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>FIT / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
+        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Close as resolved</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
+        <tr><td>Any non-terminal</td><td>Cancel case</td><td><span class="pill pill-cancelled">Cancelled</span></td><td>All clocks stop · no resolution code</td></tr>
+      </tbody>
+    </table>
   `;
 }
 
