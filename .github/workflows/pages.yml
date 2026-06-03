@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/excel-replacement-tool-aHBnF
+      - claude/dual-status-case-kanban-WApps
     paths:
       - 'prototype/**'
       - '.github/workflows/pages.yml'
