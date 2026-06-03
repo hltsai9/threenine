@@ -1,0 +1,11 @@
+# Local Case Center credentials — NEVER commit these.
+local/secrets.local.json
+**/secrets.local.json
+*.secret.json
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor cruft
+.DS_Store

@@ -15,9 +15,40 @@ const STATE = {
 };
 
 const STORAGE_KEY = 'case-tracker-state-v3';
+// In live mode (served by local/serve.py, cases come from Case Center each refresh) we
+// persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
+// so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
+const AGENT_KEY = 'case-tracker-agent-v1';
+
+// The agent-owned fields that survive a live data refresh.
+function agentLayerFromState() {
+  const map = {};
+  for (const c of STATE.cases) {
+    map[c.id] = { agentStatus: c.agentStatus, handover: c.handover, reminder: c.reminder };
+  }
+  return map;
+}
+
+function applyAgentLayer(map) {
+  for (const c of STATE.cases) {
+    const a = map[c.id];
+    if (!a) { if (c.agentStatus == null) c.agentStatus = 'unqueued'; continue; }
+    if (a.agentStatus != null) c.agentStatus = a.agentStatus;
+    if (a.handover !== undefined) c.handover = a.handover;
+    if (a.reminder !== undefined) c.reminder = a.reminder;
+  }
+}
 
 function saveState() {
   try {
+    if (window.__LIVE__) {
+      localStorage.setItem(AGENT_KEY, JSON.stringify({
+        v: 1,
+        operatorId: STATE.operatorId,
+        agent: agentLayerFromState(),
+      }));
+      return;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       v: 3,
       cases: STATE.cases,
@@ -43,7 +74,12 @@ function loadState() {
 }
 
 function resetState() {
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(AGENT_KEY);
+  } catch (e) { /* ignore */ }
+  // In live mode the source of truth is Case Center — reload to re-pull fresh data.
+  if (window.__LIVE__) { location.reload(); return; }
   STATE.cases = window.CASES.map(c => structuredClone(c));
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
   STATE.lastListRoute = '#/cases';
@@ -54,7 +90,9 @@ function resetState() {
 loadState();
 
 const HOUR = 3600 * 1000;
-const NOW = window.NOW;
+// Frozen demo clock by default (keeps the seeded SLA scenarios reproducible). In live mode
+// tryLoadLiveCases() advances this to the real current time so SLA math is correct.
+let NOW = window.NOW;
 
 /* ---------- Helpers ---------- */
 
@@ -1927,7 +1965,84 @@ function checkReminders() {
 setInterval(checkReminders, 10000);
 setTimeout(checkReminders, 200);
 
+/* ---------- Live data (Case Center via local/serve.py) ---------- */
+
+// Fill any board fields the API omits with safe defaults, so a partial Case Center record
+// can't crash the renderer. The Python adapter (local/casecenter.py) maps Case Center
+// statuses into the board's status enum; everything else falls back here.
+function normalizeLiveCase(c) {
+  const nowIso = new Date(NOW).toISOString();
+  return Object.assign({
+    flags: [],
+    priority: 'medium',
+    caseType: 'access',
+    fitId: null, hqId: null, currentOwner: null,
+    slaPaused: false, slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: null,
+    handover: null,
+    reminder: undefined,
+    agentStatus: 'unqueued',
+    history: [],
+    weekId: window.CURRENT_WEEK.id,   // default to current week so live cases show on the board
+    caseLink: '',
+    requester: '',
+    notes: '',
+    subject: '(no subject)',
+    slaStartedAt: c.createdAt || nowIso,
+    createdAt: c.slaStartedAt || nowIso,
+  }, c);
+}
+
+// Try the local backend. Returns true if live Case Center data was loaded; false otherwise
+// (public Pages demo, file://, or backend down) — in which case the seed data stays.
+async function tryLoadLiveCases() {
+  // Only meaningful when served over http(s) (i.e. by local/serve.py). Skip for file://
+  // and avoid a noisy console error when someone just opens standalone.html directly.
+  if (!/^https?:$/.test(location.protocol)) return false;
+  let res;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    res = await fetch('api/cases', { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    clearTimeout(t);
+  } catch (e) {
+    return false; // no local backend reachable → seed/demo mode
+  }
+  if (!res.ok) return false;
+  let data;
+  try { data = await res.json(); } catch (e) { return false; }
+  const cases = Array.isArray(data) ? data : (data && data.cases);
+  if (!Array.isArray(cases)) return false;
+
+  window.__LIVE__ = true;
+  NOW = new Date(); // real time for SLA math against live timestamps
+  STATE.cases = cases.map(normalizeLiveCase);
+
+  // Re-apply the operator's local layer (queue placement, handover notes, reminders).
+  try {
+    const raw = localStorage.getItem(AGENT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
+        STATE.operatorId = parsed.operatorId;
+      }
+      applyAgentLayer(parsed.agent || {});
+    }
+  } catch (e) { /* ignore corrupt local layer */ }
+  return true;
+}
+
 /* ---------- Boot ---------- */
 
-if (!location.hash) location.hash = '#/cases';
-render();
+async function boot() {
+  if (!location.hash) location.hash = '#/cases';
+  render(); // immediate paint from seed / saved state
+  const live = await tryLoadLiveCases();
+  if (live) {
+    render(); // repaint with live Case Center data + merged agent layer
+    showToast(`Live: loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} from Case Center.`, 'success');
+  }
+}
+
+boot();
