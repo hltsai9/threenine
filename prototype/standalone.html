@@ -2301,12 +2301,24 @@ function fmtRelative(iso) {
   if (diff < 60_000) return 'just now';
   return `${fmtDuration(diff)} ago`;
 }
+// Viewer's local timezone abbreviation (e.g. "PDT", "GMT+8"), computed once.
+const LOCAL_TZ = (() => {
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value || '';
+  } catch (e) { return ''; }
+})();
+
+// Absolute case timestamps are shown in the viewer's LOCAL time (case timestamps are
+// stored as ISO UTC; this renders them where the operator actually is).
 function fmtAbsolute(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  const date = d.toISOString().slice(0, 10);
-  const time = d.toISOString().slice(11, 16);
-  return `${date} ${time}Z`;
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${date} ${time}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({
