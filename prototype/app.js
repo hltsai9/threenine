@@ -14,7 +14,7 @@ const STATE = {
   lastListLabel: 'Cases',
 };
 
-const STORAGE_KEY = 'case-tracker-state-v3';
+const STORAGE_KEY = 'case-tracker-state-v4';
 // In live mode (served by local/serve.py, cases come from Case Center each refresh) we
 // persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
 // so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
@@ -50,9 +50,10 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 3,
+      v: 4,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
+      anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
     }));
   } catch (e) { /* SecurityError on some file:// origins, ignore */ }
 }
@@ -62,8 +63,9 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 3 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 4 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
+    if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
       STATE.operatorId = parsed.operatorId;
     }
@@ -81,6 +83,7 @@ function resetState() {
   // In live mode the source of truth is Case Center — reload to re-pull fresh data.
   if (window.__LIVE__) { location.reload(); return; }
   STATE.cases = window.CASES.map(c => structuredClone(c));
+  anchorFreshSeed();   // re-anchor the pristine seed on the real current time
   // Restore the roster to the data.js values (the editor mutates these in place).
   window.OPERATORS = structuredClone(SEED_ROSTER.operators);
   window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
@@ -99,12 +102,49 @@ const SEED_ROSTER = {
   currentOperatorId: window.CURRENT_OPERATOR_ID,
 };
 
-loadState();
-
 const HOUR = 3600 * 1000;
-// Frozen demo clock by default (keeps the seeded SLA scenarios reproducible). In live mode
-// tryLoadLiveCases() advances this to the real current time so SLA math is correct.
+
+// The demo clock. The seed in data.js is authored around SEED_ANCHOR; on boot we shift
+// every seed timestamp by a single offset so "now" lands on the real current time — this
+// keeps all the curated durations (SLA, idle, shift-ending) intact while making timestamps
+// real and never in the future. Live mode (Case Center) sets NOW to real time directly.
 let NOW = window.NOW;
+const SEED_ANCHOR = window.NOW.getTime();
+const SEED_CURRENT_SHIFT = structuredClone(window.CURRENT_SHIFT);
+
+function shiftIso(v, off) { return v ? new Date(new Date(v).getTime() + off).toISOString() : v; }
+function shiftCaseTimes(c, off) {
+  c.createdAt = shiftIso(c.createdAt, off);
+  c.slaStartedAt = shiftIso(c.slaStartedAt, off);
+  c.holdStartedAt = shiftIso(c.holdStartedAt, off);
+  if (c.closedAt) c.closedAt = shiftIso(c.closedAt, off);
+  if (c.lastOwnerContact) c.lastOwnerContact.at = shiftIso(c.lastOwnerContact.at, off);
+  if (c.handover) c.handover.at = shiftIso(c.handover.at, off);
+  if (c.reminder) c.reminder.fireAt = shiftIso(c.reminder.fireAt, off);
+  (c.history || []).forEach(h => { h.at = shiftIso(h.at, off); });
+}
+function applyShiftToCurrentShift(off) {
+  window.CURRENT_SHIFT = structuredClone(SEED_CURRENT_SHIFT);
+  window.CURRENT_SHIFT.endsAtUtc = shiftIso(SEED_CURRENT_SHIFT.endsAtUtc, off);
+}
+// Shift the pristine seed (already cloned into STATE.cases) so it anchors on real now.
+function anchorFreshSeed() {
+  const off = Date.now() - SEED_ANCHOR;
+  STATE.cases.forEach(c => shiftCaseTimes(c, off));
+  STATE.anchorOffset = off;
+  applyShiftToCurrentShift(off);
+  NOW = new Date();
+}
+function seedBoot(loadedFromStorage) {
+  if (loadedFromStorage && typeof STATE.anchorOffset === 'number') {
+    applyShiftToCurrentShift(STATE.anchorOffset); // restored cases already carry this offset
+    NOW = new Date();
+  } else {
+    anchorFreshSeed();
+  }
+}
+
+seedBoot(loadState());
 
 /* ---------- Helpers ---------- */
 
@@ -203,6 +243,14 @@ function fmtAbsolute(iso) {
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return `${date} ${time}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+}
+// Compact local "M/D HH:MM" for timeline transition markers (full time on hover).
+function fmtClockShort(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 // Local HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
 function fmtLocalTime(iso) {
@@ -802,9 +850,24 @@ function renderOwnershipTimeline(c) {
   }).join('');
 
   const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
+  // A timestamp marker at every transition (segment start) plus the end (now / closed).
+  const bounds = segs.map(s => s.start).concat([last]);
+  let prevPct = -99;
+  const marks = bounds.map((b, i) => {
+    const pct = ((b - first) / span) * 100;
+    const isEnd = i === bounds.length - 1;
+    const label = (isEnd && !terminal) ? 'now' : fmtClockShort(new Date(b).toISOString());
+    const row = (pct - prevPct < 7) ? 1 : 0;  // stagger markers that sit too close together
+    prevPct = pct;
+    const horiz = pct <= 1 ? 'left:0;text-align:left'
+      : pct >= 99 ? 'left:100%;transform:translateX(-100%);text-align:right'
+        : `left:${pct}%;transform:translateX(-50%)`;
+    return `<span class="tl-mark" style="${horiz};top:${row * 13}px" title="${escapeHtml(fmtAbsolute(new Date(b).toISOString()))}">${escapeHtml(label)}</span>`;
+  }).join('');
+
   return `
     <div class="timeline" role="img" aria-label="Ownership timeline">${bar}</div>
-    <div class="tl-axis"><span>${fmtAbsolute(new Date(first).toISOString())}</span><span>${terminal ? statusLabel(c.status) : 'now'}</span></div>
+    <div class="tl-marks">${marks}</div>
     <div class="tl-legend">${legend}</div>
   `;
 }

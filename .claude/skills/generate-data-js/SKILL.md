@@ -174,7 +174,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 
 ## Generation recipe
 
-1. **Pick the demo NOW.** A weekday mid-shift time is best (e.g. Friday 13:00 UTC). All other timestamps anchor off it.
+1. **Pick the demo NOW.** A weekday mid-shift time is best (e.g. Friday 13:00 UTC). All other timestamps anchor off it. (At load the app shifts every seed timestamp by one offset so "now" lands on the viewer's real current time — so authoring everything *relative to* `window.NOW` is what keeps the scenario correct and free of future timestamps.)
 2. **Build the calendar.** Set `CURRENT_WEEK` to the ISO week containing NOW. Add 3 prior weeks to `WEEKS`. Use `'W{NN}-{YYYY}'` ids.
 3. **Decide the active operator and shift.** `CURRENT_OPERATOR_ID` + `CURRENT_SHIFT.endsAtUtc` (typically NOW − 1h to show "ends soon" coloring, or NOW + a few hours).
 4. **Write active cases first** (current week), then historical closed/cancelled cases for prior weeks.

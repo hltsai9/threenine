@@ -754,6 +754,12 @@ table.case-table {
 }
 .tl-seg + .tl-seg { border-left: 1px solid rgba(255, 255, 255, .65); }
 .tl-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+/* transition timestamp markers under the bar */
+.tl-marks { position: relative; height: 28px; margin-top: 3px; }
+.tl-mark {
+  position: absolute; top: 0; font-size: 9px; line-height: 1.2;
+  color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 .tl-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; }
 .tl-key { display: inline-flex; align-items: center; gap: 5px; }
 .tl-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
