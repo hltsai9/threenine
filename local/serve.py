@@ -87,6 +87,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(msg)
             return
+        # Never let the browser reuse a cached/304 copy of the board files while developing.
+        for h in ("If-Modified-Since", "If-None-Match"):
+            if h in self.headers:
+                del self.headers[h]
         super().do_GET()
 
     def _serve_cases(self):
@@ -108,7 +112,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # Never let the browser cache the app or the data while developing locally.
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         super().end_headers()
 
 
