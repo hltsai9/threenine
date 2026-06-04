@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Case Tracker — Shift &amp; Operator Editor</title>
+<style>
+  :root{
+    --accent:#2563eb; --good:#059669; --danger:#dc2626; --warn:#d97706;
+    --text:#111827; --text-muted:#6b7280; --border:#e5e7eb; --bg:#f5f6f8;
+    --panel:#fff; --sidebar:#1f2937;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.45}
+  header{background:var(--sidebar);color:#fff;padding:16px 24px}
+  header h1{margin:0;font-size:18px}
+  header .sub{color:#cbd5e1;font-size:13px;margin-top:4px}
+  main{max-width:1040px;margin:0 auto;padding:24px;display:grid;gap:20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+  .card h2{margin:0 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--text)}
+  .card .hint{color:var(--text-muted);font-size:12px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);font-weight:600}
+  input,select{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:6px;width:100%;background:#fff;color:var(--text)}
+  input.mono{font-family:var(--mono);font-size:12px}
+  .btn{font:inherit;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:6px;padding:7px 12px;font-weight:600}
+  .btn:hover{border-color:var(--accent)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-ghost{border:none;background:transparent;color:var(--danger);padding:4px 8px}
+  .btn-row{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .col-id{width:170px} .col-shift{width:170px} .col-hours{width:230px} .col-x{width:44px;text-align:right}
+  .pill{display:inline-block;background:var(--border);border-radius:999px;padding:1px 8px;font-size:11px;color:var(--text)}
+  .out-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+  textarea{width:100%;min-height:300px;font-family:var(--mono);font-size:12.5px;border:1px solid var(--border);border-radius:8px;padding:12px;background:#0b1020;color:#e6edf3;line-height:1.5;white-space:pre;overflow:auto}
+  .warnings{margin:0;padding:0;list-style:none}
+  .warnings li{color:var(--warn);font-size:12.5px;padding:2px 0}
+  .warnings li.err{color:var(--danger)}
+  .ok{color:var(--good);font-size:12.5px}
+  .muted{color:var(--text-muted)} .tiny{font-size:12px}
+  code{font-family:var(--mono);background:#eef1f5;padding:1px 5px;border-radius:4px;font-size:12px}
+  .copied{color:var(--good);font-size:12px;margin-left:8px;opacity:0;transition:opacity .15s}
+  .copied.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Shift &amp; Operator Editor</h1>
+  <div class="sub">Add shifts and operators, then copy the generated snippet into <code style="color:#fff;background:#374151">prototype/data.js</code>.</div>
+</header>
+<main>
+  <div class="card">
+    <h2>Shifts</h2>
+    <div class="hint">The coverage windows. Each operator is assigned to one shift below; a shift's roster (<code>operatorIds</code>) is filled in automatically.</div>
+    <table id="shift-table">
+      <thead><tr><th class="col-shift">Shift name</th><th class="col-hours">Hours (UTC, free text)</th><th class="col-x"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="btn-row"><button class="btn" id="add-shift">+ Add shift</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Operators</h2>
+    <div class="hint">Name is shown in the operator switcher. The ID is auto-suggested from the name (used internally / for "you"); edit it if you like, but keep it unique.</div>
+    <table id="op-table">
+      <thead><tr><th>Name</th><th class="col-shift">Shift</th><th class="col-id">ID</th><th class="col-x"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="btn-row">
+      <button class="btn" id="add-op">+ Add operator</button>
+      <span style="margin-left:auto" class="tiny muted">Default operator ("you"):</span>
+      <select id="current-op" style="width:220px"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="out-head">
+      <div>
+        <h2 style="margin:0">Generated snippet</h2>
+        <div class="hint" style="margin:0">Replace the <code>window.OPERATORS</code>, <code>window.SHIFTS</code> and <code>window.CURRENT_OPERATOR_ID</code> lines in <code>prototype/data.js</code> with this.</div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <button class="btn btn-primary" id="copy">Copy</button>
+        <span class="copied" id="copied">Copied ✓</span>
+      </div>
+    </div>
+    <ul class="warnings" id="warnings"></ul>
+    <textarea id="output" readonly spellcheck="false"></textarea>
+  </div>
+</main>
+
+<script>
+// ---- initial state mirrors the current prototype/data.js ----
+let shifts = [
+  { name: 'Day',   hoursUtc: '08:00 – 20:00 UTC' },
+  { name: 'Night', hoursUtc: '20:00 – 08:00 UTC' },
+];
+let operators = [
+  { id: 'op-da', name: 'Mia (DA)', shift: 'Day',   idEdited: true },
+  { id: 'op-na', name: 'Ren (NA)', shift: 'Night', idEdited: true },
+  { id: 'op-db', name: 'Kai (DB)', shift: 'Day',   idEdited: true },
+  { id: 'op-nb', name: 'Yui (NB)', shift: 'Night', idEdited: true },
+];
+let currentOperatorId = 'op-da';
+
+const $ = sel => document.querySelector(sel);
+
+// ---- id suggestion from a name ----
+function slugId(name) {
+  const paren = (name.match(/\(([^)]+)\)/) || [])[1];     // prefer initials in (…)
+  let base = (paren || name).toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!base) base = 'op';
+  return 'op-' + base.slice(0, 12);
+}
+function uniqueId(want, ignoreIndex) {
+  const taken = new Set(operators.filter((_, i) => i !== ignoreIndex).map(o => o.id));
+  if (!taken.has(want)) return want;
+  let n = 2;
+  while (taken.has(want + n)) n++;
+  return want + n;
+}
+
+// ---- render ----
+function renderShifts() {
+  const tb = $('#shift-table tbody');
+  tb.innerHTML = shifts.map((s, i) => `
+    <tr data-i="${i}">
+      <td><input data-f="name" value="${esc(s.name)}" placeholder="e.g. Day"></td>
+      <td><input data-f="hoursUtc" value="${esc(s.hoursUtc)}" placeholder="08:00 – 20:00 UTC"></td>
+      <td class="col-x"><button class="btn-ghost" data-del-shift="${i}" title="Remove shift">✕</button></td>
+    </tr>`).join('');
+}
+function renderOperators() {
+  const tb = $('#op-table tbody');
+  const opts = shifts.map(s => s.name);
+  tb.innerHTML = operators.map((o, i) => `
+    <tr data-i="${i}">
+      <td><input data-f="name" value="${esc(o.name)}" placeholder="e.g. Sam (SA)"></td>
+      <td><select data-f="shift">${opts.map(n => `<option value="${esc(n)}"${n === o.shift ? ' selected' : ''}>${esc(n)}</option>`).join('')}${opts.includes(o.shift) ? '' : `<option selected value="${esc(o.shift)}">${esc(o.shift)} (missing)</option>`}</select></td>
+      <td><input class="mono" data-f="id" value="${esc(o.id)}" placeholder="op-…"></td>
+      <td class="col-x"><button class="btn-ghost" data-del-op="${i}" title="Remove operator">✕</button></td>
+    </tr>`).join('');
+}
+function renderCurrentOp() {
+  const sel = $('#current-op');
+  sel.innerHTML = operators.map(o => `<option value="${esc(o.id)}"${o.id === currentOperatorId ? ' selected' : ''}>${esc(o.name)} — ${esc(o.shift)}</option>`).join('');
+}
+function renderAll() { renderShifts(); renderOperators(); renderCurrentOp(); regenerate(); }
+
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---- JS string literal in data.js style (single quotes) ----
+function q(s){ return "'" + String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'"; }
+
+// ---- generate output + warnings ----
+function regenerate() {
+  const warns = [];
+  const ids = operators.map(o => o.id);
+  const dupes = ids.filter((id, i) => id && ids.indexOf(id) !== i);
+  if (dupes.length) warns.push({ err:true, msg:`Duplicate operator IDs: ${[...new Set(dupes)].join(', ')}` });
+  operators.forEach(o => {
+    if (!o.name.trim()) warns.push({ err:true, msg:`An operator is missing a name.` });
+    if (!o.id.trim()) warns.push({ err:true, msg:`Operator "${o.name||'(unnamed)'}" is missing an ID.` });
+    if (!shifts.some(s => s.name === o.shift)) warns.push({ err:true, msg:`Operator "${o.name||o.id}" is on shift "${o.shift}" which has no Shift row.` });
+  });
+  shifts.forEach(s => { if (!s.name.trim()) warns.push({ err:true, msg:`A shift is missing a name.` }); });
+  const shiftNames = shifts.map(s=>s.name);
+  shiftNames.filter((n,i)=>n&&shiftNames.indexOf(n)!==i).forEach(n=>warns.push({err:true,msg:`Duplicate shift name: ${n}`}));
+  shifts.forEach(s => { if (s.name && !operators.some(o => o.shift === s.name)) warns.push({ err:false, msg:`Shift "${s.name}" has no operators.` }); });
+  if (operators.length && !operators.some(o => o.id === currentOperatorId)) warns.push({ err:false, msg:`Default operator is not in the list — it will fall back to the first operator.` });
+
+  const opLines = operators.map(o => `  { id: ${q(o.id)}, name: ${q(o.name)}, shift: ${q(o.shift)} },`).join('\n');
+  const shiftLines = shifts.map(s => {
+    const roster = operators.filter(o => o.shift === s.name).map(o => q(o.id));
+    return `  { name: ${q(s.name)}, hoursUtc: ${q(s.hoursUtc)}, operatorIds: [${roster.join(', ')}] },`;
+  }).join('\n');
+  const cur = operators.some(o => o.id === currentOperatorId) ? currentOperatorId : (operators[0] && operators[0].id) || '';
+
+  const out =
+`window.OPERATORS = [
+${opLines}
+];
+
+window.SHIFTS = [
+${shiftLines}
+];
+
+window.CURRENT_OPERATOR_ID = ${q(cur)};`;
+
+  $('#output').value = out;
+  const ul = $('#warnings');
+  if (!warns.length) {
+    ul.innerHTML = `<li class="ok">✓ Looks good — ${operators.length} operator(s) across ${shifts.length} shift(s).</li>`;
+  } else {
+    ul.innerHTML = warns.map(w => `<li class="${w.err?'err':''}">${w.err?'✗':'⚠'} ${esc(w.msg)}</li>`).join('');
+  }
+}
+
+// ---- events (delegated) ----
+$('#shift-table').addEventListener('input', e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const i = +tr.dataset.i, f = e.target.dataset.f;
+  shifts[i][f] = e.target.value;
+  if (f === 'name') { renderOperators(); renderCurrentOp(); } // shift selects depend on names
+  regenerate();
+});
+$('#shift-table').addEventListener('click', e => {
+  const del = e.target.dataset.delShift; if (del === undefined) return;
+  shifts.splice(+del, 1); renderAll();
+});
+$('#add-shift').addEventListener('click', () => { shifts.push({ name:'', hoursUtc:'' }); renderShifts(); renderOperators(); regenerate(); });
+
+$('#op-table').addEventListener('input', e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const i = +tr.dataset.i, f = e.target.dataset.f, o = operators[i];
+  if (f === 'name') {
+    o.name = e.target.value;
+    if (!o.idEdited) { o.id = uniqueId(slugId(o.name), i); $(`#op-table tr[data-i="${i}"] input[data-f="id"]`).value = o.id; }
+  } else if (f === 'id') {
+    o.id = e.target.value; o.idEdited = true;
+  } else if (f === 'shift') {
+    o.shift = e.target.value;
+  }
+  if (f !== 'id') renderCurrentOp();
+  regenerate();
+});
+$('#op-table').addEventListener('click', e => {
+  const del = e.target.dataset.delOp; if (del === undefined) return;
+  operators.splice(+del, 1); renderAll();
+});
+$('#add-op').addEventListener('click', () => {
+  const shift = shifts[0] ? shifts[0].name : '';
+  const o = { id:'', name:'', shift, idEdited:false };
+  o.id = uniqueId('op-new', -1);
+  operators.push(o); renderOperators(); renderCurrentOp(); regenerate();
+  const rows = document.querySelectorAll('#op-table tbody tr, #op-table tr');
+  const last = document.querySelector(`#op-table tr[data-i="${operators.length-1}"] input[data-f="name"]`);
+  if (last) last.focus();
+});
+$('#current-op').addEventListener('change', e => { currentOperatorId = e.target.value; regenerate(); });
+
+$('#copy').addEventListener('click', async () => {
+  const ta = $('#output');
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly',''); }
+  const c = $('#copied'); c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200);
+});
+
+renderAll();
+</script>
+</body>
+</html>
