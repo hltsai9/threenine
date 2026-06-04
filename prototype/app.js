@@ -7,6 +7,20 @@
 //   c.agentStatus = first-line agent status ('queued' | 'unqueued'; drives the
 //                   top/bottom band split inside each column).
 
+// === CONFIG ===
+// How long to wait for the live /api/cases call (talking to Case Center) before giving up
+// and falling back to seed data. Increase this if your on-prem Case Center is slow.
+// Adjust without editing this file by adding ?liveTimeout=SECONDS to the URL,
+// e.g.  http://127.0.0.1:8787/?liveTimeout=60   (60 seconds)
+const LIVE_FETCH_TIMEOUT_MS = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('liveTimeout');
+    if (q != null && q !== '' && !isNaN(+q)) return Math.max(1000, +q * 1000);
+  } catch (e) { /* ignore */ }
+  if (typeof window.LIVE_FETCH_TIMEOUT_MS === 'number') return window.LIVE_FETCH_TIMEOUT_MS;
+  return 30000;   // default: 30 seconds  ← edit this number to change the default
+})();
+
 const STATE = {
   cases: window.CASES.map(c => structuredClone(c)),
   operatorId: window.CURRENT_OPERATOR_ID,
@@ -2541,7 +2555,7 @@ async function tryLoadLiveCases() {
   let res;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 30000); // allow a slow on-prem Case Center call
+    const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
     res = await fetch('api/cases', { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     clearTimeout(t);
   } catch (e) {
