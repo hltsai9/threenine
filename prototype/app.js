@@ -146,7 +146,7 @@ function fmtDuration(ms) {
 // Reminders use real wall-clock time (vs. frozen NOW used for case state).
 function realNow() { return new Date(); }
 
-// Live wall-clock shown in the sidebar (real current date/time, local + UTC).
+// Live wall-clock shown in the sidebar — local-first (UTC kept on hover for reference).
 function updateClock() {
   const t = document.getElementById('clock-time');
   const d = document.getElementById('clock-date');
@@ -154,7 +154,9 @@ function updateClock() {
   const now = realNow();
   t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  d.textContent = `${date} · ${now.toISOString().slice(11, 16)} UTC`;
+  d.textContent = `${date}${LOCAL_TZ ? ' · ' + LOCAL_TZ : ''}`;
+  const wrap = t.closest('.sidebar-clock');
+  if (wrap) wrap.title = `UTC ${now.toISOString().slice(11, 16)}`;
 }
 function fmtUntil(iso) {
   const diff = new Date(iso).getTime() - realNow().getTime();
@@ -201,6 +203,27 @@ function fmtAbsolute(iso) {
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return `${date} ${time}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+}
+// Local HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
+function fmtLocalTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+}
+// Render a "HH:MM – HH:MM UTC" coverage window in local time (display only; the roster
+// still stores the canonical UTC text). Falls back to the raw string if unparseable.
+function fmtShiftHoursLocal(hoursUtc) {
+  const m = String(hoursUtc || '').match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
+  if (!m) return hoursUtc || '—';
+  const base = new Date();
+  const toLocal = (h, min) => {
+    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), +h, +min));
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  return `${toLocal(m[1], m[2])} – ${toLocal(m[3], m[4])}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({
@@ -373,7 +396,7 @@ function renderSidebar() {
   }
 
   document.getElementById('op-shift').textContent = op.shift;
-  document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
+  document.getElementById('op-ends').textContent = fmtLocalTime(window.CURRENT_SHIFT.endsAtUtc);
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
   updateClock();
 
@@ -1397,7 +1420,7 @@ function renderShiftsIndex() {
     return `
       <a class="shift-card ${isCurrent ? 'is-current' : ''}" href="#/shifts/${encodeURIComponent(sh.name)}">
         <div class="shift-name">${escapeHtml(sh.name)} shift ${isCurrent ? '<span class="badge-current">On now</span>' : ''}</div>
-        <div class="shift-hours">${escapeHtml(sh.hoursUtc)}</div>
+        <div class="shift-hours" title="${escapeHtml(sh.hoursUtc)}">${escapeHtml(fmtShiftHoursLocal(sh.hoursUtc))}</div>
         <div class="roster">${ops}</div>
         <div class="stats">
           <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Handed to</div></div>
@@ -1482,7 +1505,7 @@ function renderShiftDetail(shiftName) {
           ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}
         </div>
         <h1 style="margin-top:8px">${escapeHtml(sh.name)} shift</h1>
-        <div class="subtitle">${escapeHtml(sh.hoursUtc)} · handover boundary with ${escapeHtml(otherShift)} shift</div>
+        <div class="subtitle" title="${escapeHtml(sh.hoursUtc)}">${escapeHtml(fmtShiftHoursLocal(sh.hoursUtc))} · handover boundary with ${escapeHtml(otherShift)} shift</div>
       </div>
     </div>
 
