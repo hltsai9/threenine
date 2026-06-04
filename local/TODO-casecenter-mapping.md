@@ -39,21 +39,26 @@ is `Wait User` / `Return` under `In-Progress`. Mapped in `local/casecenter.py`:
 ### 3. caseLevel → priority  ✅
 `Normal → medium`, `Urgent → high` (`LEVEL_MAP` in `local/casecenter.py`).
 
-## Polish (confirm if they matter)
+## Polish (items 4–6)  ✅
 
-### 4. Requester & assignee
-- [ ] Is there a **requester/reporter** field to show? (Not in the field list → blank today.)
-- [ ] Turn `assignee.accountId` into a readable name/team? If yes, need an
-      `accountId → name` lookup or a Case Center user endpoint. If no, leave as `assigneeId`
-      (the column already conveys FIT vs HQ).
+### 4. People & departments  ✅
+Mapped in `map_record()` and shown on the case detail Routing section (and the card's
+owner slot falls back to the assignee when there's no FIT/HQ owner):
+- `customField.userAccount` / `userDept` → **requester** (+ `requesterDept`) — the end user.
+- `reporter.accountId` / `deptName` → **reporterId** / **reporterDept**.
+- `assignee.accountId` / `deptName` → **assigneeId** / **assigneeDept**.
+- Open item: these show the raw `accountId`. If you have an `accountId → display name`
+  lookup (or a CC user endpoint), wire it in `map_record()` to show names instead of ids.
 
-### 5. Case link
-- [ ] Is there a URL field, or a pattern to build from `caseId`
-      (e.g. `https://case-center.internal/cases/{caseId}`)? Set `caseLink` in `map_record()`.
+### 5. Case link  ✅
+`BASE_URL` constant at the top of `local/casecenter.py` (or `CASE_CENTER_BASE_URL` env var)
+— **fill it in**; `build_case_link()` appends the `caseId`. Adjust the pattern there if your
+URL needs e.g. `?id=`.
 
-### 6. createDateTime format
-- [ ] Confirm it's ISO-8601 like `2026-06-05T05:12:00Z`. If epoch ms / other, add a
-      conversion in `map_record()` so the SLA clock is correct.
+### 6. createDateTime format  ✅
+Confirmed GMT ISO-8601 with millis/offset (`2026-06-04T20:57:18.742+00:00`). The browser
+parses it directly and renders it in local time — no conversion needed; passed through as
+`createdAt` / `slaStartedAt`.
 
 ## Live-mode gaps from later features (timeline, owner-hold, SLA, archive)
 

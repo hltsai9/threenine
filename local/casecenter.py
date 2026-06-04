@@ -21,8 +21,10 @@ Status enum (this is the *Case Center status*, it drives the kanban columns):
     new | with_fit | with_hq | sanity_check | returned_to_requester
     | resolved | closed | cancelled
 Optional (sensible defaults applied in the browser if omitted):
-    caseLink, requester, priority (low|medium|high), caseType,
-    createdAt / slaStartedAt (ISO-8601, e.g. "2026-06-05T05:12:00Z"), notes
+    caseLink (built from BASE_URL + caseId), ccStatusLabel (the displayed CC status),
+    requester + requesterDept (the end user), reporterId + reporterDept,
+    assigneeId + assigneeDept, priority (low|medium|high), caseType,
+    createdAt / slaStartedAt (ISO-8601 GMT, e.g. "2026-06-04T20:57:18.742+00:00"), notes
 The agent layer (queue placement, handover notes, reminders) is LOCAL to the
 browser and must NOT come from Case Center — it is merged back automatically.
 """
@@ -30,6 +32,18 @@ import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# >>> FILL IN: your Case Center base URL, used to build a clickable link per case.
+#     The caseId is appended to it (adjust build_case_link() below if your URL pattern
+#     differs, e.g. needs "?id="). Can also be set via the CASE_CENTER_BASE_URL env var.
+#     Example: "https://case-center.internal/case/"
+BASE_URL = os.environ.get("CASE_CENTER_BASE_URL", "") or ""
+
+
+def build_case_link(case_id):
+    if not BASE_URL or not case_id:
+        return ""
+    return BASE_URL.rstrip("/") + "/" + str(case_id)
 
 
 def _load_secrets():
@@ -107,9 +121,13 @@ def map_priority(case_level):
 def map_record(r):
     """Translate a single Case Center record (one element of x_json['data']) into a
     board case dict. Field names below match what you provided."""
+    reporter = r.get("reporter") or {}
     assignee = r.get("assignee") or {}
+    custom = r.get("customField") or {}
+    case_id = str(r.get("caseId") or "")
     return {
-        "id": str(r.get("caseId") or ""),
+        "id": case_id,
+        "caseLink": build_case_link(case_id),
         "subject": r.get("subject") or "(no subject)",
         "status": map_status(r.get("caseStatus"), r.get("caseSubstatus")),
         # Real Case Center status shown on the board (caseStatus + caseSubstatus), e.g.
@@ -117,14 +135,19 @@ def map_record(r):
         # above only drives which column the card sits in.
         "ccStatusLabel": status_label(r.get("caseStatus"), r.get("caseSubstatus")),
         "priority": map_priority(r.get("caseLevel")),
+        # createDateTime is GMT ISO-8601 with millis/offset (e.g. 2026-06-04T20:57:18.742+00:00);
+        # the browser parses it directly and renders it in the viewer's local time.
         "createdAt": r.get("createDateTime"),
         "slaStartedAt": r.get("createDateTime"),
-        # Case Center assignee account id. The board's visible "owner" is a FIT/HQ desk
-        # from data.js, so this id is stored for reference but won't resolve to a name
-        # unless you add an accountId -> owner lookup (tell me if you want that).
+        # People. The board "requester" is the end user the case is about.
+        "requester": custom.get("userAccount") or "",
+        "requesterDept": custom.get("userDept"),
+        "reporterId": reporter.get("accountId"),
+        "reporterDept": reporter.get("deptName"),
         "assigneeId": assignee.get("accountId"),
+        "assigneeDept": assignee.get("deptName"),
         # Not provided by Case Center in your field list — left at board defaults:
-        # caseLink, requester, caseType, notes.
+        # caseType, notes.
     }
 
 

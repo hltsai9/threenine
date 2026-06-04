@@ -2848,7 +2848,7 @@ function renderKanbanCard(c) {
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
       <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
       <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : '<span class="muted">unassigned</span>'}</span>
+        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assigneeId ? escapeHtml(c.assigneeId) : '<span class="muted">unassigned</span>')}</span>
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
@@ -3079,7 +3079,9 @@ function renderCaseDetailBody(c) {
         <div class="card"><div class="card-body">
           <div class="detail-section">
             <h3>Routing</h3>
-            <div class="detail-row"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
+            <div class="detail-row"><span class="k">Requester</span><span class="v">${c.requester ? escapeHtml(c.requester) : '<span class="muted">—</span>'}${c.requesterDept ? ` <span class="muted">· ${escapeHtml(c.requesterDept)}</span>` : ''}</span></div>
+            ${c.reporterId ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporterId)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
+            ${c.assigneeId ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assigneeId)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
             <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
