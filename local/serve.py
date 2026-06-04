@@ -65,33 +65,38 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=WEBROOT, **kwargs)
 
     def do_GET(self):  # noqa: N802 (http.server naming)
-        path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "/api/cases":
-            self._serve_cases()
-            return
-        # Friendly message instead of a bare 404 when the board files aren't found.
-        if not WEBROOT_OK and path in ("", "/index.html"):
-            msg = (
-                "Case Tracker board files not found.\n\n"
-                "serve.py looked for index.html in:\n  " + WEBROOT + "\n\n"
-                "Fix it one of these ways:\n"
-                "  - run serve.py from inside the cloned repo (so ../prototype exists), or\n"
-                "  - point it at the prototype folder:\n"
-                "      CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py\n"
-                "      (or:  python3 serve.py /path/to/prototype)\n\n"
-                "The data feed still works: /api/cases\n"
-            ).encode("utf-8")
-            self.send_response(404)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Length", str(len(msg)))
-            self.end_headers()
-            self.wfile.write(msg)
-            return
-        # Never let the browser reuse a cached/304 copy of the board files while developing.
-        for h in ("If-Modified-Since", "If-None-Match"):
-            if h in self.headers:
-                del self.headers[h]
-        super().do_GET()
+        try:
+            path = self.path.split("?", 1)[0].rstrip("/")
+            if path == "/api/cases":
+                self._serve_cases()
+                return
+            # Friendly message instead of a bare 404 when the board files aren't found.
+            if not WEBROOT_OK and path in ("", "/index.html"):
+                msg = (
+                    "Case Tracker board files not found.\n\n"
+                    "serve.py looked for index.html in:\n  " + WEBROOT + "\n\n"
+                    "Fix it one of these ways:\n"
+                    "  - run serve.py from inside the cloned repo (so ../prototype exists), or\n"
+                    "  - point it at the prototype folder:\n"
+                    "      CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py\n"
+                    "      (or:  python3 serve.py /path/to/prototype)\n\n"
+                    "The data feed still works: /api/cases\n"
+                ).encode("utf-8")
+                self.send_response(404)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+                return
+            # Never let the browser reuse a cached/304 copy of the board files while developing.
+            for h in ("If-Modified-Since", "If-None-Match"):
+                if h in self.headers:
+                    del self.headers[h]
+            super().do_GET()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            # The browser closed the connection before we finished writing (reload, navigate
+            # away, or the page's fetch timed out). Harmless — don't dump a traceback.
+            print("  (client closed the connection before the response finished — ignored)")
 
     def _serve_cases(self):
         try:

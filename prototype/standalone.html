@@ -4674,7 +4674,7 @@ async function tryLoadLiveCases() {
   let res;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
+    const t = setTimeout(() => ctrl.abort(), 30000); // allow a slow on-prem Case Center call
     res = await fetch('api/cases', { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     clearTimeout(t);
   } catch (e) {
