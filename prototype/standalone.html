@@ -2434,6 +2434,13 @@ function statusLabel(s) {
   })[s] || s;
 }
 
+// Visible status label. Live Case Center cases carry ccStatusLabel (the raw
+// caseStatus + caseSubstatus, e.g. "In-Progress Wait User"); seed cases fall back to the
+// board enum label. The pill COLOR still uses the mapped enum (c.status).
+function displayStatus(c) {
+  return (c && c.ccStatusLabel) || statusLabel(c.status);
+}
+
 // Agent status: has the first-line agent pulled this case into their active queue?
 // Drives the top (queued) vs bottom (rest) band split inside each kanban column.
 function isQueued(c) { return c.agentStatus === 'queued'; }
@@ -2656,7 +2663,7 @@ function renderWatchlists(sla, escalated) {
       <a class="watch-row" href="#/cases/${c.id}">
         <span class="mono muted">${c.id}</span>
         <span class="watch-subject">${escapeHtml(c.subject)}</span>
-        <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+        <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
         <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
       </a>
     `;
@@ -2770,7 +2777,7 @@ function renderCaseList() {
           <div>
             <div class="row-flex">
               <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-              <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+              <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
               <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
             </div>
             <div class="reminder-subject">${escapeHtml(c.subject)}</div>
@@ -2865,7 +2872,7 @@ function renderReadingPanel(c) {
       <div>
         <div class="row-flex">
           <a class="mono muted" href="#/cases/${c.id}">${c.id}</a>
-          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
           ${flags}
         </div>
@@ -3080,7 +3087,7 @@ function renderCaseDetailBody(c) {
           </div>
           <div class="detail-section">
             <h3>Filing</h3>
-            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(statusLabel(c.status))}</span></div>
+            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(displayStatus(c))}</span></div>
             <div class="detail-row"><span class="k">Case type</span><span class="v">${escapeHtml(c.caseType)}</span></div>
             <div class="detail-row"><span class="k">Week</span><span class="v">${escapeHtml(c.weekId)}</span></div>
             <div class="detail-row"><span class="k">Created</span><span class="v">${fmtAbsolute(c.createdAt)} · ${escapeHtml(c.createdBy)}</span></div>
@@ -3106,7 +3113,7 @@ function renderCaseDetail(id) {
         <div class="row-flex">
           <a class="btn-link" href="${escapeHtml(STATE.lastListRoute)}">← ${escapeHtml(STATE.lastListLabel)}</a>
           <span class="mono muted">${c.id}</span>
-          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
           ${flags}
         </div>
@@ -3257,7 +3264,7 @@ function renderArchiveWeek(weekId) {
         <td>${escapeHtml(c.requester)}</td>
         <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
-        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}${carry}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
       </tr>
@@ -3649,7 +3656,7 @@ function renderShiftDetail(shiftName) {
         <div>
           <div class="row-flex">
             <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+            <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           </div>
           <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
         </div>

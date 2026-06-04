@@ -52,27 +52,30 @@ def _load_secrets():
 
 
 # ---- 2a. Map Case Center status -> the board's status enum ---------------------------
-# The board column for a case is its Case Center status. You have BOTH caseStatus and
-# caseSubstatus, so map on the (caseStatus, caseSubstatus) pair first, then fall back to
-# caseStatus alone. Board enum values:
+# The board column for a case is its Case Center status. We map on the
+# (caseStatus, caseSubstatus) pair first, then fall back to caseStatus alone.
+# Board enum values:
 #   new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
 #
-# >>> TODO: replace the example keys below with YOUR real caseStatus / caseSubstatus
-#     strings. I still need the list of possible values to finish this. <<<
+# Notes on choices (Case Center is coarser than the board in two places):
+#   - "In-Progress Wait User" -> returned_to_requester (waiting on the user; SLA-paused).
+#     sanity_check would land in the SAME board column ("Sanity Check / With Requester"),
+#     so the column is identical either way — change here if you prefer the green pill.
+#   - "Close" -> closed (the board's terminal/closed state; 'resolved' is the same column-less
+#     terminal outcome). Change to "resolved" if you want to distinguish them.
+#   - "In-Progress" / "Open" -> new (the operator then moves it to with_fit / with_hq).
 STATUS_MAP = {
     # (caseStatus, caseSubstatus): board_status
-    # ("Open",       "New"):              "new",
-    # ("Open",       "Local FIT"):        "with_fit",
-    # ("Open",       "HQ Product Team"):  "with_hq",
-    # ("Open",       "Validation"):       "sanity_check",
-    # ("Pending",    "Awaiting Customer"):"returned_to_requester",
+    ("In-Progress", "Return"):    "new",                    # requester returned the case to IT
+    ("In-Progress", "Wait User"): "returned_to_requester",  # waiting on the user
 }
 STATUS_MAP_BY_STATUS = {
     # caseStatus alone (used when the (status, substatus) pair isn't listed above)
-    # "Open":      "new",
-    # "Resolved":  "resolved",
-    # "Closed":    "closed",
-    # "Cancelled": "cancelled",
+    "Open":            "new",
+    "In-Progress":     "new",
+    "Wait Resolution": "with_hq",
+    "Close":           "closed",
+    "Drop":            "cancelled",
 }
 
 
@@ -84,11 +87,15 @@ def map_status(case_status, case_substatus):
     return "new"  # safe default so an unmapped case still shows up (in the New column)
 
 
+def status_label(case_status, case_substatus):
+    """Human label shown on the board = caseStatus + caseSubstatus (the real CC status)."""
+    return (str(case_status or "") + (" " + str(case_substatus) if case_substatus else "")).strip() or "—"
+
+
 # ---- 2b. Map caseLevel -> board priority (low | medium | high) ------------------------
-# >>> TODO: replace with YOUR real caseLevel values. <<<
 LEVEL_MAP = {
-    # "P1": "high", "P2": "high", "P3": "medium", "P4": "low",
-    # "1": "high", "2": "medium", "3": "low",
+    "Normal": "medium",
+    "Urgent": "high",
 }
 
 
@@ -105,6 +112,10 @@ def map_record(r):
         "id": str(r.get("caseId") or ""),
         "subject": r.get("subject") or "(no subject)",
         "status": map_status(r.get("caseStatus"), r.get("caseSubstatus")),
+        # Real Case Center status shown on the board (caseStatus + caseSubstatus), e.g.
+        # "In-Progress Wait User". The board uses this for the visible label; `status`
+        # above only drives which column the card sits in.
+        "ccStatusLabel": status_label(r.get("caseStatus"), r.get("caseSubstatus")),
         "priority": map_priority(r.get("caseLevel")),
         "createdAt": r.get("createDateTime"),
         "slaStartedAt": r.get("createDateTime"),

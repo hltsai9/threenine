@@ -9,25 +9,35 @@ bottom. Full context: `local/README.md`.
 - [x] Frontend live-fetch + seed fallback + agent-layer merge (`prototype/app.js`)
 - [x] `map_record()` wired to real fields: `caseId`, `subject`, `createDateTime`,
       `caseLevel`, `caseStatus`, `caseSubstatus`, `assignee.accountId`
-- [ ] **Value tables still empty** → every case currently lands in **New** / **medium**
+- [x] **Status / priority value tables filled** (see below) — cases now land in the right
+      columns and the board shows the real Case Center status.
 
-## Needed from the user (blockers)
+## Resolved with the user (items 1–3)
 
-### 1. caseStatus values
-- [ ] List every possible `caseStatus` string.
+### 1–2. caseStatus / caseSubstatus → column + label  ✅
+caseStatus ∈ `Open · In-Progress · Wait Resolution · Close · Drop`; the only substatus seen
+is `Wait User` / `Return` under `In-Progress`. Mapped in `local/casecenter.py`:
 
-### 2. caseSubstatus values + status mapping
-- [ ] List every possible `caseSubstatus` string (and which `caseStatus` each pairs with).
-- [ ] For each (caseStatus, caseSubstatus), say which board column it is:
-      `new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled`.
-- [ ] Confirm which field distinguishes **With Local FIT** vs **With HQ Product Team**
-      (hunch: `caseSubstatus`).
-- [ ] Fill `STATUS_MAP` (keyed on `(caseStatus, caseSubstatus)`) and
-      `STATUS_MAP_BY_STATUS` (caseStatus-only fallback) in `local/casecenter.py`.
+| Case Center (status + substatus) | board column (`status`) |
+| --- | --- |
+| Open | new |
+| In-Progress | new *(operator moves it to with_fit / with_hq)* |
+| In-Progress · Return | new *(requester returned the case to IT)* |
+| In-Progress · Wait User | returned_to_requester |
+| Wait Resolution | with_hq |
+| Close | closed |
+| Drop | cancelled |
 
-### 3. caseLevel → priority
-- [ ] List `caseLevel` values (e.g. P1/P2/P3 or 1/2/3).
-- [ ] Map each to `high | medium | low`; fill `LEVEL_MAP` in `local/casecenter.py`.
+- The **visible status label** is the raw `caseStatus + caseSubstatus` concatenation
+  (e.g. `In-Progress Wait User`) via `map_record()` → `ccStatusLabel`, shown by
+  `displayStatus()` in `app.js`. The pill **colour/column** uses the mapped enum.
+- Two coarseness decisions (change in `casecenter.py` if you disagree):
+  - `In-Progress Wait User` → `returned_to_requester` (same "Sanity Check / With Requester"
+    column as `sanity_check`, so the column is identical either way).
+  - `Close` → `closed` (rather than `resolved`).
+
+### 3. caseLevel → priority  ✅
+`Normal → medium`, `Urgent → high` (`LEVEL_MAP` in `local/casecenter.py`).
 
 ## Polish (confirm if they matter)
 
