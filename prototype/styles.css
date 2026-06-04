@@ -939,6 +939,43 @@ table.case-table {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 12px;
 }
+
+/* ---------- Roster editor (Shifts page) ---------- */
+.roster-editor { margin-top: 18px; }
+.roster-editor .re-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.roster-editor .re-head h3 { margin: 0; font-size: 15px; }
+.roster-editor .re-sub {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-muted); font-weight: 600; margin: 14px 0 6px;
+}
+.re-table { width: 100%; border-collapse: collapse; }
+.re-table th, .re-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.re-table th { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 600; }
+.re-table input, .re-table select { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; color: var(--text); }
+.re-table input.re-mono { font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace); font-size: 12px; }
+.re-table td.re-x { width: 40px; text-align: right; }
+.re-table td.re-refs { width: 84px; white-space: nowrap; }
+.re-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.re-actions select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+.re-warn { list-style: none; margin: 12px 0 0; padding: 0; }
+.re-warn li { font-size: 12.5px; color: var(--warn); padding: 1px 0; }
+.re-warn li.err { color: var(--danger); }
+.re-ok { font-size: 12.5px; color: var(--good); margin-top: 12px; }
+.re-out-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; }
+.re-copied { color: var(--good); font-size: 12px; margin-left: 8px; opacity: 0; transition: opacity .15s; }
+.re-copied.show { opacity: 1; }
+.re-output {
+  width: 100%; min-height: 220px; margin-top: 8px; padding: 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: #0b1020; color: #e6edf3;
+  font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace); font-size: 12.5px; line-height: 1.5;
+  white-space: pre; overflow: auto;
+}
+/* delete-operator modal */
+.re-refbox { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 13px; }
+.re-refbox ul { margin: 6px 0 0; padding-left: 18px; }
+.re-radio { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: 13px; cursor: pointer; }
+.re-radio input { margin-top: 3px; }
+.re-modesel select[data-field="to"] { margin: 4px 0 4px 24px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
 .shift-card {
   background: var(--panel);
   border: 1px solid var(--border);

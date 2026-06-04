@@ -946,6 +946,43 @@ table.case-table {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 12px;
 }
+
+/* ---------- Roster editor (Shifts page) ---------- */
+.roster-editor { margin-top: 18px; }
+.roster-editor .re-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.roster-editor .re-head h3 { margin: 0; font-size: 15px; }
+.roster-editor .re-sub {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-muted); font-weight: 600; margin: 14px 0 6px;
+}
+.re-table { width: 100%; border-collapse: collapse; }
+.re-table th, .re-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.re-table th { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 600; }
+.re-table input, .re-table select { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; color: var(--text); }
+.re-table input.re-mono { font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace); font-size: 12px; }
+.re-table td.re-x { width: 40px; text-align: right; }
+.re-table td.re-refs { width: 84px; white-space: nowrap; }
+.re-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.re-actions select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+.re-warn { list-style: none; margin: 12px 0 0; padding: 0; }
+.re-warn li { font-size: 12.5px; color: var(--warn); padding: 1px 0; }
+.re-warn li.err { color: var(--danger); }
+.re-ok { font-size: 12.5px; color: var(--good); margin-top: 12px; }
+.re-out-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; }
+.re-copied { color: var(--good); font-size: 12px; margin-left: 8px; opacity: 0; transition: opacity .15s; }
+.re-copied.show { opacity: 1; }
+.re-output {
+  width: 100%; min-height: 220px; margin-top: 8px; padding: 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: #0b1020; color: #e6edf3;
+  font-family: var(--mono, ui-monospace, Menlo, Consolas, monospace); font-size: 12.5px; line-height: 1.5;
+  white-space: pre; overflow: auto;
+}
+/* delete-operator modal */
+.re-refbox { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-size: 13px; }
+.re-refbox ul { margin: 6px 0 0; padding-left: 18px; }
+.re-radio { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: 13px; cursor: pointer; }
+.re-radio input { margin-top: 3px; }
+.re-modesel select[data-field="to"] { margin: 4px 0 4px 24px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
 .shift-card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -2089,11 +2126,23 @@ function resetState() {
   // In live mode the source of truth is Case Center — reload to re-pull fresh data.
   if (window.__LIVE__) { location.reload(); return; }
   STATE.cases = window.CASES.map(c => structuredClone(c));
+  // Restore the roster to the data.js values (the editor mutates these in place).
+  window.OPERATORS = structuredClone(SEED_ROSTER.operators);
+  window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
+  window.CURRENT_OPERATOR_ID = SEED_ROSTER.currentOperatorId;
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
   STATE.lastListRoute = '#/cases';
   STATE.lastListLabel = 'Cases';
   render();
 }
+
+// Pristine copy of the roster as defined in data.js, so "Reset to seed" can undo
+// any in-session edits made with the shift editor.
+const SEED_ROSTER = {
+  operators: structuredClone(window.OPERATORS),
+  shifts: structuredClone(window.SHIFTS),
+  currentOperatorId: window.CURRENT_OPERATOR_ID,
+};
 
 loadState();
 
@@ -2328,19 +2377,22 @@ function renderSidebar() {
     STATE.operatorId = window.CURRENT_OPERATOR_ID;
   }
   const op = getOperator(STATE.operatorId);
-  // Operator switcher
+  // Operator switcher — repopulate options every render so roster edits show up;
+  // attach the change listener only once.
   const sw = document.getElementById('op-switcher');
-  if (sw && sw.dataset.populated !== '1') {
+  if (sw) {
     sw.innerHTML = window.OPERATORS
       .map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
       .join('');
-    sw.addEventListener('change', () => {
-      STATE.operatorId = sw.value;
-      render();
-    });
-    sw.dataset.populated = '1';
+    if (sw.dataset.bound !== '1') {
+      sw.addEventListener('change', () => {
+        STATE.operatorId = sw.value;
+        render();
+      });
+      sw.dataset.bound = '1';
+    }
+    sw.value = STATE.operatorId;
   }
-  if (sw) sw.value = STATE.operatorId;
 
   document.getElementById('op-shift').textContent = op.shift;
   document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
@@ -2970,6 +3022,270 @@ function shiftStats(shiftName) {
   return { handedTo, handedFrom, writtenByShift, missingForShift, opIds };
 }
 
+/* ---------- Roster editor (Shifts page) ---------- */
+
+// Unique operator id suggested from a name (prefers initials in parentheses, e.g.
+// "Sam (SA)" -> op-sa), unique against the current operators.
+function makeOpId(name, exceptIndex) {
+  const paren = (String(name).match(/\(([^)]+)\)/) || [])[1];
+  const base = (paren || name || 'op').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 12) || 'op';
+  const want = 'op-' + base;
+  const taken = new Set(window.OPERATORS.filter((_, i) => i !== exceptIndex).map(o => o.id));
+  if (!taken.has(want)) return want;
+  let n = 2; while (taken.has(want + n)) n++;
+  return want + n;
+}
+
+// Keep each shift's operatorIds derived from operators' shift assignment.
+function syncShiftRosters() {
+  window.SHIFTS.forEach(s => {
+    s.operatorIds = window.OPERATORS.filter(o => o.shift === s.name).map(o => o.id);
+  });
+}
+
+// How many records would be orphaned if this operator id were removed.
+function operatorRefCounts(id) {
+  let created = 0, history = 0, handover = 0;
+  for (const c of STATE.cases) {
+    if (c.createdBy === id) created++;
+    if (c.handover && c.handover.author === id) handover++;
+    for (const h of (c.history || [])) if (h.who === id) history++;
+  }
+  return { created, history, handover, total: created + history + handover };
+}
+
+function rosterSnippet() {
+  const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const ops = window.OPERATORS.map(o => `  { id: ${q(o.id)}, name: ${q(o.name)}, shift: ${q(o.shift)} },`).join('\n');
+  const shifts = window.SHIFTS.map(s => {
+    const roster = window.OPERATORS.filter(o => o.shift === s.name).map(o => q(o.id));
+    return `  { name: ${q(s.name)}, hoursUtc: ${q(s.hoursUtc)}, operatorIds: [${roster.join(', ')}] },`;
+  }).join('\n');
+  const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
+    ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
+  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};`;
+}
+
+function rosterWarnings() {
+  const w = [];
+  const ids = window.OPERATORS.map(o => o.id);
+  [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate operator ID: ${id}` }));
+  window.OPERATORS.forEach(o => {
+    if (!String(o.name).trim()) w.push({ err: 1, msg: 'An operator is missing a name.' });
+    if (!window.SHIFTS.some(s => s.name === o.shift)) w.push({ err: 1, msg: `Operator "${o.name || o.id}" is on a shift that doesn't exist.` });
+  });
+  const sn = window.SHIFTS.map(s => s.name);
+  [...new Set(sn.filter((n, i) => n && sn.indexOf(n) !== i))].forEach(n => w.push({ err: 1, msg: `Duplicate shift name: ${n}` }));
+  window.SHIFTS.forEach(s => { if (s.name && !window.OPERATORS.some(o => o.shift === s.name)) w.push({ err: 0, msg: `Shift "${s.name}" has no operators.` }); });
+  return w;
+}
+
+function renderRosterEditor() {
+  const shiftRows = window.SHIFTS.map((s, i) => `
+    <tr data-si="${i}">
+      <td><input data-sf="name" value="${escapeHtml(s.name)}" placeholder="Day"></td>
+      <td><input data-sf="hoursUtc" value="${escapeHtml(s.hoursUtc)}" placeholder="08:00 – 20:00 UTC"></td>
+      <td class="re-x"><button class="btn-ghost re-del-shift" data-si="${i}" title="Remove shift">✕</button></td>
+    </tr>`).join('');
+  const shiftOpts = window.SHIFTS.map(s => s.name);
+  const opRows = window.OPERATORS.map((o, i) => {
+    const refs = operatorRefCounts(o.id);
+    const sel = shiftOpts.map(n => `<option value="${escapeHtml(n)}"${n === o.shift ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')
+      + (shiftOpts.includes(o.shift) ? '' : `<option selected value="${escapeHtml(o.shift)}">${escapeHtml(o.shift)} (missing)</option>`);
+    return `
+    <tr data-oi="${i}">
+      <td><input data-of="name" value="${escapeHtml(o.name)}" placeholder="Sam (SA)"></td>
+      <td><select data-of="shift">${sel}</select></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id)}" placeholder="op-…"></td>
+      <td class="re-refs tiny ${refs.total ? '' : 'muted'}" title="cases created · history entries · handover notes referencing this operator">${refs.total ? refs.total + ' ref' + (refs.total === 1 ? '' : 's') : '—'}</td>
+      <td class="re-x"><button class="btn-ghost re-del-op" data-oi="${i}" title="Remove operator">✕</button></td>
+    </tr>`;
+  }).join('');
+  const curOpts = window.OPERATORS.map(o => `<option value="${escapeHtml(o.id)}"${o.id === window.CURRENT_OPERATOR_ID ? ' selected' : ''}>${escapeHtml(o.name)} — ${escapeHtml(o.shift)}</option>`).join('');
+  const warns = rosterWarnings();
+  const warnHtml = warns.length
+    ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
+    : `<div class="re-ok">✓ ${window.OPERATORS.length} operator(s) across ${window.SHIFTS.length} shift(s).</div>`;
+
+  return `
+  <div class="card roster-editor" id="roster-editor">
+    <div class="re-head">
+      <h3>Edit shifts &amp; operators</h3>
+      <span class="muted tiny">Changes apply to this session. Copy the snippet into <code>prototype/data.js</code> to keep them. "Reset to seed" undoes session edits.</span>
+    </div>
+
+    <div class="re-sub">Shifts</div>
+    <table class="re-table"><thead><tr><th>Shift</th><th>Hours (UTC)</th><th class="re-x"></th></tr></thead><tbody>${shiftRows}</tbody></table>
+    <div class="re-actions"><button class="btn" id="re-add-shift">+ Add shift</button></div>
+
+    <div class="re-sub">Operators</div>
+    <table class="re-table"><thead><tr><th>Name</th><th>Shift</th><th>ID</th><th>Refs</th><th class="re-x"></th></tr></thead><tbody>${opRows}</tbody></table>
+    <div class="re-actions">
+      <button class="btn" id="re-add-op">+ Add operator</button>
+      <span class="muted tiny" style="margin-left:auto">Default operator ("you"):</span>
+      <select id="re-current">${curOpts}</select>
+    </div>
+
+    ${warnHtml}
+
+    <div class="re-out-head">
+      <div class="re-sub" style="margin:0">Snippet for <code>data.js</code></div>
+      <div><button class="btn btn-primary" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
+    </div>
+    <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
+  </div>`;
+}
+
+// Foolproof operator removal: never delete the last operator; reassign or knowingly
+// orphan any records that reference the operator; move the "default operator" if needed.
+function deleteOperator(i) {
+  const o = window.OPERATORS[i];
+  if (!o) return;
+  if (window.OPERATORS.length <= 1) { showToast('At least one operator is required.', 'warn'); return; }
+
+  const refs = operatorRefCounts(o.id);
+  const isDefault = window.CURRENT_OPERATOR_ID === o.id || STATE.operatorId === o.id;
+  const others = window.OPERATORS.filter((_, j) => j !== i);
+  const reassignOpts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)} (${escapeHtml(x.shift)})</option>`).join('');
+  const refBox = refs.total
+    ? `<div class="re-refbox"><strong>${escapeHtml(o.name || o.id)}</strong> is referenced by:
+         <ul><li>${refs.created} case(s) created</li><li>${refs.history} history entr${refs.history === 1 ? 'y' : 'ies'}</li><li>${refs.handover} active handover note(s)</li></ul></div>`
+    : '<div class="muted tiny">No cases reference this operator — safe to remove.</div>';
+
+  showModal(`
+    <h3>Delete operator “${escapeHtml(o.name || o.id)}”?</h3>
+    <div class="modal-sub mono tiny">${escapeHtml(o.id)}${isDefault ? ' · current default operator' : ''}</div>
+    ${refBox}
+    ${refs.total ? `
+      <div class="re-modesel">
+        <div style="font-weight:600;margin:10px 0 4px">What happens to those records?</div>
+        <label class="re-radio"><input type="radio" name="re-mode" value="reassign" checked> <span>Reassign them to another operator <span class="muted">(recommended — no broken references)</span></span></label>
+        <select data-field="to">${reassignOpts}</select>
+        <label class="re-radio"><input type="radio" name="re-mode" value="orphan"> <span>Delete anyway <span class="muted">— leaves records pointing at the removed ID</span></span></label>
+      </div>
+    ` : `<input type="hidden" data-field="to" value="${escapeHtml(others[0].id)}">`}
+    ${isDefault ? '<div class="muted tiny" style="margin-top:8px">The default operator will move to the reassignment target (or the first remaining operator).</div>' : ''}
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-danger" data-modal-submit>Delete operator</button>
+    </div>`,
+    (m) => {
+      const modeEl = m.querySelector('input[name="re-mode"]:checked');
+      const mode = modeEl ? modeEl.value : 'reassign';
+      const toField = m.querySelector('[data-field="to"]');
+      const toId = toField ? toField.value : others[0].id;
+      const reassign = refs.total > 0 && mode === 'reassign';
+      if (reassign) {
+        for (const c of STATE.cases) {
+          if (c.createdBy === o.id) c.createdBy = toId;
+          if (c.handover && c.handover.author === o.id) c.handover.author = toId;
+          for (const h of (c.history || [])) if (h.who === o.id) h.who = toId;
+        }
+      }
+      const idx = window.OPERATORS.findIndex(x => x.id === o.id);
+      window.OPERATORS.splice(idx, 1);
+      const fallback = reassign ? toId : window.OPERATORS[0].id;
+      if (window.CURRENT_OPERATOR_ID === o.id) window.CURRENT_OPERATOR_ID = fallback;
+      if (STATE.operatorId === o.id) STATE.operatorId = fallback;
+      syncShiftRosters();
+      showToast(
+        `Operator removed${refs.total ? (reassign ? `; records reassigned to ${getOperator(toId)?.name || toId}` : '; references left pointing at the old ID') : ''}.`,
+        refs.total && !reassign ? 'warn' : 'success'
+      );
+      render();
+      return true;
+    });
+}
+
+function deleteShift(i) {
+  const s = window.SHIFTS[i];
+  if (!s) return;
+  if (window.SHIFTS.length <= 1) { showToast('At least one shift is required.', 'warn'); return; }
+  const members = window.OPERATORS.filter(o => o.shift === s.name);
+  if (members.length === 0) {
+    showModal(`<h3>Delete shift “${escapeHtml(s.name)}”?</h3>
+      <div class="modal-sub">No operators are on this shift.</div>
+      <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Delete shift</button></div>`,
+      () => {
+        window.SHIFTS.splice(window.SHIFTS.findIndex(x => x === s), 1);
+        syncShiftRosters(); showToast('Shift deleted.', 'info'); render(); return true;
+      });
+    return;
+  }
+  const opts = window.SHIFTS.filter((_, j) => j !== i).map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('');
+  showModal(`<h3>Delete shift “${escapeHtml(s.name)}”?</h3>
+    <div class="modal-sub">${members.length} operator(s) are on this shift; move them first.</div>
+    <label>Reassign operators to</label>
+    <select data-field="to">${opts}</select>
+    <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Reassign &amp; delete</button></div>`,
+    (m) => {
+      const to = m.querySelector('[data-field="to"]').value;
+      members.forEach(o => { o.shift = to; });
+      window.SHIFTS.splice(window.SHIFTS.findIndex(x => x === s), 1);
+      syncShiftRosters(); showToast(`Shift deleted; ${members.length} operator(s) moved to ${to}.`, 'success'); render(); return true;
+    });
+}
+
+function bindRosterEditor() {
+  const ed = document.getElementById('roster-editor');
+  if (!ed) return;
+  const refreshOutput = () => { const ta = document.getElementById('roster-output'); if (ta) ta.value = rosterSnippet(); };
+
+  // Text inputs update the live roster but DON'T re-render (so typing keeps focus).
+  ed.querySelectorAll('input[data-sf]').forEach(inp => inp.addEventListener('input', () => {
+    const i = +inp.closest('tr').dataset.si, f = inp.dataset.sf;
+    if (f === 'name') {
+      const old = window.SHIFTS[i].name;
+      window.SHIFTS[i].name = inp.value;
+      window.OPERATORS.forEach(o => { if (o.shift === old) o.shift = inp.value; });
+      syncShiftRosters();
+    } else {
+      window.SHIFTS[i][f] = inp.value;
+    }
+    refreshOutput();
+  }));
+  ed.querySelectorAll('input[data-of]').forEach(inp => inp.addEventListener('input', () => {
+    const tr = inp.closest('tr');
+    const i = +tr.dataset.oi, f = inp.dataset.of, o = window.OPERATORS[i];
+    if (f === 'name') {
+      o.name = inp.value;
+      // Auto-suggest the id from the name until the user edits the id directly.
+      if (!o._idEdited) {
+        o.id = o.name.trim() ? makeOpId(o.name, i) : '';
+        const idInput = tr.querySelector('input[data-of="id"]');
+        if (idInput) idInput.value = o.id;
+      }
+    } else if (f === 'id') {
+      o.id = inp.value;
+      o._idEdited = true;
+    } else {
+      o[f] = inp.value;
+    }
+    refreshOutput();
+  }));
+  ed.querySelectorAll('select[data-of="shift"]').forEach(sel => sel.addEventListener('change', () => {
+    const i = +sel.closest('tr').dataset.oi;
+    window.OPERATORS[i].shift = sel.value;
+    syncShiftRosters();
+    refreshOutput();
+  }));
+  document.getElementById('re-current')?.addEventListener('change', e => { window.CURRENT_OPERATOR_ID = e.target.value; refreshOutput(); });
+  document.getElementById('re-add-shift')?.addEventListener('click', () => { window.SHIFTS.push({ name: '', hoursUtc: '', operatorIds: [] }); render(); });
+  document.getElementById('re-add-op')?.addEventListener('click', () => {
+    // id starts blank and auto-derives from the name as you type (until edited directly).
+    window.OPERATORS.push({ id: '', name: '', shift: window.SHIFTS[0] ? window.SHIFTS[0].name : '', _idEdited: false });
+    syncShiftRosters(); render();
+  });
+  ed.querySelectorAll('.re-del-shift').forEach(btn => btn.addEventListener('click', () => deleteShift(+btn.dataset.si)));
+  ed.querySelectorAll('.re-del-op').forEach(btn => btn.addEventListener('click', () => deleteOperator(+btn.dataset.oi)));
+  document.getElementById('re-copy')?.addEventListener('click', async () => {
+    const ta = document.getElementById('roster-output');
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', ''); }
+    const c = document.getElementById('re-copied'); if (c) { c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200); }
+  });
+}
+
 function renderShiftsIndex() {
   const cards = window.SHIFTS.map(sh => {
     const s = shiftStats(sh.name);
@@ -3000,6 +3316,7 @@ function renderShiftsIndex() {
       </div>
     </div>
     <div class="shift-grid">${cards}</div>
+    ${renderRosterEditor()}
   `;
 }
 
@@ -3939,6 +4256,7 @@ function bindHandlers() {
       render();
     });
   });
+  bindRosterEditor();
   const filter = document.getElementById('case-filter');
   if (filter) {
     filter.addEventListener('input', () => {
