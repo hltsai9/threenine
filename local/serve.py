@@ -92,6 +92,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _serve_cases(self):
         try:
             cases = casecenter.fetch_cases()
+            with_id = sum(1 for c in cases if c.get("id"))
+            print(f"/api/cases -> {len(cases)} case(s) mapped ({with_id} with an id)")
             payload = json.dumps({"cases": cases}).encode("utf-8")
             status = 200
         except Exception as exc:  # surface the error to the browser console, keep server up

@@ -195,6 +195,13 @@ def fetch_raw():
 
 def fetch_cases():
     """Called by serve.py for GET /api/cases. Returns board-shaped case dicts."""
-    data = fetch_raw()                       # expected: x_json["data"]
+    data = fetch_raw()
+    # Tolerate returning the whole response object: unwrap the list of cases from a
+    # common envelope key, so `return x_json` works as well as `return x_json["data"]`.
+    if isinstance(data, dict):
+        for key in ("data", "items", "records", "cases", "results", "content", "list", "rows"):
+            if isinstance(data.get(key), list):
+                data = data[key]
+                break
     records = data if isinstance(data, list) else [data]
     return [map_record(r) for r in records]
