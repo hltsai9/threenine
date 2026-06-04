@@ -145,6 +145,17 @@ function fmtDuration(ms) {
 }
 // Reminders use real wall-clock time (vs. frozen NOW used for case state).
 function realNow() { return new Date(); }
+
+// Live wall-clock shown in the sidebar (real current date/time, local + UTC).
+function updateClock() {
+  const t = document.getElementById('clock-time');
+  const d = document.getElementById('clock-date');
+  if (!t || !d) return;
+  const now = realNow();
+  t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  d.textContent = `${date} · ${now.toISOString().slice(11, 16)} UTC`;
+}
 function fmtUntil(iso) {
   const diff = new Date(iso).getTime() - realNow().getTime();
   if (diff <= 0) return 'due now';
@@ -352,6 +363,7 @@ function renderSidebar() {
   document.getElementById('op-shift').textContent = op.shift;
   document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
+  updateClock();
 
   document.getElementById('nav-cases-count').textContent =
     STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
@@ -2252,6 +2264,7 @@ function checkReminders() {
 
 setInterval(checkReminders, 10000);
 setTimeout(checkReminders, 200);
+setInterval(updateClock, 1000);
 
 /* ---------- Live data (Case Center via local/serve.py) ---------- */
 

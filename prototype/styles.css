@@ -84,9 +84,28 @@ html, body {
   background: var(--accent);
   color: var(--accent-fg);
 }
+.sidebar-clock {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.sidebar-clock .clock-time {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--sidebar-fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  line-height: 1.1;
+}
+.sidebar-clock .clock-date {
+  font-size: 11px;
+  color: var(--sidebar-muted);
+  margin-top: 3px;
+}
 .shift-info {
   border-top: 1px solid rgba(255,255,255,.08);
   padding-top: 16px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
