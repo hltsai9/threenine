@@ -31,6 +31,37 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 | `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
 | `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
 
+## Relationship to Case Center (live data)
+
+In production the board reads **live cases from the on-prem Case Center** via a small local
+server (`local/serve.py` → `local/casecenter.py` → `GET /api/cases`). `data.js` is the
+**seed / demo fallback** used on GitHub Pages, over `file://`, and whenever the local server
+isn't running. Generate seed cases that *mirror* what Case Center returns so the demo matches
+reality.
+
+**Two statuses per case** (keep this split when seeding):
+- `status` = the **Case Center status** (real, external) → drives the kanban **columns**.
+- `agentStatus` = the **first-line agent's** local handling state (`queued`/`unqueued`) →
+  drives the top/bottom band split. This never comes from Case Center.
+
+**Case Center → board mapping** (`map_record()` in `local/casecenter.py`):
+
+| Case Center field | board field |
+| --- | --- |
+| `caseId` | `id` |
+| `subject` | `subject` |
+| `caseStatus` + `caseSubstatus` | `status` (via `STATUS_MAP`) |
+| `caseLevel` | `priority` |
+| `createDateTime` | `createdAt` / `slaStartedAt` |
+| `assignee.accountId` | `assigneeId` |
+
+Fields the live feed does **not** supply today are local/demo-only — keep them in the seed
+(they make the prototype fully featured), but know they're synthesized for the demo:
+`agentStatus`, `handover`, `reminder`, FIT/HQ routing (`fitId`/`hqId`/`currentOwner`), and
+`history` (which powers the **ownership timeline** and the **FIT-vs-HQ time** split on the
+case detail). Open work to populate these from Case Center is tracked in
+`local/TODO-casecenter-mapping.md`.
+
 ## Conventions (do not break)
 
 - **All timestamps are ISO UTC** (`'2026-06-05T13:00:00Z'`). Never local time.
@@ -117,7 +148,14 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 }
 ```
 
-`history.kind` values: `created | assigned | escalated | returned | status | flag | closed | cancelled | note | rolled_over`.
+`history.kind` values: `created | assigned | escalated | returned | resumed | status | reassigned | flag | handover | note | reminder | closed | cancelled | rolled_over`.
+
+The **ownership timeline** and **FIT vs HQ time** on the case detail are reconstructed from
+`history` (see `ownershipSegments()` in `app.js`): `created` → first line, `assigned` →
+Local FIT, `escalated` → HQ, `returned` → with requester, `status`/`resumed` parsed from
+`detail` (e.g. `'→ Sanity Check'`, `'… HQ …'`), `closed`/`cancelled` → done. So give cases
+**realistic, chronologically-spaced history chains** — the timeline width and per-owner
+totals come straight from these timestamps.
 
 ## Coverage to aim for
 
@@ -128,7 +166,7 @@ A good seed exercises every UI surface. Spread cases across:
 - **Idle thresholds** — one FIT case past `fitIdleHours`, one HQ case past `hqIdleHours` to drive the watchlist.
 - **SLA** — one case past `approachingSlaHours` (drives the SLA watchlist banner).
 - **Handover freshness** — at least one case with `staleForCurrentShift: true` so the cutover-blocked rule shows.
-- **Escalation history** — one case with a full `created → assigned → escalated → status` chain (drives Status Flow demo).
+- **Escalation history** — one case with a full `created → assigned → escalated → status` chain, with realistic gaps between timestamps (drives the Status Flow demo **and** the ownership timeline / FIT-vs-HQ split — vary the gaps so the timeline segments differ in width).
 - **Carry-over** — one case with `carriedFrom` set, dated into a prior `weekId` to show rollover.
 - **Historical weeks** — a handful of `closed`/`cancelled` cases in W-1, W-2, W-3 to populate Weekly Archive medians.
 
