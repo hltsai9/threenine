@@ -670,6 +670,22 @@ function renderCaseList() {
 
   const watchlist = renderWatchlists(approachingSlaCases(), escalatedCases());
 
+  // Live-mode banner so the board is never silently empty when running on Case Center data.
+  const liveBanner = window.__LIVE__ ? (() => {
+    const total = STATE.cases.length;
+    const shown = allCases.length;
+    const hidden = total - shown;
+    let msg;
+    if (total === 0) {
+      msg = 'Live · Case Center returned <strong>0 cases</strong>. Check your <span class="mono">fetch_raw()</span> query / filters.';
+    } else if (shown === 0) {
+      msg = `Live · loaded <strong>${total}</strong> case${total === 1 ? '' : 's'} from Case Center, but ${total === 1 ? 'it is' : 'all are'} closed/cancelled — the board only shows active cases.`;
+    } else {
+      msg = `Live · <strong>${shown}</strong> active case${shown === 1 ? '' : 's'} from Case Center${hidden ? ` · ${hidden} closed/cancelled hidden` : ''}.`;
+    }
+    return `<div class="kanban-live-banner">${msg}</div>`;
+  })() : '';
+
   return `
     <div class="page-header">
       <div>
@@ -681,6 +697,7 @@ function renderCaseList() {
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
     </div>
+    ${liveBanner}
     ${remindersBanner}
     ${handoverBanner}
     <div class="kanban">${kanban}</div>

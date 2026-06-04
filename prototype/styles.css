@@ -239,6 +239,15 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   font-size: 13px;
 }
 .kanban-handover-banner strong { color: #92400e; }
+.kanban-live-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #1e3a8a;
+}
 .watchlist {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
