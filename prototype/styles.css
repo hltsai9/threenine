@@ -728,9 +728,42 @@ table.case-table {
 
 .clock-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
 }
+
+/* ---------- Ownership timeline ---------- */
+.timeline {
+  display: flex;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.tl-seg {
+  min-width: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+}
+.tl-seg + .tl-seg { border-left: 1px solid rgba(255, 255, 255, .65); }
+.tl-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; }
+.tl-key { display: inline-flex; align-items: center; gap: 5px; }
+.tl-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+/* holder colors (deeper than the status pills so text stays readable) */
+.tl-triage    { background: #c7d2fe; color: #3730a3; }
+.tl-fit       { background: #fcd34d; color: #92400e; }
+.tl-hq        { background: #fca5a5; color: #7f1d1d; }
+.tl-sanity    { background: #6ee7b7; color: #065f46; }
+.tl-requester { background: #67e8f9; color: #155e75; }
+.tl-done      { background: #d1d5db; color: #374151; }
 .clock {
   background: #f9fafb;
   border: 1px solid var(--border);

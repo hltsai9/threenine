@@ -735,9 +735,42 @@ table.case-table {
 
 .clock-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
 }
+
+/* ---------- Ownership timeline ---------- */
+.timeline {
+  display: flex;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.tl-seg {
+  min-width: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+}
+.tl-seg + .tl-seg { border-left: 1px solid rgba(255, 255, 255, .65); }
+.tl-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 12px; }
+.tl-key { display: inline-flex; align-items: center; gap: 5px; }
+.tl-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+/* holder colors (deeper than the status pills so text stays readable) */
+.tl-triage    { background: #c7d2fe; color: #3730a3; }
+.tl-fit       { background: #fcd34d; color: #92400e; }
+.tl-hq        { background: #fca5a5; color: #7f1d1d; }
+.tl-sanity    { background: #6ee7b7; color: #065f46; }
+.tl-requester { background: #67e8f9; color: #155e75; }
+.tl-done      { background: #d1d5db; color: #374151; }
 .clock {
   background: #f9fafb;
   border: 1px solid var(--border);
@@ -2758,13 +2791,117 @@ function renderReadingPanel(c) {
 
 /* ---------- Case Detail view ---------- */
 
+/* ---------- Ownership timeline (who held the case, when) ---------- */
+
+// Reconstruct the ordered possession segments from a case's history. Each segment is
+// { holder, start, end, label } where holder is which "hand" the case was in.
+function ownershipSegments(c) {
+  const events = (c.history || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
+  if (!events.length) return [];
+
+  // Map a history event to the holder it puts the case in (null = not a handoff).
+  const classify = (ev, prev) => {
+    const d = (ev.detail || '').toLowerCase();
+    switch (ev.kind) {
+      case 'created': return 'triage';
+      case 'assigned': return 'fit';      // assignment is always to Local FIT
+      case 'escalated': return 'hq';
+      case 'returned': return 'requester';
+      case 'closed': case 'cancelled': return 'done';
+      case 'status': case 'resumed': {    // ambiguous — read the detail
+        if (/sanity check/.test(d)) return 'sanity';
+        if (/\bhq\b|product team/.test(d)) return 'hq';
+        if (/local fit|→ fit|\bfit\b/.test(d)) return 'fit';
+        if (/requester|returned/.test(d)) return 'requester';
+        if (/resolved|closed/.test(d)) return 'done';
+        if (/unassigned|\bnew\b/.test(d)) return 'triage';
+        return prev;
+      }
+      default: return null;               // reminder / handover / note / flag / reassigned
+    }
+  };
+
+  const segs = [];
+  let holder = null;
+  let start = new Date(c.createdAt || events[0].at).getTime();
+  let label = '';
+  for (const ev of events) {
+    const h = classify(ev, holder);
+    if (h == null) continue;
+    const at = new Date(ev.at).getTime();
+    if (holder == null) { holder = h; start = Math.min(start, at); label = ev.detail || ''; continue; }
+    if (h === holder) continue;
+    segs.push({ holder, start, end: at, label });
+    if (h === 'done') { holder = 'done'; break; }
+    holder = h; start = at; label = ev.detail || '';
+  }
+  if (holder && holder !== 'done') {
+    const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
+    const end = terminal ? start : NOW.getTime();
+    segs.push({ holder, start, end: Math.max(end, start), label });
+  }
+  return segs;
+}
+
+// Total time spent in each holder, summed from the ownership segments (history-derived).
+function holderTotals(c) {
+  const tot = { triage: 0, fit: 0, hq: 0, sanity: 0, requester: 0 };
+  for (const s of ownershipSegments(c)) {
+    if (s.holder in tot) tot[s.holder] += Math.max(0, s.end - s.start);
+  }
+  return tot;
+}
+
+const HOLDER_META = {
+  triage:    { label: 'First line',       cls: 'tl-triage' },
+  fit:       { label: 'Local FIT',        cls: 'tl-fit' },
+  hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
+  sanity:    { label: 'Sanity check',     cls: 'tl-sanity' },
+  requester: { label: 'With requester',   cls: 'tl-requester' },
+  done:      { label: 'Closed',           cls: 'tl-done' },
+};
+
+function renderOwnershipTimeline(c) {
+  const segs = ownershipSegments(c);
+  if (segs.length === 0) {
+    return '<div class="muted tiny">The timeline appears here as the case moves between owners.</div>';
+  }
+  const first = segs[0].start;
+  const last = segs[segs.length - 1].end;
+  const span = Math.max(1, last - first);
+
+  const bar = segs.map(s => {
+    const m = HOLDER_META[s.holder] || HOLDER_META.triage;
+    const dur = s.end - s.start;
+    const pct = (dur / span) * 100;
+    const tip = `${m.label} · ${fmtDuration(dur)} · from ${fmtAbsolute(new Date(s.start).toISOString())}${s.label ? ' · ' + s.label : ''}`;
+    return `<div class="tl-seg ${m.cls}" style="width:${pct}%" title="${escapeHtml(tip)}">${pct > 14 ? escapeHtml(m.label) : ''}</div>`;
+  }).join('');
+
+  const totals = holderTotals(c);
+  const legend = Object.keys(totals).filter(k => totals[k] > 0).map(k => {
+    const m = HOLDER_META[k] || HOLDER_META.triage;
+    return `<span class="tl-key"><span class="tl-dot ${m.cls}"></span>${escapeHtml(m.label)} <span class="muted">${fmtDuration(totals[k])}</span></span>`;
+  }).join('');
+
+  const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
+  return `
+    <div class="timeline" role="img" aria-label="Ownership timeline">${bar}</div>
+    <div class="tl-axis"><span>${fmtAbsolute(new Date(first).toISOString())}</span><span>${terminal ? statusLabel(c.status) : 'now'}</span></div>
+    <div class="tl-legend">${legend}</div>
+  `;
+}
+
 function renderCaseDetailBody(c) {
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
 
   const slaMs = caseSlaMs(c);
-  const fitMs = caseHoldMs(c, 'fit');
-  const hqMs = caseHoldMs(c, 'hq');
+  // FIT/HQ time spent is derived from the ownership timeline so the clocks and the
+  // timeline legend always agree (same source: the case history).
+  const hold = holderTotals(c);
+  const fitMs = hold.fit;
+  const hqMs = hold.hq;
 
   const handoverHtml = c.handover ? `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
@@ -2789,19 +2926,28 @@ function renderCaseDetailBody(c) {
       <div>
         <div class="card"><div class="card-body">
           <div class="detail-section">
-            <h3>Two clocks</h3>
+            <h3>Clocks</h3>
             <div class="clock-grid">
               <div class="clock">
-                <div class="label">SLA clock (time on us)</div>
+                <div class="label">SLA · time on us</div>
                 <div class="value">${fmtDuration(slaMs)}</div>
                 <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
               </div>
               <div class="clock">
-                <div class="label">Owner-hold totals</div>
-                <div class="value mono" style="font-size:13px;">FIT ${fmtDuration(fitMs)} · HQ ${fmtDuration(hqMs)}</div>
-                <div class="state ${c.currentOwner ? 'running' : ''}">${c.currentOwner ? `Active: ${c.currentOwner.toUpperCase()}` : 'No active owner'}</div>
+                <div class="label">Local FIT</div>
+                <div class="value">${fmtDuration(fitMs)}</div>
+                <div class="state ${c.currentOwner === 'fit' ? 'running' : ''}">${c.currentOwner === 'fit' ? 'Holding now' : 'Idle'}</div>
+              </div>
+              <div class="clock">
+                <div class="label">HQ Product Team</div>
+                <div class="value">${fmtDuration(hqMs)}</div>
+                <div class="state ${c.currentOwner === 'hq' ? 'running' : ''}">${c.currentOwner === 'hq' ? 'Holding now' : 'Idle'}</div>
               </div>
             </div>
+          </div>
+          <div class="detail-section">
+            <h3>Ownership timeline</h3>
+            ${renderOwnershipTimeline(c)}
           </div>
           <div class="detail-section">
             <h3>Handover (latest)</h3>
