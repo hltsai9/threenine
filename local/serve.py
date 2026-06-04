@@ -30,7 +30,30 @@ import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WEBROOT = os.path.normpath(os.path.join(HERE, "..", "prototype"))
+
+
+def resolve_webroot():
+    """Find the folder that holds the board's index.html. Tries (in order): the
+    CASE_TRACKER_WEBROOT env var, a path given as the first CLI arg, ../prototype next to
+    this script, ./prototype under the current dir, and the current dir itself."""
+    candidates = []
+    if os.environ.get("CASE_TRACKER_WEBROOT"):
+        candidates.append(os.environ["CASE_TRACKER_WEBROOT"])
+    if len(sys.argv) > 1:
+        candidates.append(sys.argv[1])
+    candidates += [
+        os.path.normpath(os.path.join(HERE, "..", "prototype")),
+        os.path.join(os.getcwd(), "prototype"),
+        os.getcwd(),
+    ]
+    for c in candidates:
+        if c and os.path.isfile(os.path.join(c, "index.html")):
+            return os.path.abspath(c), True
+    # Nothing found — fall back to the conventional path so the error is concrete.
+    return os.path.normpath(os.path.join(HERE, "..", "prototype")), False
+
+
+WEBROOT, WEBROOT_OK = resolve_webroot()
 
 # Import the adapter that talks to your on-prem Case Center.
 sys.path.insert(0, HERE)
@@ -45,6 +68,24 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split("?", 1)[0].rstrip("/")
         if path == "/api/cases":
             self._serve_cases()
+            return
+        # Friendly message instead of a bare 404 when the board files aren't found.
+        if not WEBROOT_OK and path in ("", "/index.html"):
+            msg = (
+                "Case Tracker board files not found.\n\n"
+                "serve.py looked for index.html in:\n  " + WEBROOT + "\n\n"
+                "Fix it one of these ways:\n"
+                "  - run serve.py from inside the cloned repo (so ../prototype exists), or\n"
+                "  - point it at the prototype folder:\n"
+                "      CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py\n"
+                "      (or:  python3 serve.py /path/to/prototype)\n\n"
+                "The data feed still works: /api/cases\n"
+            ).encode("utf-8")
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(msg)))
+            self.end_headers()
+            self.wfile.write(msg)
             return
         super().do_GET()
 
@@ -72,9 +113,20 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     port = int(os.environ.get("PORT", "8787"))
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"Case Tracker (LIVE)  →  http://127.0.0.1:{port}/")
-    print(f"Serving static site from: {WEBROOT}")
-    print("Data endpoint:            /api/cases   (Ctrl+C to stop)")
+    print("=" * 60)
+    print(f"  Open the BOARD here:  http://127.0.0.1:{port}/")
+    print(f"  (raw data feed only:  http://127.0.0.1:{port}/api/cases )")
+    print("=" * 60)
+    if WEBROOT_OK:
+        print(f"Serving board files from: {WEBROOT}")
+    else:
+        print("!! WARNING: could not find the board's index.html.")
+        print(f"!! Looked in: {WEBROOT}")
+        print("!! The board (/) will 404. Point serve.py at the prototype folder:")
+        print("!!   CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py")
+        print("!!   (or:  python3 serve.py /path/to/prototype)")
+        print("!! The /api/cases data feed still works.")
+    print("Ctrl+C to stop.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -46,8 +46,27 @@ browser  ──GET /api/cases─▶  serve.py  ──calls──▶  casecenter.
 
 ```bash
 python3 local/serve.py        # stdlib only, nothing to install
-# open http://127.0.0.1:8787/
 ```
+
+**Open the BOARD at the root:** `http://127.0.0.1:8787/`
+
+`http://127.0.0.1:8787/api/cases` is just the raw JSON the board fetches — visiting it
+directly shows JSON by design; it is **not** the app. Open `/` to see the board (a toast
+confirms "Live: loaded N cases from Case Center").
+
+### Troubleshooting
+- **`/` shows 404 "File not found" but `/api/cases` works** → serve.py can't find the board
+  files (`prototype/index.html`). Check the startup line `Serving board files from: …`.
+  Run serve.py from inside the cloned repo, or point it at the prototype folder:
+  ```bash
+  CASE_TRACKER_WEBROOT=/path/to/prototype python3 local/serve.py
+  #   or:  python3 local/serve.py /path/to/prototype
+  ```
+- **Board opens but shows demo data** → `/api/cases` returned an `{"error":…}` (e.g.
+  `fetch_raw()` not implemented yet, or auth failed), so the board fell back to seed data.
+- **Board opens but looks empty** → the board hides `Close`/`Drop` (closed/cancelled) cases;
+  pull some `Open` / `In-Progress` cases.
+
 
 You should see a toast: **"Live: loaded N cases from Case Center."** Refresh the page to
 re-pull. If the server isn't running (or you open the public site), the board falls back to
