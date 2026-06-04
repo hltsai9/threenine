@@ -10,12 +10,8 @@ window.THRESHOLDS = {
   shiftEndingSoonMinutes: 60,
 };
 
-window.OPERATORS = [
-  { id: 'op-da', name: 'Mia (DA)', shift: 'Day' },
-  { id: 'op-na', name: 'Ren (NA)', shift: 'Night' },
-  { id: 'op-db', name: 'Kai (DB)', shift: 'Day' },
-  { id: 'op-nb', name: 'Yui (NB)', shift: 'Night' },
-];
+// Operators & shifts (window.OPERATORS / window.SHIFTS / window.CURRENT_OPERATOR_ID)
+// live in shifts.js so the roster can be edited without touching this file.
 
 window.OWNERS = {
   fit: [
@@ -30,7 +26,6 @@ window.OWNERS = {
   ],
 };
 
-window.CURRENT_OPERATOR_ID = 'op-da';
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-05T12:00:00Z', date: '2026-06-05' };
 window.CURRENT_WEEK = { id: 'W23-2026', label: 'W23 · June 1 – 7, 2026', startsAt: '2026-06-01T00:00:00Z' };
 
@@ -39,11 +34,6 @@ window.WEEKS = [
   { id: 'W22-2026', label: 'W22 · May 25 – 31, 2026', startsAt: '2026-05-25T00:00:00Z', endsAt: '2026-06-01T00:00:00Z' },
   { id: 'W21-2026', label: 'W21 · May 18 – May 24, 2026', startsAt: '2026-05-18T00:00:00Z', endsAt: '2026-05-25T00:00:00Z' },
   { id: 'W20-2026', label: 'W20 · May 11 – May 17, 2026', startsAt: '2026-05-11T00:00:00Z', endsAt: '2026-05-18T00:00:00Z' },
-];
-
-window.SHIFTS = [
-  { name: 'Day',   hoursUtc: '08:00 – 20:00 UTC', operatorIds: ['op-da', 'op-db'] },
-  { name: 'Night', hoursUtc: '20:00 – 08:00 UTC', operatorIds: ['op-na', 'op-nb'] },
 ];
 
 // Each case mirrors the Excel columns plus the v1 additions from the URD.

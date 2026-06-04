@@ -7,22 +7,29 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 
 `prototype/data.js` is the seed dataset the SPA boots from. It declares everything via `window.*` globals (no modules, no build step). After editing it you **must** rerun `node prototype/bundle.mjs` so `prototype/standalone.html` picks up the change.
 
+> **The roster lives in a separate file.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are defined in **`prototype/shifts.js`** (so the roster can be edited — including via the in-app Shift editor — without touching data.js). Do **not** put them in data.js. When you reference operator ids or shift names from data.js (e.g. `createdBy`, history `who`), keep them consistent with shifts.js.
+
 ## File contract
 
-The file must define these globals, in this order:
+`data.js` must define these globals, in this order:
 
 | Global | Type | Purpose |
 | --- | --- | --- |
 | `window.NOW` | `Date` | Frozen "now" the app uses for SLA math, idle clocks, office-hours coloring. Pick a wall-clock time on the demo day. |
 | `window.THRESHOLDS` | object | `fitIdleHours`, `hqIdleHours`, `approachingSlaHours`, `shiftEndingSoonMinutes`. |
-| `window.OPERATORS` | array | `{ id, name, shift }`. Shift must be `'Day'` or `'Night'`. |
 | `window.OWNERS` | `{ fit: [...], hq: [...] }` | FIT desks (Phoenix TZ) and HQ teams (Taipei TZ). |
-| `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
-| `window.CURRENT_SHIFT` | object | `{ name, endsAtUtc, date }`. |
+| `window.CURRENT_SHIFT` | object | `{ name, endsAtUtc, date }`. `name` must match a shift in shifts.js. |
 | `window.CURRENT_WEEK` | object | `{ id, label, startsAt }`. |
 | `window.WEEKS` | array | Past + current ISO weeks. Mark the current one with `isCurrent: true`. |
-| `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
 | `window.CASES` | array | The case records — see schema below. |
+
+`shifts.js` defines the roster (edit there, not here):
+
+| Global | Type | Purpose |
+| --- | --- | --- |
+| `window.OPERATORS` | array | `{ id, name, shift }`. Shift must match a `SHIFTS` name. |
+| `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
+| `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
 
 ## Conventions (do not break)
 

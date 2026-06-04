@@ -1064,30 +1064,37 @@ function renderRosterEditor() {
 
   return `
   <div class="card roster-editor" id="roster-editor">
-    <div class="re-head">
-      <h3>Edit shifts &amp; operators</h3>
-      <span class="muted tiny">Changes apply to this session. Copy the snippet into <code>prototype/data.js</code> to keep them. "Reset to seed" undoes session edits.</span>
+    <div class="card-header">
+      <span>Edit shifts &amp; operators</span>
+      <span class="muted tiny">Session only · paste the snippet into <code>shifts.js</code> to keep changes · "Reset to seed" undoes them</span>
     </div>
+    <div class="card-body">
+      <div class="detail-section">
+        <h3>Shifts</h3>
+        <table class="re-table"><thead><tr><th>Shift</th><th>Hours (UTC)</th><th class="re-x"></th></tr></thead><tbody>${shiftRows}</tbody></table>
+        <div class="re-actions"><button class="btn" id="re-add-shift">+ Add shift</button></div>
+      </div>
 
-    <div class="re-sub">Shifts</div>
-    <table class="re-table"><thead><tr><th>Shift</th><th>Hours (UTC)</th><th class="re-x"></th></tr></thead><tbody>${shiftRows}</tbody></table>
-    <div class="re-actions"><button class="btn" id="re-add-shift">+ Add shift</button></div>
+      <div class="detail-section">
+        <h3>Operators</h3>
+        <table class="re-table"><thead><tr><th>Name</th><th>Shift</th><th>ID</th><th>Refs</th><th class="re-x"></th></tr></thead><tbody>${opRows}</tbody></table>
+        <div class="re-actions">
+          <button class="btn" id="re-add-op">+ Add operator</button>
+          <span class="muted tiny" style="margin-left:auto">Default operator ("you")</span>
+          <select id="re-current" class="re-select">${curOpts}</select>
+        </div>
+      </div>
 
-    <div class="re-sub">Operators</div>
-    <table class="re-table"><thead><tr><th>Name</th><th>Shift</th><th>ID</th><th>Refs</th><th class="re-x"></th></tr></thead><tbody>${opRows}</tbody></table>
-    <div class="re-actions">
-      <button class="btn" id="re-add-op">+ Add operator</button>
-      <span class="muted tiny" style="margin-left:auto">Default operator ("you"):</span>
-      <select id="re-current">${curOpts}</select>
+      ${warnHtml}
+
+      <div class="detail-section" style="margin-bottom:0">
+        <div class="re-out-head">
+          <h3 style="margin:0">Snippet for <code>shifts.js</code></h3>
+          <div><button class="btn btn-primary" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
+        </div>
+        <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
+      </div>
     </div>
-
-    ${warnHtml}
-
-    <div class="re-out-head">
-      <div class="re-sub" style="margin:0">Snippet for <code>data.js</code></div>
-      <div><button class="btn btn-primary" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
-    </div>
-    <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
   </div>`;
 }
 

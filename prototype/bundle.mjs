@@ -4,8 +4,8 @@
 //
 // Usage:  node prototype/bundle.mjs
 //
-// Reads index.html / styles.css / data.js / app.js / tour.js from this folder
-// and writes prototype/standalone.html. The modular files remain the
+// Reads index.html / styles.css / data.js / shifts.js / app.js / tour.js from this
+// folder and writes prototype/standalone.html. The modular files remain the
 // source of truth; re-run this script after editing them.
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -20,6 +20,7 @@ function read(name) {
 
 const css = read('styles.css');
 const data = read('data.js');
+const shifts = read('shifts.js');
 const app = read('app.js');
 const tour = read('tour.js');
 const indexHtml = read('index.html');
@@ -46,6 +47,8 @@ ${css}
 ${bodyContent}
 <script>
 ${data}
+
+${shifts}
 
 ${app}
 
