@@ -25,6 +25,7 @@ const owners = read('owners.js');
 const app = read('app.js');
 const tour = read('tour.js');
 const indexHtml = read('index.html');
+const faviconDataUri = 'data:image/svg+xml;base64,' + Buffer.from(read('favicon.svg')).toString('base64');
 
 const bodyMatch = indexHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/);
 if (!bodyMatch) {
@@ -40,6 +41,7 @@ const out = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Case Tracker — Prototype (standalone)</title>
+<link rel="icon" type="image/svg+xml" href="${faviconDataUri}">
 <style>
 ${css}
 </style>
