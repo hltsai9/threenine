@@ -28,10 +28,16 @@ Optional (sensible defaults applied in the browser if omitted):
 The agent layer (queue placement, handover notes, reminders) is LOCAL to the
 browser and must NOT come from Case Center — it is merged back automatically.
 """
+import inspect
 import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Case Center query window (hours back) — how far back to look for cases. The board's
+# "Created within … h / Load" control sets this per request; this is just the default.
+# Use it in your fetch_raw() JQL, e.g.  f"created >= -{int(LOOKBACK_HOURS)}h"
+LOOKBACK_HOURS = float(os.environ.get("CASE_CENTER_LOOKBACK_HOURS", "6") or "6")
 
 # >>> FILL IN: your Case Center base URL, used to build a clickable link per case.
 #     The caseId is appended to it (adjust build_case_link() below if your URL pattern
@@ -158,6 +164,11 @@ def fetch_raw():
     Use api_key + cookie from _load_secrets(), perform the request, parse the JSON into
     `x_json`, and return `x_json["data"]` (the case records). fetch_cases() handles both a
     list of records and a single record.
+
+    LOOK-BACK WINDOW: use the module global LOOKBACK_HOURS in your JQL so the board's
+    "Created within … h / Load" control works, e.g.:
+        jql = f"created >= -{int(LOOKBACK_HOURS)}h ORDER BY created DESC"
+    (You can also accept it as a parameter: def fetch_raw(lookback_hours=6): ... )
     """
     api_key, cookie = _load_secrets()  # noqa: F841 (used by your request below)
 
@@ -193,9 +204,24 @@ def fetch_raw():
     # return x_json["data"]
 
 
-def fetch_cases():
-    """Called by serve.py for GET /api/cases. Returns board-shaped case dicts."""
-    data = fetch_raw()
+def fetch_cases(lookback_hours=None):
+    """Called by serve.py for GET /api/cases (?hours=N). Returns board-shaped case dicts.
+
+    `lookback_hours` (from the board's Load control) sets the global LOOKBACK_HOURS, which
+    your fetch_raw() JQL can use. fetch_raw is also called with the value if it accepts a
+    parameter — use whichever you prefer in your query.
+    """
+    global LOOKBACK_HOURS
+    if lookback_hours not in (None, ""):
+        try:
+            LOOKBACK_HOURS = float(lookback_hours)
+        except (TypeError, ValueError):
+            pass
+    try:
+        takes_arg = len(inspect.signature(fetch_raw).parameters) >= 1
+    except (TypeError, ValueError):
+        takes_arg = False
+    data = fetch_raw(LOOKBACK_HOURS) if takes_arg else fetch_raw()
     # Tolerate returning the whole response object: unwrap the list of cases from a
     # common envelope key, so `return x_json` works as well as `return x_json["data"]`.
     if isinstance(data, dict):

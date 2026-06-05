@@ -26,7 +26,12 @@ const STATE = {
   operatorId: window.CURRENT_OPERATOR_ID,
   lastListRoute: '#/cases',
   lastListLabel: 'Cases',
+  lookbackHours: 6,          // Case Center query window (hours); adjustable from the board
 };
+try {
+  const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
+  if (lb > 0) STATE.lookbackHours = lb;
+} catch (e) { /* ignore */ }
 
 const STORAGE_KEY = 'case-tracker-state-v4';
 // In live mode (served by local/serve.py, cases come from Case Center each refresh) we
@@ -61,6 +66,7 @@ function saveState() {
         operatorId: STATE.operatorId,
         agent: agentLayerFromState(),
       }));
+      persistChangedCases();   // push any operator edits to data.js via the local server
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -716,6 +722,11 @@ function renderCaseList() {
         <div class="subtitle">${allCases.length} open · ${queuedCount} in your queue · ${closedCount} closed/cancelled this week. Columns are the Case Center status; <span class="mono">+ Queue</span> lifts a card into your top band.</div>
       </div>
       <div class="toolbar">
+        ${/^https?:$/.test(location.protocol) ? `
+        <label class="lookback-ctl" title="Pull Case Center cases created within this many hours">Created within
+          <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}"> h
+          <button class="btn" id="lookback-load">Load</button>
+        </label>` : ''}
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
@@ -2015,7 +2026,6 @@ function handlePrompt(caseId, kind) {
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
-      saveCaseToServer(c);   // persist the note into data.js (live mode)
       showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
       render();
       return true;
@@ -2492,6 +2502,18 @@ function bindHandlers() {
     });
   });
   bindRosterEditor();
+  const lookbackLoad = document.getElementById('lookback-load');
+  if (lookbackLoad) {
+    const doLoad = () => {
+      const v = parseFloat(document.getElementById('lookback-input').value);
+      if (!(v > 0)) { showToast('Enter a positive number of hours.', 'warn'); return; }
+      STATE.lookbackHours = v;
+      try { localStorage.setItem('case-tracker-lookback', String(v)); } catch (e) { /* ignore */ }
+      reloadLiveCases();
+    };
+    lookbackLoad.addEventListener('click', doLoad);
+    document.getElementById('lookback-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
+  }
   const filter = document.getElementById('case-filter');
   if (filter) {
     filter.addEventListener('input', () => {
@@ -2556,18 +2578,36 @@ function normalizeLiveCase(c) {
   }, c);
 }
 
-// Push an operator edit (e.g. a handover note) back to the local server so it gets written
-// into data.js. Only in live mode (served by serve.py); fire-and-forget.
-function saveCaseToServer(c) {
-  if (!window.__LIVE__ || !/^https?:$/.test(location.protocol)) return;
+// Push operator edits back to the local server so they get written into data.js.
+// Fire-and-forget; only in live mode (served by serve.py).
+function saveCasesToServer(cases) {
+  if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !cases.length) return;
   try {
     fetch('api/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cases: [c] }),
+      body: JSON.stringify({ cases }),
     }).then(r => { if (!r.ok) console.warn('save to data.js failed:', r.status); })
       .catch(e => console.warn('save to data.js failed:', e));
   } catch (e) { /* ignore */ }
+}
+
+// Persist ANY case that changed since the last save (queue, status, assignment, reminder,
+// handover note, …). Called from saveState() in live mode; diffs against a snapshot so only
+// changed cases are sent.
+function persistChangedCases() {
+  if (!window.__LIVE__) return;
+  if (!STATE._savedSnapshot) STATE._savedSnapshot = {};
+  const changed = [];
+  for (const c of STATE.cases) {
+    if (!c.id) continue;
+    const j = JSON.stringify(c);
+    if (STATE._savedSnapshot[c.id] !== j) {
+      STATE._savedSnapshot[c.id] = j;
+      changed.push(c);
+    }
+  }
+  saveCasesToServer(changed);
 }
 
 // Try the local backend. Returns true if live Case Center data was loaded; false otherwise
@@ -2580,7 +2620,8 @@ async function tryLoadLiveCases() {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
-    res = await fetch('api/cases', { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    const url = 'api/cases' + (STATE.lookbackHours ? ('?hours=' + encodeURIComponent(STATE.lookbackHours)) : '');
+    res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     clearTimeout(t);
   } catch (e) {
     return false; // no local backend reachable → seed/demo mode
@@ -2606,6 +2647,9 @@ async function tryLoadLiveCases() {
       applyAgentLayer(parsed.agent || {});
     }
   } catch (e) { /* ignore corrupt local layer */ }
+  // Baseline for change-detection: the server already has this data, so only later edits POST.
+  STATE._savedSnapshot = {};
+  for (const c of STATE.cases) if (c.id) STATE._savedSnapshot[c.id] = JSON.stringify(c);
   return true;
 }
 
@@ -2621,6 +2665,19 @@ function showLiveLoading() {
 }
 function hideLiveLoading() {
   document.getElementById('live-loading')?.remove();
+}
+
+// Re-fetch live cases (used by the "Load" button after changing the look-back window).
+async function reloadLiveCases() {
+  showLiveLoading();
+  const ok = await tryLoadLiveCases();
+  hideLiveLoading();
+  render();
+  showToast(
+    ok ? `Loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} created within ${STATE.lookbackHours}h.`
+       : 'Could not load from Case Center (is serve.py running?).',
+    ok ? 'success' : 'warn'
+  );
 }
 
 async function boot() {

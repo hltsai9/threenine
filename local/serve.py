@@ -28,6 +28,7 @@ import os
 import sys
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -105,9 +106,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _serve_cases(self):
         try:
-            cases = casecenter.fetch_cases()
+            hours = parse_qs(urlparse(self.path).query).get("hours", [None])[0]
+            cases = casecenter.fetch_cases(lookback_hours=hours)
             with_id = sum(1 for c in cases if c.get("id"))
-            print(f"/api/cases -> {len(cases)} case(s) mapped ({with_id} with an id)")
+            print(f"/api/cases (within {hours or 'default'}h) -> {len(cases)} case(s) mapped ({with_id} with an id)")
             if WRITE_DATA_JS:
                 try:
                     added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))

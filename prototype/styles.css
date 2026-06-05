@@ -265,6 +265,8 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   font-size: 13px;
   box-shadow: 0 4px 14px rgba(17, 24, 39, .25);
 }
+.lookback-ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.lookback-ctl input { width: 60px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
 .live-spinner {
   width: 14px;
   height: 14px;
