@@ -114,11 +114,21 @@ def persist_cases(cases, data_js_path):
             added += 1
 
     merged_list = list(by_id.values())
-    if added == 0 and updated == 0 and os.path.exists(data_js_path) and os.path.exists(STORE):
-        return (0, 0, len(merged_list))
 
-    with open(STORE, "w", encoding="utf-8") as fh:
-        json.dump(merged_list, fh, indent=2, ensure_ascii=False)
+    # Keep the sidecar store in sync (gitignored mirror used as a fallback baseline).
+    try:
+        with open(STORE, "w", encoding="utf-8") as fh:
+            json.dump(merged_list, fh, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+    # Write data.js only when its actual content would change (compare by id, order-agnostic),
+    # so it's not skipped just because the in-memory counts were 0 while data.js is out of date.
+    current = _read_data_js_cases(data_js_path)
+    same = current is not None and \
+        {c.get("id"): c for c in current} == {c.get("id"): c for c in merged_list}
+    if same:
+        return (added, updated, len(merged_list))
 
     _write_data_js(data_js_path, merged_list)
     return (added, updated, len(merged_list))
