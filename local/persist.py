@@ -17,6 +17,7 @@ store are gitignored. Consider:  git update-index --skip-worktree prototype/data
 """
 import json
 import os
+import re
 import shutil
 from datetime import datetime
 
@@ -64,11 +65,40 @@ def _load_store():
     return []
 
 
+def _read_data_js_cases(path):
+    """Parse the existing window.CASES array out of data.js (JSON, as we write it).
+    Returns a list, or None if data.js doesn't exist / isn't parseable (e.g. the original
+    hand-authored seed with JS-literal object syntax)."""
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+        m = re.search(r"window\.CASES\s*=\s*(\[.*\])\s*;", text, re.DOTALL)
+        if not m:
+            return None
+        data = json.loads(m.group(1))
+        return data if isinstance(data, list) else None
+    except Exception:
+        return None
+
+
 def persist_cases(cases, data_js_path):
-    """Merge `cases` (list of board-shaped dicts) into the store + data.js.
+    """Merge `cases` (list of board-shaped dicts) into data.js, KEEPING cases already there.
+    Append new, update existing (by id), and never drop old cases that weren't in this query.
     Returns (added, updated, total). Writes nothing if nothing changed."""
-    store = _load_store()
-    by_id = {c.get("id"): c for c in store if c.get("id")}
+    # Baseline = whatever is already in data.js (the file we maintain) unioned with the
+    # sidecar store, so old cases are preserved even if the store was cleared.
+    by_id = {}
+    for c in _load_store():
+        if c.get("id"):
+            by_id[c["id"]] = c
+    existing = _read_data_js_cases(data_js_path)
+    if existing is not None:
+        for c in existing:                 # data.js wins over the store for shared ids
+            if c.get("id"):
+                by_id[c["id"]] = c
+
     added = updated = 0
     for c in cases:
         cid = c.get("id")
