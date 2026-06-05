@@ -3,7 +3,8 @@
 This document is a roadmap. It captures (1) a code-review of the current prototype with
 prioritized fixes, (2) a redesign spec for the guided site tour, (3) an improvement +
 regeneration spec for the promo slide deck, and (4) a backlog of requested features (refresh
-buttons, Load New vs Refresh, weekly-archive splitting, and a recycle bin). File references use
+buttons, Load New vs Refresh, weekly-archive splitting, a recycle bin, a first-line handling clock,
+and a clock-model explainer page). File references use
 `path:line` anchors against the tree at the time of writing so a later implementation session
 can execute directly.
 
@@ -201,10 +202,15 @@ Tracked todo list — each item has a concrete plan below.
 - [ ] **4.3** Split the weekly archive out of `data.js` so the file doesn't grow unbounded.
 - [ ] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
   1-week recycle bin for deleted cases.
+- [ ] **4.5** Add a **First-line handling** clock to the case-detail clock grid (alongside SLA,
+  Local FIT, and HQ Product Team).
+- [ ] **4.6** Add a **"Clock model"** explainer page (like Status Flow) showing how each clock is
+  calculated.
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
-`local/persist.py`, so they should be designed together.
+`local/persist.py`, so they should be designed together. 4.5 and 4.6 are display-only (no backend
+change); 4.6 documents 4.5, so build 4.5 first or together.
 
 ### 4.1 — Per-case refresh + refresh-all-stored
 
@@ -310,6 +316,74 @@ loads every case into `STATE.cases` up front (`app.js:25`).
   recycle bin with a countdown; Restore brings it back; permanent delete needs the second confirm.
 - Confirm `data.js` stays bounded after sealing a week (archive file created, index still renders
   from the stats snapshot), and a case binned >7 days ago is purged on next boot.
+
+### 4.5 — First-line handling clock
+
+**Today** the case-detail clock grid shows three clocks: **SLA · time on us**, **Local FIT**, and
+**HQ Product Team** (`renderCaseDetailBody`, `app.js:982–998`). There is no clock for the time a
+case sits directly with the **first-line agent** (triage on a New case, and the Sanity-Check
+verify step) — even though that time is real "on us" handling time.
+
+**What exists to reuse — the data is already computed.** The ownership timeline derives per-holder
+totals from case history in `holderTotals(c)` (`app.js:884–890`), which already returns
+`{ triage, fit, hq, sanity, requester }`. The detail clocks for FIT/HQ already source from this
+(not from `c.holdMs`), so the timeline and clocks stay in agreement. `HOLDER_META`
+(`app.js:892–899`) holds the labels/colors (`triage` = "First line" `tl-triage`, `sanity` =
+"Sanity check" `tl-sanity`).
+
+**Plan**
+- Add a fourth `.clock` tile to the clock grid (`app.js:982–998`) labelled **First line** with the
+  value `holderTotals(c).triage + holderTotals(c).sanity` (the time the case was held by the agent
+  directly — triage while New, plus the Sanity-Check verify window). Add a tooltip breaking it into
+  "triage / sanity" so the number reconciles with the timeline legend.
+- **"Holding now"** state is active when `c.currentOwner === null`, the case is open, not paused/
+  returned, and status ∈ {`new`, `sanity_check`} — mirror the `running` styling the FIT/HQ tiles
+  use (`c.currentOwner === 'fit'`).
+- Use the `tl-triage` color dot so the clock visually matches its timeline segment.
+- **CSS:** the grid currently lays out three tiles; let four wrap cleanly (`.clock-grid` in
+  `styles.css` — make it `repeat(auto-fit, minmax(…))` or a 2×2 grid).
+- Surface the same figure in any compact clock view if one exists (reading panel); otherwise scope
+  to the detail grid.
+
+**Tests (reuse the harness):** `holderTotals` / `ownershipSegments` (`app.js:835–890`) are
+pure, history-derived functions — ideal for `prototype/tests/run.cjs`. Add characterization tests
+that feed a synthetic `history` (created → assigned → escalated → returned → resumed → closed) and
+assert the `triage`/`sanity`/`fit`/`hq`/`requester` splits, locking the first-line math before and
+after the UI change.
+
+### 4.6 — "Clock model" explainer page (like Status Flow)
+
+**What exists to reuse.** Status Flow is a self-contained SVG page: `renderStatusFlow()`
+(`app.js:1864+`) on route `#/flow`, wired in five small places — nav link in `index.html:34`
+(`<a href="#/flow" data-route="flow">`), router (`app.js:417`), `labelForRoute` (`app.js:436`),
+the active-nav map (`app.js:456`), and the render dispatch (`app.js:467`). The new page mirrors
+this exactly.
+
+**Plan**
+- Add `renderClockModel()` and a new route `#/clocks` (label e.g. "Clock model"), wired in the same
+  five spots as `flow`. Add a sidebar nav entry next to "Status Flow".
+- Content — explain, per clock, what **starts**, **pauses/stops**, and **banks** it, matching the
+  real logic so the page is the single source of truth:
+  - **SLA · time on us** — runs from `slaStartedAt`; **pauses** on `returned_to_requester`
+    (`approaching_sla` handler), **resumes** with a fresh segment on `resume`, and is **banked**
+    into `slaAccumulatedMs` on close/cancel. (`caseSlaMs`, `app.js:195–203`.)
+  - **First line** — accrues while the case is in triage (New) or Sanity Check (`holderTotals`
+    `triage`+`sanity`).
+  - **Local FIT** / **HQ Product Team** — accrue between `assigned`→hand-off and
+    `escalated`→hand-off respectively (history-derived via `ownershipSegments`).
+- Reuse the **timeline colors** (`HOLDER_META` / `tl-*` classes) so the legend matches the case
+  detail, and render a small **worked example**: build one synthetic case and call the existing
+  `renderOwnershipTimeline()` so the explainer shows a real bar with the same component used on the
+  detail page (guarantees the doc can't drift from the calculation).
+- Keep it static/diagram-style like `renderStatusFlow` (an SVG or a styled table mapping each
+  lifecycle state → which clock is running), plus the worked-example timeline.
+
+**Verification (4.5–4.6)**
+- Open a case detail (e.g. one that went New → FIT → HQ → Sanity → Closed): the new **First line**
+  clock shows non-zero and its value + the FIT/HQ/SLA clocks reconcile with the ownership-timeline
+  legend. `node prototype/tests/run.cjs` stays green with the new `holderTotals` tests.
+- Navigate to `#/clocks`: the explainer renders, the worked-example timeline matches the detail
+  page's component, and each clock's start/pause/bank description matches the handler behavior.
 
 ## Notes
 
