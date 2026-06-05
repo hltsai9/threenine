@@ -280,6 +280,18 @@ function fmtUntil(iso) {
   const m = min % 60;
   return m ? `in ${hr}h ${m}m` : `in ${hr}h`;
 }
+// Next occurrence of a local clock time "HH:MM" — today if still ahead, otherwise tomorrow.
+// Used by the reminder "at a specific time" option. Returns an ISO string, or null if invalid.
+function nextTimeIso(hhmm, base) {
+  base = base || realNow();
+  const parts = String(hhmm).split(':');
+  const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+  if (!(h >= 0 && h < 24 && m >= 0 && m < 60)) return null;
+  const d = new Date(base.getTime());
+  d.setHours(h, m, 0, 0);
+  if (d.getTime() <= base.getTime()) d.setDate(d.getDate() + 1);
+  return d.toISOString();
+}
 function fmtOverdue(iso) {
   const diff = realNow().getTime() - new Date(iso).getTime();
   if (diff < 60000) return 'just now';
@@ -2714,8 +2726,10 @@ function handlePrompt(caseId, kind) {
       <div class="modal-sub">${existing
         ? 'Reminder is currently set for ' + fmtUntil(existing.fireAt) + '.'
         : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC FIT come online before assigning).'}</div>
-      <label>Remind me</label>
+      <label>Remind me in…</label>
       <select data-field="when">${presets.map(p => `<option value="${p.value}">${escapeHtml(p.label)}</option>`).join('')}</select>
+      <label>…or at a specific time <span class="muted tiny">(today, or tomorrow if it's already past)</span></label>
+      <input type="time" data-field="atTime">
       <label>Note (optional)</label>
       <textarea data-field="note" placeholder="Why are you deferring this?">${escapeHtml(existing?.note || '')}</textarea>
       <div class="modal-actions">
@@ -2726,9 +2740,13 @@ function handlePrompt(caseId, kind) {
         </div>
       </div>
     `, (modal) => {
-      const minutes = parseInt(fieldVal(modal, 'when'), 10);
       const note = fieldVal(modal, 'note').trim();
-      const fireAt = new Date(realNow().getTime() + minutes * 60000).toISOString();
+      // A specific time (e.g. 05:30) wins over the relative preset when set.
+      const atTime = fieldVal(modal, 'atTime');
+      const fireAt = atTime
+        ? nextTimeIso(atTime)
+        : new Date(realNow().getTime() + parseInt(fieldVal(modal, 'when'), 10) * 60000).toISOString();
+      if (!fireAt) { alert('Enter a valid time (HH:MM).'); return false; }
       c.reminder = {
         fireAt,
         note,

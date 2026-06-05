@@ -389,6 +389,20 @@ test('windowError: validates the created-between window', () => {
   eq(app.windowError(24, 0), null);
 });
 
+/* ---------- reminder: set at a specific time ---------- */
+test('nextTimeIso: next future occurrence of a local HH:MM (today or tomorrow)', () => {
+  const base = new Date(FIXED);
+  const soon = new Date(base.getTime() + 60000);   // 1 min ahead → same day
+  const hh = `${String(soon.getHours()).padStart(2, '0')}:${String(soon.getMinutes()).padStart(2, '0')}`;
+  const r = new Date(app.nextTimeIso(hh, base));
+  ok(r.getTime() > base.getTime() && r.getTime() - base.getTime() <= 25 * HOUR);
+  eq([r.getHours(), r.getMinutes()], [soon.getHours(), soon.getMinutes()]);
+  const past = new Date(base.getTime() - 60000);   // 1 min behind → rolls to tomorrow
+  const ph = `${String(past.getHours()).padStart(2, '0')}:${String(past.getMinutes()).padStart(2, '0')}`;
+  ok(new Date(app.nextTimeIso(ph, base)).getTime() - base.getTime() > 23 * HOUR);
+  eq([app.nextTimeIso('99:99', base), app.nextTimeIso('', base)], [null, null]);
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {
