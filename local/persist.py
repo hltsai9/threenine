@@ -25,6 +25,32 @@ STORE = os.path.join(HERE, "cases.store.json")
 
 SENTINEL = "// === LIVE CASES (auto-written by local/serve.py — do NOT commit) ==="
 
+# Files the Owners / Shift editors may save to, with a short header for each.
+EDITOR_FILES = {
+    "shifts": ("shifts.js", "// Shift & operator roster — saved from the in-app Shift editor.\n"),
+    "owners": ("owners.js", "// Owner directory (Local FIT desks & HQ Product Teams) — saved from the in-app Owners editor.\n"),
+}
+
+
+def _timestamp():
+    now = datetime.now()
+    return now.strftime("%Y%m%d-%H%M%S-") + f"{now.microsecond // 1000:03d}"
+
+
+def write_js_file(webroot, name, snippet):
+    """Write a generated snippet to shifts.js / owners.js (with backups). Returns the path."""
+    if name not in EDITOR_FILES:
+        raise ValueError(f"unknown editor file: {name!r}")
+    fname, header = EDITOR_FILES[name]
+    path = os.path.join(webroot, fname)
+    if os.path.exists(path):
+        if not os.path.exists(path + ".orig"):
+            shutil.copyfile(path, path + ".orig")
+        shutil.copyfile(path, f"{path}.{_timestamp()}.bak")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(header + (snippet or "").rstrip() + "\n")
+    return path
+
 
 def _load_store():
     if os.path.exists(STORE):
@@ -77,8 +103,7 @@ def _write_data_js(path, cases):
         # (timestamped so refreshes don't overwrite previous backups)
         if not os.path.exists(path + ".orig"):
             shutil.copyfile(path, path + ".orig")
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S-") + f"{datetime.now().microsecond // 1000:03d}"
-        shutil.copyfile(path, f"{path}.{ts}.bak")
+        shutil.copyfile(path, f"{path}.{_timestamp()}.bak")
 
     # Keep everything before our injected block (or before the original window.CASES = ).
     if SENTINEL in text:

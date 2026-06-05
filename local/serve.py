@@ -131,26 +131,36 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self):  # noqa: N802
-        # POST /api/save  body: {"cases":[ {...} ]} or a single case dict.
-        # Persist operator edits (e.g. a handover note) into data.js.
+        # POST /api/save       body {"cases":[...]}      — persist operator edits into data.js
+        # POST /api/save-file  body {"file":"shifts"|"owners","js":"..."} — write shifts/owners.js
         try:
-            if self.path.split("?", 1)[0].rstrip("/") != "/api/save":
-                self.send_error(404, "Not found")
-                return
+            path = self.path.split("?", 1)[0].rstrip("/")
             length = int(self.headers.get("Content-Length", "0") or "0")
             body = self.rfile.read(length) if length else b""
             data = json.loads(body.decode("utf-8")) if body else {}
-            cases = data.get("cases") if isinstance(data, dict) and "cases" in data else data
-            if isinstance(cases, dict):
-                cases = [cases]
-            if not isinstance(cases, list):
-                cases = []
-            added = updated = 0
-            if WRITE_DATA_JS and cases:
-                added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
-                if added or updated:
-                    print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total")
-            payload = json.dumps({"ok": True, "added": added, "updated": updated}).encode("utf-8")
+            result = {"ok": True}
+
+            if path == "/api/save":
+                cases = data.get("cases") if isinstance(data, dict) and "cases" in data else data
+                if isinstance(cases, dict):
+                    cases = [cases]
+                if not isinstance(cases, list):
+                    cases = []
+                added = updated = 0
+                if WRITE_DATA_JS and cases:
+                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                    if added or updated:
+                        print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total")
+                result = {"ok": True, "added": added, "updated": updated}
+            elif path == "/api/save-file":
+                fpath = persist.write_js_file(WEBROOT, data.get("file"), data.get("js", ""))
+                print(f"  wrote {os.path.basename(fpath)} from the in-app editor")
+                result = {"ok": True, "file": os.path.basename(fpath)}
+            else:
+                self.send_error(404, "Not found")
+                return
+
+            payload = json.dumps(result).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(payload)))

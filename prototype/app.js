@@ -1381,7 +1381,7 @@ function renderRosterEditor() {
       <div class="detail-section" style="margin-bottom:0">
         <div class="re-out-head">
           <h3 style="margin:0">Snippet for <code>shifts.js</code></h3>
-          <div><button class="btn btn-primary" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
+          <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="re-save">Save to shifts.js</button> ' : ''}<button class="btn" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
         </div>
         <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
       </div>
@@ -1531,6 +1531,7 @@ function bindRosterEditor() {
   });
   ed.querySelectorAll('.re-del-shift').forEach(btn => btn.addEventListener('click', () => deleteShift(+btn.dataset.si)));
   ed.querySelectorAll('.re-del-op').forEach(btn => btn.addEventListener('click', () => deleteOperator(+btn.dataset.oi)));
+  document.getElementById('re-save')?.addEventListener('click', () => saveJsFile('shifts', rosterSnippet(), 'shifts.js'));
   document.getElementById('re-copy')?.addEventListener('click', async () => {
     const ta = document.getElementById('roster-output');
     try { await navigator.clipboard.writeText(ta.value); }
@@ -1628,7 +1629,7 @@ function renderOwnersPage() {
         ${warnHtml}
         <div class="detail-section" style="margin-bottom:0">
           <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
-            <div><button class="btn btn-primary" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
+            <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="owners-save">Save to owners.js</button> ' : ''}<button class="btn" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
           <textarea class="re-output" id="owners-output" readonly spellcheck="false">${escapeHtml(ownersSnippet())}</textarea>
         </div>
       </div>
@@ -1702,6 +1703,7 @@ function bindOwnersEditor() {
     render();
   }));
   ed.querySelectorAll('.re-del-owner').forEach(btn => btn.addEventListener('click', () => deleteOwner(btn.dataset.pool, +btn.dataset.oi)));
+  document.getElementById('owners-save')?.addEventListener('click', () => saveJsFile('owners', ownersSnippet(), 'owners.js'));
   document.getElementById('owners-copy')?.addEventListener('click', async () => {
     const ta = document.getElementById('owners-output');
     try { await navigator.clipboard.writeText(ta.value); }
@@ -2760,16 +2762,53 @@ function normalizeLiveCase(c) {
 
 // Push operator edits back to the local server so they get written into data.js.
 // Fire-and-forget; only in live mode (served by serve.py).
+// Tiny corner indicator: setSaveStatus('saving' | 'saved' | 'error', label?).
+let _saveStatusTimer = null;
+function setSaveStatus(state, label) {
+  let el = document.getElementById('save-status');
+  if (!el) { el = document.createElement('div'); el.id = 'save-status'; document.body.appendChild(el); }
+  clearTimeout(_saveStatusTimer);
+  if (state === 'saving') {
+    el.className = 'show saving';
+    el.innerHTML = '<span class="live-spinner"></span> ' + escapeHtml(label || 'Saving…');
+  } else if (state === 'saved') {
+    el.className = 'show saved';
+    el.textContent = '✓ ' + (label || 'Saved');
+    _saveStatusTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  } else if (state === 'error') {
+    el.className = 'show error';
+    el.textContent = '⚠ ' + (label || 'Save failed');
+    _saveStatusTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  } else {
+    el.classList.remove('show');
+  }
+}
+
 function saveCasesToServer(cases) {
   if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !cases.length) return;
+  setSaveStatus('saving');
   try {
     fetch('api/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cases }),
-    }).then(r => { if (!r.ok) console.warn('save to data.js failed:', r.status); })
-      .catch(e => console.warn('save to data.js failed:', e));
-  } catch (e) { /* ignore */ }
+    }).then(r => setSaveStatus(r.ok ? 'saved' : 'error'))
+      .catch(() => setSaveStatus('error'));
+  } catch (e) { setSaveStatus('error'); }
+}
+
+// Save a generated snippet to shifts.js / owners.js via the local server (Save buttons).
+function saveJsFile(file, snippet, label) {
+  if (!/^https?:$/.test(location.protocol)) { showToast('Run the board via serve.py to save files.', 'warn'); return; }
+  setSaveStatus('saving', 'Saving ' + label + '…');
+  fetch('api/save-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file, js: snippet }),
+  }).then(r => {
+    if (r.ok) { setSaveStatus('saved', 'Saved ' + label); showToast(label + ' saved.', 'success'); }
+    else { setSaveStatus('error'); showToast('Save failed (' + r.status + ').', 'warn'); }
+  }).catch(() => { setSaveStatus('error'); showToast('Save failed — is serve.py running?', 'warn'); });
 }
 
 // Persist ANY case that changed since the last save (queue, status, assignment, reminder,

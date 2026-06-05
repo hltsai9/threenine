@@ -277,6 +277,29 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   animation: live-spin .7s linear infinite;
 }
 @keyframes live-spin { to { transform: rotate(360deg); } }
+/* tiny save indicator (bottom-right) */
+#save-status {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #fff;
+  background: var(--sidebar);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, .25);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .15s, transform .15s;
+  pointer-events: none;
+}
+#save-status.show { opacity: 1; transform: translateY(0); }
+#save-status.saved { background: var(--good); }
+#save-status.error { background: var(--danger); }
 .watchlist {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
