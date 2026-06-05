@@ -133,9 +133,10 @@ class Handler(SimpleHTTPRequestHandler):
             print("  (client closed before the response finished — cases still persisted below)")
 
         # Persist after responding (best-effort), even if the client already disconnected.
+        # source="live": refresh only CC-owned fields on existing cases, preserve operator work.
         if status == 200 and WRITE_DATA_JS and cases is not None:
             try:
-                added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"), source="live")
                 if added or updated:
                     print(f"  data.js updated: +{added} new, {updated} updated, {total} total (backup: data.js.bak)")
             except Exception:
@@ -160,7 +161,8 @@ class Handler(SimpleHTTPRequestHandler):
                     cases = []
                 added = updated = 0
                 if WRITE_DATA_JS and cases:
-                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                    # source="operator": these edits are authoritative and fully overwrite.
+                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"), source="operator")
                     if added or updated:
                         print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total")
                 result = {"ok": True, "added": added, "updated": updated}

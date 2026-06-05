@@ -24,6 +24,16 @@ from datetime import datetime
 HERE = os.path.dirname(os.path.abspath(__file__))
 STORE = os.path.join(HERE, "cases.store.json")
 
+# Fields Case Center authoritatively owns. When persisting a LIVE fetch, only these are
+# refreshed onto a case that already exists; everything else (board status, FIT/HQ routing,
+# history, notes, clocks, queue/handover/reminder) is operator-local and is preserved — so a
+# /api/cases refresh never resets a case you've assigned/moved back to its raw CC status.
+# Must stay in sync with CC_OWNED_FIELDS in prototype/app.js.
+CC_OWNED_FIELDS = (
+    "subject", "ccStatusLabel", "priority", "caseLink",
+    "requester", "requesterDept", "reporterId", "reporterDept", "assigneeId", "assigneeDept",
+)
+
 SENTINEL = "// === LIVE CASES (auto-written by local/serve.py — do NOT commit) ==="
 
 # Files the Owners / Shift editors may save to, with a short header for each.
@@ -83,10 +93,17 @@ def _read_data_js_cases(path):
         return None
 
 
-def persist_cases(cases, data_js_path):
+def persist_cases(cases, data_js_path, source="live"):
     """Merge `cases` (list of board-shaped dicts) into data.js, KEEPING cases already there.
     Append new, update existing (by id), and never drop old cases that weren't in this query.
-    Returns (added, updated, total). Writes nothing if nothing changed."""
+    Returns (added, updated, total). Writes nothing if nothing changed.
+
+    source="live"     — cases came from a Case Center fetch (/api/cases): for a case that
+                        already exists, only CC-owned fields are refreshed; operator work
+                        (status, routing, history, notes, clocks, agent layer) is preserved.
+    source="operator" — cases are operator edits (/api/save): they are authoritative and
+                        fully overwrite the stored case.
+    Brand-new cases (not seen before) are taken in full either way."""
     # Baseline = whatever is already in data.js (the file we maintain) unioned with the
     # sidecar store, so old cases are preserved even if the store was cleared.
     by_id = {}
@@ -105,12 +122,17 @@ def persist_cases(cases, data_js_path):
         if not cid:
             continue
         if cid in by_id:
-            merged = {**by_id[cid], **c}   # update existing fields, keep any extras
+            if source == "operator":
+                merged = {**by_id[cid], **c}   # operator edits are authoritative
+            else:
+                # live Case Center record — refresh only CC-owned fields, preserve operator work
+                overlay = {k: c[k] for k in CC_OWNED_FIELDS if k in c}
+                merged = {**by_id[cid], **overlay}
             if merged != by_id[cid]:
                 updated += 1
             by_id[cid] = merged
         else:
-            by_id[cid] = c
+            by_id[cid] = c                     # brand-new case → take the full record
             added += 1
 
     merged_list = list(by_id.values())
