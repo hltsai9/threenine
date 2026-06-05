@@ -13,7 +13,7 @@ This repo holds the **User Requirements Document** and a **click-through web pro
 
 **Locally — easiest (just open a file):** double-click `prototype/standalone.html`, or open it in any browser via `file://`. It's a self-contained build of the prototype with the CSS and JS inlined, so no HTTP server or relative file fetches are needed. This is the recommended path for sharing the prototype as a single file.
 
-**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `shifts.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
+**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `shifts.js`, `owners.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
 
 ```bash
 cd prototype && python3 -m http.server 8000
@@ -139,8 +139,9 @@ Your changes (assignments, status moves, handover notes, operator switches) are 
 │   ├── index.html               # SPA shell (modular dev entry point)
 │   ├── styles.css               # all styles
 │   ├── app.js                   # router + render + handlers
-│   ├── data.js                  # seed: owners, weeks, cases, thresholds, clock
+│   ├── data.js                  # seed: weeks, cases, thresholds, clock
 │   ├── shifts.js                # roster: operators, shifts, default operator (edit here)
+│   ├── owners.js                # FIT desks & HQ teams (edit here / via the Owners page)
 │   ├── tour.js                  # interactive guided tour
 │   ├── bundle.mjs               # build script: produces standalone.html
 │   ├── standalone.html          # self-contained single-file build (file://-safe)

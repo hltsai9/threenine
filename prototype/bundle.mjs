@@ -21,6 +21,7 @@ function read(name) {
 const css = read('styles.css');
 const data = read('data.js');
 const shifts = read('shifts.js');
+const owners = read('owners.js');
 const app = read('app.js');
 const tour = read('tour.js');
 const indexHtml = read('index.html');
@@ -49,6 +50,8 @@ ${bodyContent}
 ${data}
 
 ${shifts}
+
+${owners}
 
 ${app}
 

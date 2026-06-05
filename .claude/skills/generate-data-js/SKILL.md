@@ -7,7 +7,7 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 
 `prototype/data.js` is the seed dataset the SPA boots from. It declares everything via `window.*` globals (no modules, no build step). After editing it you **must** rerun `node prototype/bundle.mjs` so `prototype/standalone.html` picks up the change.
 
-> **The roster lives in a separate file.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are defined in **`prototype/shifts.js`** (so the roster can be edited — including via the in-app Shift editor — without touching data.js). Do **not** put them in data.js. When you reference operator ids or shift names from data.js (e.g. `createdBy`, history `who`), keep them consistent with shifts.js.
+> **Roster and owners live in separate files.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are in **`prototype/shifts.js`**; `window.OWNERS` (FIT desks & HQ teams) is in **`prototype/owners.js`**. Both can be edited via in-app editors (Shifts page / Owners page). Do **not** put them in data.js. Keep ids you reference from data.js (`createdBy`, history `who`, `fitId`, `hqId`) consistent with those files.
 
 ## File contract
 
@@ -17,7 +17,6 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 | --- | --- | --- |
 | `window.NOW` | `Date` | Frozen "now" the app uses for SLA math, idle clocks, office-hours coloring. Pick a wall-clock time on the demo day. |
 | `window.THRESHOLDS` | object | `fitIdleHours`, `hqIdleHours`, `approachingSlaHours`, `shiftEndingSoonMinutes`. |
-| `window.OWNERS` | `{ fit: [...], hq: [...] }` | FIT desks (Phoenix TZ) and HQ teams (Taipei TZ). |
 | `window.CURRENT_SHIFT` | object | `{ name, endsAtUtc, date }`. `name` must match a shift in shifts.js. |
 | `window.CURRENT_WEEK` | object | `{ id, label, startsAt }`. |
 | `window.WEEKS` | array | Past + current ISO weeks. Mark the current one with `isCurrent: true`. |
@@ -30,6 +29,12 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 | `window.OPERATORS` | array | `{ id, name, shift }`. Shift must match a `SHIFTS` name. |
 | `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
 | `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
+
+`owners.js` defines the owner directory (edit there / via the Owners page):
+
+| Global | Type | Purpose |
+| --- | --- | --- |
+| `window.OWNERS` | `{ fit: [...], hq: [...] }` | FIT desks `{id,name,region,tz,office,channel}` (Phoenix TZ) and HQ teams `{id,name,area,tz,office,channel}` (Taipei TZ). |
 
 ## Relationship to Case Center (live data)
 

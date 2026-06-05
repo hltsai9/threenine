@@ -1057,6 +1057,8 @@ table.case-table {
   border-radius: 6px; font-family: inherit; font-size: 13px; background: #fff; color: var(--text);
 }
 .re-table input.re-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-muted); }
+.re-scroll { overflow-x: auto; }
+.re-scroll .re-table { min-width: 760px; }
 .re-table td.re-x, .re-table th.re-x { width: 36px; text-align: right; }
 .re-table td.re-refs { width: 70px; white-space: nowrap; color: var(--text-muted); }
 .re-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -1431,6 +1433,10 @@ table.case-table {
         <span>Shifts</span>
         <span class="count" id="nav-shifts-count">—</span>
       </a>
+      <a href="#/owners" data-route="owners">
+        <span>Owners</span>
+        <span class="count" id="nav-owners-count">—</span>
+      </a>
       <a href="#/archive" data-route="archive">
         <span>Weekly Archive</span>
         <span class="count" id="nav-archive-count">—</span>
@@ -1480,18 +1486,8 @@ window.THRESHOLDS = {
 // Operators & shifts (window.OPERATORS / window.SHIFTS / window.CURRENT_OPERATOR_ID)
 // live in shifts.js so the roster can be edited without touching this file.
 
-window.OWNERS = {
-  fit: [
-    { id: 'fit-apac', name: 'FIT — APAC desk',  region: 'APAC', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-apac' },
-    { id: 'fit-emea', name: 'FIT — EMEA desk',  region: 'EMEA', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-emea' },
-    { id: 'fit-amer', name: 'FIT — AMER desk',  region: 'AMER', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-amer' },
-  ],
-  hq: [
-    { id: 'hq-identity', name: 'HQ Identity Team',  area: 'Identity / SSO', tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-data',     name: 'HQ Data Platform',  area: 'Data Platform',  tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-mobile',   name: 'HQ Mobile App',     area: 'Mobile',         tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-  ],
-};
+// Owners (window.OWNERS — Local FIT desks & HQ Product Teams) live in owners.js so the
+// directory can be edited without touching this file.
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-05T12:00:00Z', date: '2026-06-05' };
 window.CURRENT_WEEK = { id: 'W23-2026', label: 'W23 · June 1 – 7, 2026', startsAt: '2026-06-01T00:00:00Z' };
@@ -2160,6 +2156,31 @@ window.SHIFTS = [
 window.CURRENT_OPERATOR_ID = 'op-da';
 
 
+// Owner directory for the Case Tracker — Local FIT desks and HQ Product Teams.
+//
+// EDIT THIS FILE to change who cases get routed to. Kept separate from data.js so it can be
+// updated (including via the in-app Owners editor) without touching cases or the clock.
+// The in-app Owners editor (Owners page) generates exactly the block below; paste its
+// output here to make changes permanent.
+//
+//   fit: Local FIT desks  — { id, name, region, tz, office, channel }
+//   hq:  HQ Product Teams — { id, name, area,   tz, office, channel }
+// Case routing references these by id (case.fitId / case.hqId).
+
+window.OWNERS = {
+  fit: [
+    { id: 'fit-apac', name: 'FIT — APAC desk',  region: 'APAC', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-apac' },
+    { id: 'fit-emea', name: 'FIT — EMEA desk',  region: 'EMEA', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-emea' },
+    { id: 'fit-amer', name: 'FIT — AMER desk',  region: 'AMER', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-amer' },
+  ],
+  hq: [
+    { id: 'hq-identity', name: 'HQ Identity Team',  area: 'Identity / SSO', tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
+    { id: 'hq-data',     name: 'HQ Data Platform',  area: 'Data Platform',  tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
+    { id: 'hq-mobile',   name: 'HQ Mobile App',     area: 'Mobile',         tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
+  ],
+};
+
+
 // Case Tracker prototype — single-file SPA.
 // Renders the kanban board (Cases), Case Detail, Shifts and Archive views
 // against the seed data in data.js. State is in-memory; reload resets.
@@ -2270,6 +2291,7 @@ function resetState() {
   window.OPERATORS = structuredClone(SEED_ROSTER.operators);
   window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
   window.CURRENT_OPERATOR_ID = SEED_ROSTER.currentOperatorId;
+  window.OWNERS = structuredClone(SEED_OWNERS);
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
   STATE.lastListRoute = '#/cases';
   STATE.lastListLabel = 'Cases';
@@ -2283,6 +2305,8 @@ const SEED_ROSTER = {
   shifts: structuredClone(window.SHIFTS),
   currentOperatorId: window.CURRENT_OPERATOR_ID,
 };
+// Pristine owner directory, so "Reset to seed" can undo in-session Owners-editor changes.
+const SEED_OWNERS = structuredClone(window.OWNERS);
 
 const HOUR = 3600 * 1000;
 
@@ -2567,6 +2591,7 @@ function currentRoute() {
   if (h.startsWith('#/archive')) return { name: 'archive' };
   if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
+  if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
   return { name: 'cases' };
 }
@@ -2579,6 +2604,7 @@ function labelForRoute(route) {
   switch (route.name) {
     case 'cases': return 'Cases';
     case 'shifts': return 'Shifts';
+    case 'owners': return 'Owners';
     case 'shiftDetail': return `${route.shift} shift`;
     case 'archive': return 'Weekly Archive';
     case 'archiveWeek': {
@@ -2604,6 +2630,7 @@ function render() {
     cases: 'cases', detail: 'cases',
     archive: 'archive', archiveWeek: 'archive',
     shifts: 'shifts', shiftDetail: 'shifts',
+    owners: 'owners',
     flow: 'flow',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
@@ -2613,6 +2640,7 @@ function render() {
   else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
   else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
+  else if (route.name === 'owners') main.innerHTML = renderOwnersPage();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
   bindHandlers();
@@ -2650,6 +2678,8 @@ function renderSidebar() {
     STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
+  const navOwners = document.getElementById('nav-owners-count');
+  if (navOwners) navOwners.textContent = (window.OWNERS.fit.length + window.OWNERS.hq.length);
   const navArchive = document.getElementById('nav-archive-count');
   if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
@@ -3173,7 +3203,6 @@ function renderCaseDetailBody(c) {
             ${c.assigneeId ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assigneeId)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
             <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
-            <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
           <div class="detail-section">
@@ -3690,6 +3719,177 @@ function bindRosterEditor() {
     try { await navigator.clipboard.writeText(ta.value); }
     catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', ''); }
     const c = document.getElementById('re-copied'); if (c) { c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200); }
+  });
+}
+
+/* ---------- Owners editor (Owners page) ---------- */
+
+function makeOwnerId(pool, name, exceptIndex) {
+  // Drop boilerplate words so "FIT — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
+  const cleaned = String(name || '').toLowerCase().replace(/\b(fit|hq|desk|team|product|the)\b/g, ' ');
+  const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || pool;
+  const want = pool + '-' + base;
+  const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
+  if (!taken.has(want)) return want;
+  let n = 2; while (taken.has(want + n)) n++;
+  return want + n;
+}
+
+function ownerRefCounts(pool, id) {
+  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  let n = 0;
+  for (const c of STATE.cases) if (c[field] === id) n++;
+  return n;
+}
+
+function ownersSnippet() {
+  const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const fit = window.OWNERS.fit.map(o =>
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+  const hq = window.OWNERS.hq.map(o =>
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+  return `window.OWNERS = {\n  fit: [\n${fit}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
+}
+
+function ownersWarnings() {
+  const w = [];
+  ['fit', 'hq'].forEach(pool => {
+    const ids = window.OWNERS[pool].map(o => o.id);
+    [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate ${pool.toUpperCase()} id: ${id}` }));
+    window.OWNERS[pool].forEach(o => {
+      if (!String(o.name).trim()) w.push({ err: 1, msg: `A ${pool.toUpperCase()} owner is missing a name.` });
+      if (!String(o.id).trim()) w.push({ err: 1, msg: `A ${pool.toUpperCase()} owner is missing an id.` });
+    });
+  });
+  return w;
+}
+
+function renderOwnerRows(pool) {
+  const key = pool === 'fit' ? 'region' : 'area';
+  return window.OWNERS[pool].map((o, i) => {
+    const refs = ownerRefCounts(pool, o.id);
+    return `
+    <tr data-pool="${pool}" data-oi="${i}">
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'FIT — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
+      <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
+      <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
+      <td><input data-of="channel" value="${escapeHtml(o.channel || '')}" placeholder="Slack / JIRA"></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool}-…"></td>
+      <td class="re-refs tiny ${refs ? '' : 'muted'}" title="cases routed to this owner">${refs ? refs + ' ref' + (refs === 1 ? '' : 's') : '—'}</td>
+      <td class="re-x"><button class="btn-ghost re-del-owner" data-pool="${pool}" data-oi="${i}" title="Remove">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOwnersTable(pool, label, regionLabel) {
+  return `
+    <div class="detail-section">
+      <h3>${escapeHtml(label)}</h3>
+      <div class="re-scroll"><table class="re-table"><thead><tr>
+        <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
+      </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'FIT desk' : 'HQ team'}</button></div>
+    </div>`;
+}
+
+function renderOwnersPage() {
+  const warns = ownersWarnings();
+  const warnHtml = warns.length
+    ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
+    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} FIT desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+  return `
+    <div class="page-header"><div>
+      <h1>Owners</h1>
+      <div class="subtitle">Local FIT desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
+    </div></div>
+    <div class="card roster-editor" id="owners-editor">
+      <div class="card-header"><span>Edit FIT desks &amp; HQ teams</span></div>
+      <div class="card-body">
+        ${renderOwnersTable('fit', 'Local FIT desks', 'Region')}
+        ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
+        ${warnHtml}
+        <div class="detail-section" style="margin-bottom:0">
+          <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
+            <div><button class="btn btn-primary" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
+          <textarea class="re-output" id="owners-output" readonly spellcheck="false">${escapeHtml(ownersSnippet())}</textarea>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Foolproof delete: reassign the cases routed to this owner, or knowingly orphan them.
+function deleteOwner(pool, i) {
+  const o = window.OWNERS[pool][i];
+  if (!o) return;
+  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  const kind = pool === 'fit' ? 'FIT desk' : 'HQ team';
+  const refs = ownerRefCounts(pool, o.id);
+  const others = window.OWNERS[pool].filter((_, j) => j !== i);
+  const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
+  const refBox = refs
+    ? `<div class="re-refbox"><strong>${escapeHtml(o.name || o.id)}</strong> is routed ${refs} case${refs === 1 ? '' : 's'}.</div>`
+    : '<div class="muted tiny">No cases are routed to this owner — safe to remove.</div>';
+  showModal(`
+    <h3>Delete ${kind} “${escapeHtml(o.name || o.id)}”?</h3>
+    <div class="modal-sub mono tiny">${escapeHtml(o.id)}</div>
+    ${refBox}
+    ${refs ? (others.length ? `
+      <div class="re-modesel">
+        <div style="font-weight:600;margin:10px 0 4px">What about those cases?</div>
+        <label class="re-radio"><input type="radio" name="own-mode" value="reassign" checked> <span>Reassign them to another ${kind}</span></label>
+        <select data-field="to">${opts}</select>
+        <label class="re-radio"><input type="radio" name="own-mode" value="orphan"> <span>Delete anyway <span class="muted">— those cases lose their ${pool.toUpperCase()} owner</span></span></label>
+      </div>` : `<div class="muted tiny" style="margin-top:8px">No other ${kind} to reassign to — those cases will lose their ${pool.toUpperCase()} owner.</div>`) : ''}
+    <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Delete</button></div>`,
+    (m) => {
+      const modeEl = m.querySelector('input[name="own-mode"]:checked');
+      const mode = modeEl ? modeEl.value : 'orphan';
+      const toEl = m.querySelector('[data-field="to"]');
+      if (refs && mode === 'reassign' && toEl) {
+        const toId = toEl.value;
+        for (const c of STATE.cases) if (c[field] === o.id) c[field] = toId;
+      } else if (refs) {
+        for (const c of STATE.cases) if (c[field] === o.id) c[field] = null;
+      }
+      const idx = window.OWNERS[pool].indexOf(o);
+      if (idx >= 0) window.OWNERS[pool].splice(idx, 1);
+      showToast(`Removed ${o.name || o.id}.`, (refs && mode !== 'reassign') ? 'warn' : 'success');
+      render();
+      return true;
+    });
+}
+
+function bindOwnersEditor() {
+  const ed = document.getElementById('owners-editor');
+  if (!ed) return;
+  const refresh = () => { const ta = document.getElementById('owners-output'); if (ta) ta.value = ownersSnippet(); };
+  ed.querySelectorAll('input[data-of]').forEach(inp => inp.addEventListener('input', () => {
+    const tr = inp.closest('tr');
+    const pool = tr.dataset.pool, i = +tr.dataset.oi, f = inp.dataset.of, o = window.OWNERS[pool][i];
+    if (f === 'name') {
+      o.name = inp.value;
+      if (!o._idEdited) { o.id = o.name.trim() ? makeOwnerId(pool, o.name, i) : ''; const idIn = tr.querySelector('input[data-of="id"]'); if (idIn) idIn.value = o.id; }
+    } else if (f === 'id') {
+      o.id = inp.value; o._idEdited = true;
+    } else {
+      o[f] = inp.value;
+    }
+    refresh();
+  }));
+  ed.querySelectorAll('[data-add-owner]').forEach(btn => btn.addEventListener('click', () => {
+    const pool = btn.dataset.addOwner;
+    window.OWNERS[pool].push(pool === 'fit'
+      ? { id: '', name: '', region: '', tz: 'America/Phoenix', office: '08:00–17:00', channel: '', _idEdited: false }
+      : { id: '', name: '', area: '', tz: 'Asia/Taipei', office: '09:00–18:00', channel: '', _idEdited: false });
+    render();
+  }));
+  ed.querySelectorAll('.re-del-owner').forEach(btn => btn.addEventListener('click', () => deleteOwner(btn.dataset.pool, +btn.dataset.oi)));
+  document.getElementById('owners-copy')?.addEventListener('click', async () => {
+    const ta = document.getElementById('owners-output');
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', ''); }
+    const c = document.getElementById('owners-copied'); if (c) { c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200); }
   });
 }
 
@@ -4664,6 +4864,7 @@ function bindHandlers() {
     });
   });
   bindRosterEditor();
+  bindOwnersEditor();
   const lookbackLoad = document.getElementById('lookback-load');
   if (lookbackLoad) {
     const doLoad = () => {

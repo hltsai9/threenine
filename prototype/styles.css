@@ -1050,6 +1050,8 @@ table.case-table {
   border-radius: 6px; font-family: inherit; font-size: 13px; background: #fff; color: var(--text);
 }
 .re-table input.re-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-muted); }
+.re-scroll { overflow-x: auto; }
+.re-scroll .re-table { min-width: 760px; }
 .re-table td.re-x, .re-table th.re-x { width: 36px; text-align: right; }
 .re-table td.re-refs { width: 70px; white-space: nowrap; color: var(--text-muted); }
 .re-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
