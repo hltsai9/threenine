@@ -205,8 +205,8 @@ Tracked todo list — each item has a concrete plan below.
   1-week recycle bin for deleted cases.
 - [x] **4.5** Add a **First-line handling** clock to the case-detail clock grid (alongside SLA,
   Local FIT, and HQ Product Team). *(Done: `renderCaseDetailBody` shows a 4th tile valued
-  `holderTotals.triage + .sanity`, with a `tl-triage` swatch and a "Holding now" state; guarded by
-  5 new `holderTotals` characterization tests.)*
+  `holderTotals.triage` — triage only; Sanity Check is requester time per 4.8 — with a `tl-triage`
+  swatch and a "Holding now" state; guarded by `holderTotals` characterization tests.)*
 - [x] **4.6** Add a **"Clock model"** explainer page (like Status Flow) showing how each clock is
   calculated. *(Done: `renderClockModel()` on route `#/clocks`, wired into nav/router; explains
   each clock's start/pause/bank and renders a worked example via the real `renderOwnershipTimeline`
@@ -214,10 +214,13 @@ Tracked todo list — each item has a concrete plan below.
 - [ ] **4.7** On live refresh, if a case's Case Center **assignee maps to a Local FIT desk or HQ
   Product Team**, auto-move the case to the matching status (`with_fit` / `with_hq`) and log a
   history note of the change.
-- [ ] **4.8** Clock model: count **Sanity Check time as requester time**, not first-line time
-  (revises 4.5 / 4.6 — First-line clock becomes triage-only).
-- [ ] **4.9** Let the **first-line agent return a New case to the requester** (add "Return to
-  requester" to the `new` status transitions).
+- [x] **4.8** Clock model: count **Sanity Check time as requester time**, not first-line time.
+  *(Done: `ownershipSegments` classifies Sanity Check as `requester`; First-line clock is now
+  triage-only; clock-model table/example updated; option (a) — SLA keeps running through Sanity
+  Check — was chosen.)*
+- [x] **4.9** Let the **first-line agent return a New case to the requester**. *(Done: "Return to
+  requester" added to the `new` status transitions; Status Flow diagram + table updated; handler
+  already handled the null-owner path. Test added.)*
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and

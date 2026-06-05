@@ -3061,7 +3061,8 @@ function ownershipSegments(c) {
       case 'returned': return 'requester';
       case 'closed': case 'cancelled': return 'done';
       case 'status': case 'resumed': {    // ambiguous — read the detail
-        if (/sanity check/.test(d)) return 'sanity';
+        // Sanity Check = waiting on the requester to confirm the fix → counted as requester time.
+        if (/sanity check/.test(d)) return 'requester';
         if (/\bhq\b|product team/.test(d)) return 'hq';
         if (/local fit|→ fit|\bfit\b/.test(d)) return 'fit';
         if (/requester|returned/.test(d)) return 'requester';
@@ -3096,8 +3097,10 @@ function ownershipSegments(c) {
 }
 
 // Total time spent in each holder, summed from the ownership segments (history-derived).
+// Sanity Check is classified as requester time (see ownershipSegments), so there is no separate
+// "sanity" bucket — that span lands in `requester`.
 function holderTotals(c) {
-  const tot = { triage: 0, fit: 0, hq: 0, sanity: 0, requester: 0 };
+  const tot = { triage: 0, fit: 0, hq: 0, requester: 0 };
   for (const s of ownershipSegments(c)) {
     if (s.holder in tot) tot[s.holder] += Math.max(0, s.end - s.start);
   }
@@ -3108,7 +3111,6 @@ const HOLDER_META = {
   triage:    { label: 'First line',       cls: 'tl-triage' },
   fit:       { label: 'Local FIT',        cls: 'tl-fit' },
   hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
-  sanity:    { label: 'Sanity check',     cls: 'tl-sanity' },
   requester: { label: 'With requester',   cls: 'tl-requester' },
   done:      { label: 'Closed',           cls: 'tl-done' },
 };
@@ -3169,10 +3171,10 @@ function renderCaseDetailBody(c) {
   const hold = holderTotals(c);
   const fitMs = hold.fit;
   const hqMs = hold.hq;
-  // First-line handling = time the case sat directly with the first-line agent: triage while
-  // New, plus the Sanity-Check verify window (neither is FIT/HQ owner time).
-  const firstLineMs = hold.triage + hold.sanity;
-  const firstLineHolding = c.currentOwner === null && ['new', 'sanity_check'].includes(c.status);
+  // First-line handling = time the case sat directly with the first-line agent during triage
+  // (status New). Sanity Check counts as requester time, not first-line, so it's excluded.
+  const firstLineMs = hold.triage;
+  const firstLineHolding = c.currentOwner === null && c.status === 'new';
 
   const handoverHtml = c.handover ? `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
@@ -3204,7 +3206,7 @@ function renderCaseDetailBody(c) {
                 <div class="value">${fmtDuration(slaMs)}</div>
                 <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
               </div>
-              <div class="clock" title="Time the first-line agent handled this case directly: triage (New) ${fmtDuration(hold.triage)} + Sanity Check ${fmtDuration(hold.sanity)}">
+              <div class="clock" title="Time the first-line agent handled this case directly, during triage (status New). Sanity Check counts as requester time.">
                 <div class="label"><span class="clock-swatch tl-triage"></span>First line</div>
                 <div class="value">${fmtDuration(firstLineMs)}</div>
                 <div class="state ${firstLineHolding ? 'running' : ''}">${firstLineHolding ? 'Holding now' : 'Idle'}</div>
@@ -3332,6 +3334,7 @@ function statusTransitions(c) {
   switch (c.status) {
     case 'new':
       t.push({ kind: 'assign_fit', label: 'Assign to Local FIT' });
+      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
     case 'with_fit':
       t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
@@ -4156,10 +4159,12 @@ function renderStatusFlow() {
         </g>
 
         <g stroke="#0891b2" stroke-width="2" fill="none">
+          <path d="M100,100 Q90,200 298,256" marker-end="url(#arr-pause)"/>
           <path d="M260,100 L340,248" marker-end="url(#arr-pause)"/>
           <path d="M520,100 L470,248" marker-end="url(#arr-pause)"/>
         </g>
         <g font-size="11" fill="#0891b2" font-weight="500">
+          <text x="92" y="170" text-anchor="start">Return to requester</text>
           <text x="248" y="180" text-anchor="end">Return to requester</text>
           <text x="540" y="180" text-anchor="start">Return to requester</text>
         </g>
@@ -4199,6 +4204,7 @@ function renderStatusFlow() {
       </thead>
       <tbody>
         <tr><td><span class="pill pill-new">New</span></td><td>Assign to Local FIT</td><td><span class="pill pill-with_fit">With Local FIT</span></td><td>FIT hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
         <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
         <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
@@ -4228,9 +4234,13 @@ function renderClockModel() {
     ],
   };
   const t = holderTotals(example);
-  const firstLine = t.triage + t.sanity;
-  const lifeMs = t.triage + t.fit + t.hq + t.sanity + t.requester;
-  const slaMsEx = lifeMs - t.requester; // time on us = lifetime minus paused "with requester" spans
+  const firstLine = t.triage;        // Sanity Check is requester time, not first-line
+  const requesterMs = t.requester;   // includes the Sanity Check span (see ownershipSegments)
+  const lifeMs = t.triage + t.fit + t.hq + t.requester;
+  // SLA runs the whole time the case is on us and pauses only on an explicit "Return to
+  // requester". This example never returns, so SLA spans the full lifetime — Sanity Check is
+  // requester-attributed in the breakdown but does not pause SLA.
+  const slaMsEx = lifeMs;
   const swatch = cls => `<span class="clock-swatch ${cls}"></span>`;
   const accentSwatch = '<span class="clock-swatch" style="background:var(--accent)"></span>';
 
@@ -4243,7 +4253,8 @@ function renderClockModel() {
     </div>
 
     <div class="flow-container">
-      <h2 style="margin-top:0;">The four clocks</h2>
+      <h2 style="margin-top:0;">How each clock is counted</h2>
+      <p class="muted tiny" style="margin:0 0 10px;">The case detail shows four clocks — SLA, First line, Local FIT, HQ. The “With requester” row below isn't a separate clock; it's the requester-attributed time you see on the ownership timeline.</p>
       <table class="transition-table">
         <thead>
           <tr><th>Clock</th><th>What it measures</th><th>Starts</th><th>Pauses / stops</th><th>Banked</th></tr>
@@ -4253,14 +4264,14 @@ function renderClockModel() {
             <td>${accentSwatch}<strong>SLA · time on us</strong></td>
             <td>Total time the case is our responsibility.</td>
             <td>When the case is created (<code>slaStartedAt</code>).</td>
-            <td>Pauses when <em>returned to requester</em>; resumes on <em>resume</em>.</td>
+            <td>Pauses only on an explicit <em>Return to requester</em>; resumes on <em>resume</em>. Sanity Check does <strong>not</strong> pause it.</td>
             <td>Frozen into <code>slaAccumulatedMs</code> on close / cancel.</td>
           </tr>
           <tr>
             <td>${swatch('tl-triage')}<strong>First line</strong></td>
-            <td>Time the first-line agent handled it directly — <strong>triage</strong> (New) + <strong>Sanity Check</strong>.</td>
-            <td>On creation, and again when moved to Sanity Check.</td>
-            <td>When assigned to FIT, escalated, or closed.</td>
+            <td>Time the first-line agent handled it directly — <strong>triage</strong> while the case is New.</td>
+            <td>On creation (status New).</td>
+            <td>When assigned to FIT, or returned / cancelled from New.</td>
             <td>Summed from history segments.</td>
           </tr>
           <tr>
@@ -4277,6 +4288,13 @@ function renderClockModel() {
             <td>On move-to-sanity / return / close.</td>
             <td>Summed from history segments.</td>
           </tr>
+          <tr>
+            <td>${swatch('tl-requester')}<strong>With requester</strong></td>
+            <td>Time waiting on the requester — both <em>Returned to requester</em> and <strong>Sanity Check</strong> (awaiting their confirmation).</td>
+            <td>On return to requester, or on Move to Sanity Check.</td>
+            <td>On resume / verify &amp; close.</td>
+            <td>Timeline only. (Returned spans also pause SLA; Sanity Check does not.)</td>
+          </tr>
         </tbody>
       </table>
 
@@ -4284,13 +4302,14 @@ function renderClockModel() {
       <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Local FIT → HQ → Sanity Check → Closed. The bar below is the exact component shown on the case detail.</p>
       ${renderOwnershipTimeline(example)}
       <div class="clock-grid" style="margin-top:16px;">
-        <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">creation → close (no pauses)</div></div>
-        <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage ${fmtDuration(t.triage)} + sanity ${fmtDuration(t.sanity)}</div></div>
+        <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">runs through Sanity Check (no explicit return)</div></div>
+        <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage only</div></div>
         <div class="clock"><div class="label">${swatch('tl-fit')}Local FIT</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-requester')}With requester</div><div class="value">${fmtDuration(requesterMs)}</div><div class="state">incl. Sanity Check</div></div>
       </div>
 
-      <p class="muted tiny" style="margin-top:14px;">First line + Local FIT + HQ + any time with the requester add up to the case's lifetime; <strong>SLA · time on us</strong> is that lifetime minus the paused “with requester” spans.</p>
+      <p class="muted tiny" style="margin-top:14px;">First line + Local FIT + HQ + With requester add up to the case's lifetime (${fmtDuration(lifeMs)}). <strong>Sanity Check</strong> counts as <em>With requester</em> time. <strong>SLA · time on us</strong> runs the whole lifetime and pauses only on an explicit <em>Return to requester</em> — so here it equals the full ${fmtDuration(slaMsEx)}.</p>
     </div>
   `;
 }

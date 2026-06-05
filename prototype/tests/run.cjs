@@ -100,37 +100,42 @@ test('handover: open + fresh note by current shift → false', () =>
 
 /* ---------- ownership/holder totals (drives the clocks, incl. First line) ----------
  * holderTotals reconstructs possession segments from case history; the case-detail clocks
- * (SLA aside) are derived from it. First-line handling time = triage + sanity. */
+ * (SLA aside) are derived from it. First-line handling time = triage only; Sanity Check time
+ * is attributed to the requester (4.8). */
 const holderTotals = app.holderTotals;
-test('holderTotals: full lifecycle splits triage/fit/hq/sanity', () => {
-  const c = {
-    createdAt: iso(10 * HOUR), status: 'closed', history: [
-      { at: iso(10 * HOUR), kind: 'created' },
-      { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
-      { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
-      { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
-      { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
-    ],
-  };
-  const t = holderTotals(c);
-  eq([t.triage, t.fit, t.hq, t.sanity, t.requester], [2 * HOUR, 3 * HOUR, 2 * HOUR, 2 * HOUR, 0]);
+const lifecycle = {
+  createdAt: iso(10 * HOUR), status: 'closed', history: [
+    { at: iso(10 * HOUR), kind: 'created' },
+    { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+    { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
+    { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
+    { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
+  ],
+};
+test('holderTotals: full lifecycle splits triage/fit/hq; sanity → requester', () => {
+  const t = holderTotals(lifecycle);
+  // triage 10→8h, fit 8→5h, hq 5→3h, Sanity-Check 3→1h counted as requester.
+  eq([t.triage, t.fit, t.hq, t.requester], [2 * HOUR, 3 * HOUR, 2 * HOUR, 2 * HOUR]);
 });
-test('holderTotals: first-line time = triage + sanity', () => {
-  const c = {
-    createdAt: iso(10 * HOUR), status: 'closed', history: [
-      { at: iso(10 * HOUR), kind: 'created' },
-      { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
-      { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
-      { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
-      { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
-    ],
-  };
-  const t = holderTotals(c);
-  eq(t.triage + t.sanity, 4 * HOUR);
+test('holderTotals: first-line time = triage only (no sanity)', () => {
+  const t = holderTotals(lifecycle);
+  eq(t.triage, 2 * HOUR);
+  ok(!('sanity' in t), 'no separate sanity bucket');
 });
 test('holderTotals: open New case accrues triage up to now', () => {
   const c = { createdAt: iso(4 * HOUR), status: 'new', history: [{ at: iso(4 * HOUR), kind: 'created' }] };
   eq(holderTotals(c).triage, 4 * HOUR);
+});
+test('holderTotals: open Sanity Check case accrues requester time up to now', () => {
+  const c = {
+    createdAt: iso(5 * HOUR), status: 'sanity_check', history: [
+      { at: iso(5 * HOUR), kind: 'created' },
+      { at: iso(4 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(2 * HOUR), kind: 'status', detail: '→ Sanity Check' },
+    ],
+  };
+  const t = holderTotals(c);
+  eq([t.triage, t.fit, t.requester], [1 * HOUR, 2 * HOUR, 2 * HOUR]);
 });
 test('holderTotals: returned case accrues requester time up to now', () => {
   const c = {
@@ -145,7 +150,7 @@ test('holderTotals: returned case accrues requester time up to now', () => {
 });
 test('holderTotals: no history → all zero', () => {
   const t = holderTotals({ createdAt: iso(HOUR), status: 'new', history: [] });
-  eq([t.triage, t.fit, t.hq, t.sanity, t.requester], [0, 0, 0, 0, 0]);
+  eq([t.triage, t.fit, t.hq, t.requester], [0, 0, 0, 0]);
 });
 
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
@@ -233,6 +238,17 @@ test('approaching_sla: pauses SLA and returns to requester', () => {
   submitPrompt(SCRATCH_ID, 'approaching_sla', { reason: 'need repro' });
   eq([c.status, c.slaPaused, c.currentOwner, c.holdStartedAt, c.slaAccumulatedMs, c.holdMs.hq, lastKind(c)],
      ['returned_to_requester', true, null, null, 3 * HOUR, HOUR, 'returned']);
+});
+
+test('approaching_sla: first line can return a New case to the requester (4.9)', () => {
+  const c = scratch({ status: 'new', currentOwner: null, slaStartedAt: iso(2 * HOUR) });
+  const { ret } = submitPrompt(SCRATCH_ID, 'approaching_sla', { reason: 'need repro steps' });
+  eq([ret, c.status, c.slaPaused, c.slaAccumulatedMs, lastKind(c)],
+     [true, 'returned_to_requester', true, 2 * HOUR, 'returned']);
+});
+test('statusTransitions: New offers assign + return-to-requester (4.9)', () => {
+  const kinds = app.statusTransitions({ status: 'new' }).map(t => t.kind);
+  ok(kinds.includes('assign_fit') && kinds.includes('approaching_sla'), 'New has both');
 });
 
 test('resume: restarts the SLA clock and routes back to FIT', () => {
