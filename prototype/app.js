@@ -415,6 +415,7 @@ function currentRoute() {
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
   if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
+  if (h.startsWith('#/clocks')) return { name: 'clocks' };
   return { name: 'cases' };
 }
 
@@ -434,6 +435,7 @@ function labelForRoute(route) {
       return w ? w.label : 'Archive';
     }
     case 'flow': return 'Status Flow';
+    case 'clocks': return 'Clock model';
     default: return 'Back';
   }
 }
@@ -454,6 +456,7 @@ function render() {
     shifts: 'shifts', shiftDetail: 'shifts',
     owners: 'owners',
     flow: 'flow',
+    clocks: 'clocks',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
@@ -465,6 +468,7 @@ function render() {
   else if (route.name === 'owners') main.innerHTML = renderOwnersPage();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
+  else if (route.name === 'clocks') main.innerHTML = renderClockModel();
   bindHandlers();
   saveState();
 }
@@ -954,6 +958,10 @@ function renderCaseDetailBody(c) {
   const hold = holderTotals(c);
   const fitMs = hold.fit;
   const hqMs = hold.hq;
+  // First-line handling = time the case sat directly with the first-line agent: triage while
+  // New, plus the Sanity-Check verify window (neither is FIT/HQ owner time).
+  const firstLineMs = hold.triage + hold.sanity;
+  const firstLineHolding = c.currentOwner === null && ['new', 'sanity_check'].includes(c.status);
 
   const handoverHtml = c.handover ? `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
@@ -984,6 +992,11 @@ function renderCaseDetailBody(c) {
                 <div class="label">SLA · time on us</div>
                 <div class="value">${fmtDuration(slaMs)}</div>
                 <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
+              </div>
+              <div class="clock" title="Time the first-line agent handled this case directly: triage (New) ${fmtDuration(hold.triage)} + Sanity Check ${fmtDuration(hold.sanity)}">
+                <div class="label"><span class="clock-swatch tl-triage"></span>First line</div>
+                <div class="value">${fmtDuration(firstLineMs)}</div>
+                <div class="state ${firstLineHolding ? 'running' : ''}">${firstLineHolding ? 'Holding now' : 'Idle'}</div>
               </div>
               <div class="clock">
                 <div class="label">Local FIT</div>
@@ -1985,6 +1998,89 @@ function renderStatusFlow() {
         <tr><td>Any non-terminal</td><td>Cancel case</td><td><span class="pill pill-cancelled">Cancelled</span></td><td>All clocks stop · no resolution code</td></tr>
       </tbody>
     </table>
+  `;
+}
+
+// Explainer page (like Status Flow) for how each case-detail clock is calculated. The handling
+// clocks are history-derived via the same holderTotals()/ownershipSegments() used on the detail
+// page, so the worked example below renders the real timeline component and can't drift.
+function renderClockModel() {
+  const ago = h => new Date(NOW.getTime() - h * HOUR).toISOString();
+  const example = {
+    id: 'C-EXAMPLE', status: 'closed', subject: 'Example case', createdAt: ago(10),
+    history: [
+      { at: ago(10), who: 'op', kind: 'created', detail: 'Case opened (triage)' },
+      { at: ago(8), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+      { at: ago(5), who: 'op', kind: 'escalated', detail: 'FIT → HQ Product Team' },
+      { at: ago(3), who: 'op', kind: 'status', detail: '→ Sanity Check' },
+      { at: ago(1), who: 'op', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    ],
+  };
+  const t = holderTotals(example);
+  const firstLine = t.triage + t.sanity;
+  const lifeMs = t.triage + t.fit + t.hq + t.sanity + t.requester;
+  const slaMsEx = lifeMs - t.requester; // time on us = lifetime minus paused "with requester" spans
+  const swatch = cls => `<span class="clock-swatch ${cls}"></span>`;
+  const accentSwatch = '<span class="clock-swatch" style="background:var(--accent)"></span>';
+
+  return `
+    <div class="page-header">
+      <div>
+        <h1>Clock model</h1>
+        <div class="subtitle">How each clock on the case detail is calculated. The handling clocks are reconstructed from case history — the same source as the ownership timeline — so the numbers always reconcile.</div>
+      </div>
+    </div>
+
+    <div class="flow-container">
+      <h2 style="margin-top:0;">The four clocks</h2>
+      <table class="transition-table">
+        <thead>
+          <tr><th>Clock</th><th>What it measures</th><th>Starts</th><th>Pauses / stops</th><th>Banked</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${accentSwatch}<strong>SLA · time on us</strong></td>
+            <td>Total time the case is our responsibility.</td>
+            <td>When the case is created (<code>slaStartedAt</code>).</td>
+            <td>Pauses when <em>returned to requester</em>; resumes on <em>resume</em>.</td>
+            <td>Frozen into <code>slaAccumulatedMs</code> on close / cancel.</td>
+          </tr>
+          <tr>
+            <td>${swatch('tl-triage')}<strong>First line</strong></td>
+            <td>Time the first-line agent handled it directly — <strong>triage</strong> (New) + <strong>Sanity Check</strong>.</td>
+            <td>On creation, and again when moved to Sanity Check.</td>
+            <td>When assigned to FIT, escalated, or closed.</td>
+            <td>Summed from history segments.</td>
+          </tr>
+          <tr>
+            <td>${swatch('tl-fit')}<strong>Local FIT</strong></td>
+            <td>Time the case sat with the Local FIT desk.</td>
+            <td>On <em>Assign to Local FIT</em>.</td>
+            <td>On escalate / return / close.</td>
+            <td>Summed from history segments.</td>
+          </tr>
+          <tr>
+            <td>${swatch('tl-hq')}<strong>HQ Product Team</strong></td>
+            <td>Time the case sat with the HQ product team.</td>
+            <td>On <em>Escalate to HQ</em>.</td>
+            <td>On move-to-sanity / return / close.</td>
+            <td>Summed from history segments.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Worked example</h2>
+      <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Local FIT → HQ → Sanity Check → Closed. The bar below is the exact component shown on the case detail.</p>
+      ${renderOwnershipTimeline(example)}
+      <div class="clock-grid" style="margin-top:16px;">
+        <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">creation → close (no pauses)</div></div>
+        <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage ${fmtDuration(t.triage)} + sanity ${fmtDuration(t.sanity)}</div></div>
+        <div class="clock"><div class="label">${swatch('tl-fit')}Local FIT</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
+      </div>
+
+      <p class="muted tiny" style="margin-top:14px;">First line + Local FIT + HQ + any time with the requester add up to the case's lifetime; <strong>SLA · time on us</strong> is that lifetime minus the paused “with requester” spans.</p>
+    </div>
   `;
 }
 

@@ -98,6 +98,56 @@ test('handover: open + stale note → true', () => ok(needsHandoverNote({ status
 test('handover: open + fresh note by current shift → false', () =>
   ok(!needsHandoverNote({ status: 'with_fit', handover: { staleForCurrentShift: false, author: opId } })));
 
+/* ---------- ownership/holder totals (drives the clocks, incl. First line) ----------
+ * holderTotals reconstructs possession segments from case history; the case-detail clocks
+ * (SLA aside) are derived from it. First-line handling time = triage + sanity. */
+const holderTotals = app.holderTotals;
+test('holderTotals: full lifecycle splits triage/fit/hq/sanity', () => {
+  const c = {
+    createdAt: iso(10 * HOUR), status: 'closed', history: [
+      { at: iso(10 * HOUR), kind: 'created' },
+      { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
+      { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
+      { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
+    ],
+  };
+  const t = holderTotals(c);
+  eq([t.triage, t.fit, t.hq, t.sanity, t.requester], [2 * HOUR, 3 * HOUR, 2 * HOUR, 2 * HOUR, 0]);
+});
+test('holderTotals: first-line time = triage + sanity', () => {
+  const c = {
+    createdAt: iso(10 * HOUR), status: 'closed', history: [
+      { at: iso(10 * HOUR), kind: 'created' },
+      { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
+      { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
+      { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
+    ],
+  };
+  const t = holderTotals(c);
+  eq(t.triage + t.sanity, 4 * HOUR);
+});
+test('holderTotals: open New case accrues triage up to now', () => {
+  const c = { createdAt: iso(4 * HOUR), status: 'new', history: [{ at: iso(4 * HOUR), kind: 'created' }] };
+  eq(holderTotals(c).triage, 4 * HOUR);
+});
+test('holderTotals: returned case accrues requester time up to now', () => {
+  const c = {
+    createdAt: iso(6 * HOUR), status: 'returned_to_requester', history: [
+      { at: iso(6 * HOUR), kind: 'created' },
+      { at: iso(5 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(2 * HOUR), kind: 'returned', detail: 'Returned to requester' },
+    ],
+  };
+  const t = holderTotals(c);
+  eq([t.triage, t.fit, t.requester], [1 * HOUR, 3 * HOUR, 2 * HOUR]);
+});
+test('holderTotals: no history → all zero', () => {
+  const t = holderTotals({ createdAt: iso(HOUR), status: 'new', history: [] });
+  eq([t.triage, t.fit, t.hq, t.sanity, t.requester], [0, 0, 0, 0, 0]);
+});
+
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
 test('seed: every case has a non-empty string id', () =>

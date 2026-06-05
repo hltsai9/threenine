@@ -838,6 +838,7 @@ table.case-table {
   padding: 10px 12px;
 }
 .clock .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.clock-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 .clock .value { font-size: 18px; font-weight: 600; margin-top: 2px; }
 .clock .state { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 .clock .state.running { color: var(--good); }

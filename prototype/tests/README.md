@@ -29,7 +29,9 @@ exposed, so tests construct their own inputs as offsets from the frozen clock.
 ## Covered today
 
 `fmtDuration`, `statusLabel`, `displayStatus`, `isQueued`, `caseSlaMs`, `caseHoldMs`,
-`derivePromptsForCase`, `needsHandoverNote`, plus seed structural sanity.
+`derivePromptsForCase`, `needsHandoverNote`, `holderTotals` (the history-derived clock splits that
+drive the First-line / FIT / HQ clocks), the `handlePrompt` action-handler outcomes, plus seed
+structural sanity.
 
 ## Adding tests
 

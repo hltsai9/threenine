@@ -202,10 +202,14 @@ Tracked todo list — each item has a concrete plan below.
 - [ ] **4.3** Split the weekly archive out of `data.js` so the file doesn't grow unbounded.
 - [ ] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
   1-week recycle bin for deleted cases.
-- [ ] **4.5** Add a **First-line handling** clock to the case-detail clock grid (alongside SLA,
-  Local FIT, and HQ Product Team).
-- [ ] **4.6** Add a **"Clock model"** explainer page (like Status Flow) showing how each clock is
-  calculated.
+- [x] **4.5** Add a **First-line handling** clock to the case-detail clock grid (alongside SLA,
+  Local FIT, and HQ Product Team). *(Done: `renderCaseDetailBody` shows a 4th tile valued
+  `holderTotals.triage + .sanity`, with a `tl-triage` swatch and a "Holding now" state; guarded by
+  5 new `holderTotals` characterization tests.)*
+- [x] **4.6** Add a **"Clock model"** explainer page (like Status Flow) showing how each clock is
+  calculated. *(Done: `renderClockModel()` on route `#/clocks`, wired into nav/router; explains
+  each clock's start/pause/bank and renders a worked example via the real `renderOwnershipTimeline`
+  so it can't drift from the calculation.)*
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
