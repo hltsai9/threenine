@@ -26,7 +26,7 @@ const STATE = {
   operatorId: window.CURRENT_OPERATOR_ID,
   lastListRoute: '#/cases',
   lastListLabel: 'Cases',
-  lookbackHours: 6,          // Case Center query window (hours); adjustable from the board
+  lookbackHours: 1,          // Case Center query window (hours); adjustable from the board
 };
 try {
   const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
