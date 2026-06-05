@@ -197,9 +197,14 @@ Direction: improve the fragile parts and regenerate; **stay on `.pptx`.**
 
 Tracked todo list — each item has a concrete plan below.
 
-- [ ] **4.1** Refresh button per case + a "refresh all stored cases" button.
-- [ ] **4.2** Rename the live-load action to **"Load New"** to distinguish loading new cases from
-  refreshing existing ones.
+- [x] **4.1** Refresh button per case + a "refresh all stored cases" button. *(Done: `⟳` on each
+  kanban card + reading-panel/detail actions calls `refreshCase(id)`; a "Refresh Existing" toolbar
+  button calls `refreshAllStored()`. Both reuse a shared `mergeLiveCase` (validates + normalizes +
+  merges one record, preserving the agent layer) and the existing `GET /api/cases?id=` endpoint —
+  no backend change needed. Live-mode only.)*
+- [x] **4.2** Rename the live-load action to **"Load New"** to distinguish loading new cases from
+  refreshing existing ones. *(Done: button relabelled "Load New", tooltip + `reloadLiveCases` toast
+  reworded, paired with the new "Refresh Existing" button.)*
 - [ ] **4.3** Split the weekly archive out of `data.js` so the file doesn't grow unbounded.
 - [ ] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
   1-week recycle bin for deleted cases.

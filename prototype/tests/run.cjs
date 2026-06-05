@@ -286,6 +286,42 @@ test('unknown / missing case id is a no-op', () => {
   eq([_modal, toasts.length], [null, 0]);
 });
 
+/* ---------- live merge + refresh UI gating (4.1 / 4.2) ---------- */
+const mergeLiveCase = app.mergeLiveCase;
+test('mergeLiveCase: malformed records → null', () => {
+  eq([mergeLiveCase(null), mergeLiveCase('x'), mergeLiveCase({}), mergeLiveCase({ id: '   ' }), mergeLiveCase([{ id: 'x' }])],
+     [null, null, null, null, null]);
+});
+test('mergeLiveCase: new id is added + normalized', () => {
+  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'New one', status: 'with_fit' });
+  eq([r.added, r.id], [true, 'C-MERGE-NEW']);
+  const c = app.caseById('C-MERGE-NEW');
+  eq([c.status, c.subject, c.agentStatus], ['with_fit', 'New one', 'unqueued']);
+});
+test('mergeLiveCase: existing id updates Case Center fields but preserves the agent layer', () => {
+  const c0 = app.caseById('C-MERGE-NEW');
+  c0.agentStatus = 'queued';
+  c0.handover = { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false };
+  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'Updated subject', status: 'with_hq' });
+  eq(r.added, false);
+  const c = app.caseById('C-MERGE-NEW');
+  eq([c.status, c.subject, c.agentStatus, c.handover.note], ['with_hq', 'Updated subject', 'queued', 'keep me']);
+});
+test('toolbar (live): renders Load New + Refresh Existing + per-case refresh', () => {
+  app.location.protocol = 'https:'; app.__LIVE__ = true;
+  const html = app.renderCaseList();
+  ok(html.includes('>Load New<'), 'Load New label');
+  ok(html.includes('id="refresh-existing"'), 'Refresh Existing button');
+  ok(html.includes('data-action="refresh-case"'), 'per-case refresh on cards');
+});
+test('toolbar (demo): no live-refresh controls without a backend', () => {
+  app.location.protocol = 'file:'; app.__LIVE__ = false;
+  const html = app.renderCaseList();
+  ok(!html.includes('id="lookback-load"'), 'no look-back control on file://');
+  ok(!html.includes('id="refresh-existing"'), 'no Refresh Existing');
+  ok(!html.includes('data-action="refresh-case"'), 'no per-case refresh');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

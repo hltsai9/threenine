@@ -741,10 +741,11 @@ function renderCaseList() {
       </div>
       <div class="toolbar">
         ${/^https?:$/.test(location.protocol) ? `
-        <label class="lookback-ctl" title="Pull Case Center cases created within this many hours">Created within
+        <label class="lookback-ctl" title="Pull Case Center cases CREATED within this many hours — newly-created cases">Created within
           <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}"> h
-          <button class="btn" id="lookback-load">Load</button>
-        </label>` : ''}
+          <button class="btn" id="lookback-load">Load New</button>
+        </label>
+        ${window.__LIVE__ ? '<button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>' : ''}` : ''}
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
@@ -756,6 +757,14 @@ function renderCaseList() {
     <div class="reading-panel">${readingPanel}</div>
     ${watchlist}
   `;
+}
+
+// Per-case ⟳ — re-fetch this one case from Case Center. Live mode only (no backend in the
+// public demo / file://), so it stays hidden unless a live load has succeeded.
+function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
+  if (!window.__LIVE__) return '';
+  const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
+  return `<button class="${cls} refresh-case-btn" data-action="refresh-case" data-case-id="${c.id}" title="Re-fetch this case from Case Center" onclick="event.stopPropagation()">⟳</button>`;
 }
 
 function renderKanbanCard(c) {
@@ -799,6 +808,7 @@ function renderKanbanCard(c) {
       <div class="kanban-card-actions">
         ${primaryBtn}
         ${handoverBtn}
+        ${renderRefreshButton(c, 'tiny')}
         ${renderQueueToggleButton(c, 'tiny')}
       </div>
     </div>
@@ -1114,6 +1124,7 @@ function renderDetailActions(c) {
 
   items.push(renderBellButton(c, 'detail'));
   items.push(renderQueueToggleButton(c, 'normal'));
+  items.push(renderRefreshButton(c, 'normal'));
 
   return items.join(' ');
 }
@@ -2605,36 +2616,93 @@ function handleNewCase(op) {
   });
 }
 
-// Fetch one case from Case Center by id (GET /api/cases?id=…) and add/merge it into the board.
+// Validate, normalize, and merge one raw Case Center record into STATE.cases, preserving the
+// local agent layer (queue placement, handover, reminder) when updating an existing case.
+// Returns { id, added } or null if the record was malformed. Shared by add/refresh flows.
+function mergeLiveCase(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+      || typeof raw.id !== 'string' || !raw.id.trim()) return null;
+  const nc = normalizeLiveCase(raw);
+  const i = STATE.cases.findIndex(c => c.id === nc.id);
+  if (i >= 0) {
+    const old = STATE.cases[i];   // keep the local agent layer when updating
+    STATE.cases[i] = Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder });
+    return { id: nc.id, added: false };
+  }
+  STATE.cases.unshift(nc);
+  return { id: nc.id, added: true };
+}
+
+// Fetch one case from Case Center by id (GET /api/cases?id=…). Returns the parsed cases array,
+// or throws on transport error / rejects with a status. Shared by add + refresh.
+async function fetchCaseById(id) {
+  const res = await fetch('api/cases?id=' + encodeURIComponent(id), { headers: { Accept: 'application/json' } });
+  if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
+  const data = await res.json();
+  return (Array.isArray(data) ? data : (data && data.cases)) || [];
+}
+
+// Fetch one case by id and add/merge it into the board (the "+ New case" by-id flow).
 async function addCaseById(id) {
   showLiveLoading();
   try {
-    const res = await fetch('api/cases?id=' + encodeURIComponent(id), { headers: { Accept: 'application/json' } });
+    const cases = await fetchCaseById(id);
     hideLiveLoading();
-    if (!res.ok) { showToast(`Couldn't fetch ${id} (HTTP ${res.status}).`, 'warn'); return; }
-    const data = await res.json();
-    const cases = (Array.isArray(data) ? data : (data && data.cases)) || [];
     if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
-    let added = 0;
+    let added = 0, firstId = null;
     for (const raw of cases) {
-      const nc = normalizeLiveCase(raw);
-      const i = STATE.cases.findIndex(c => c.id === nc.id);
-      if (i >= 0) {
-        const old = STATE.cases[i];   // keep the local agent layer when updating
-        STATE.cases[i] = Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder });
-      } else {
-        STATE.cases.unshift(nc);
-        added++;
-      }
-      STATE.kanbanSelected = nc.id;
+      const m = mergeLiveCase(raw);
+      if (!m) continue;
+      if (m.added) added++;
+      STATE.kanbanSelected = m.id;
+      if (!firstId) firstId = m.id;
     }
+    if (!firstId) { showToast(`Case ${id} returned a malformed record.`, 'warn'); return; }
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
-    showToast(`${added ? 'Added' : 'Updated'} ${cases[0].id} from Case Center.`, 'success');
+    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from Case Center.`, 'success');
   } catch (e) {
     hideLiveLoading();
-    showToast('Could not reach Case Center (is serve.py running?).', 'warn');
+    showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
   }
+}
+
+// Re-fetch a single stored case from Case Center (the per-card / reading-panel ⟳ button).
+async function refreshCase(id) {
+  if (!window.__LIVE__) return;
+  showLiveLoading();
+  try {
+    const cases = await fetchCaseById(id);
+    hideLiveLoading();
+    if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
+    let merged = 0;
+    for (const raw of cases) if (mergeLiveCase(raw)) merged++;
+    render();
+    showToast(merged ? `Refreshed ${id} from Case Center.` : `Case ${id} returned a malformed record.`, merged ? 'success' : 'warn');
+  } catch (e) {
+    hideLiveLoading();
+    showToast(e.status ? `Couldn't refresh ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
+  }
+}
+
+// Re-pull every case already on the board ("Refresh Existing"). Distinct from "Load New",
+// which queries the look-back window for newly-created cases. Re-fetches by id so it picks up
+// status/owner changes on cases you already have, without changing which cases are shown.
+async function refreshAllStored() {
+  if (!window.__LIVE__) return;
+  const ids = STATE.cases.map(c => c.id).filter(Boolean);
+  if (!ids.length) { showToast('No stored cases to refresh.', 'info'); return; }
+  showLiveLoading();
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const cases = await fetchCaseById(id);
+      for (const raw of cases) if (mergeLiveCase(raw)) ok++;
+    } catch (e) { fail++; }
+  }
+  hideLiveLoading();
+  render();
+  showToast(`Refreshed ${ok} stored case${ok === 1 ? '' : 's'}${fail ? ` · ${fail} failed` : ''}.`, fail ? 'warn' : 'success');
 }
 
 function handleReassign(caseId, type) {
@@ -2784,6 +2852,14 @@ function bindHandlers() {
     lookbackLoad.addEventListener('click', doLoad);
     document.getElementById('lookback-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
   }
+  document.getElementById('refresh-existing')?.addEventListener('click', refreshAllStored);
+  document.querySelectorAll('[data-action="refresh-case"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      refreshCase(el.dataset.caseId);
+    });
+  });
   const filter = document.getElementById('case-filter');
   if (filter) {
     filter.addEventListener('input', () => {
@@ -3007,14 +3083,16 @@ function hideLiveLoading() {
   document.getElementById('live-loading')?.remove();
 }
 
-// Re-fetch live cases (used by the "Load" button after changing the look-back window).
+// Re-fetch live cases (the "Load New" button) — queries Case Center for cases CREATED within
+// the look-back window and merges them in. Use "Refresh Existing" to re-pull cases you already
+// have without changing the query window.
 async function reloadLiveCases() {
   showLiveLoading();
   const ok = await tryLoadLiveCases();
   hideLiveLoading();
   render();
   showToast(
-    ok ? `Loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} created within ${STATE.lookbackHours}h.`
+    ok ? `Loaded new cases created within ${STATE.lookbackHours}h — ${STATE.cases.length} on the board.`
        : 'Could not load from Case Center (is serve.py running?).',
     ok ? 'success' : 'warn'
   );
