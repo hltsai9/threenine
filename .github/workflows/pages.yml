@@ -6,6 +6,7 @@ on:
       - main
       - claude/excel-replacement-tool-aHBnF
       - claude/dual-status-case-kanban-WApps
+      - claude/busy-heisenberg-26Sh8
     paths:
       - 'prototype/**'
       - '.github/workflows/pages.yml'

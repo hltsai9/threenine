@@ -4,7 +4,7 @@ This document is a roadmap. It captures (1) a code-review of the current prototy
 prioritized fixes, (2) a redesign spec for the guided site tour, (3) an improvement +
 regeneration spec for the promo slide deck, and (4) a backlog of requested features (refresh
 buttons, Load New vs Refresh, weekly-archive splitting, a recycle bin, a first-line handling clock,
-and a clock-model explainer page). File references use
+a clock-model explainer page, and auto-status from the Case Center assignee). File references use
 `path:line` anchors against the tree at the time of writing so a later implementation session
 can execute directly.
 
@@ -210,6 +210,9 @@ Tracked todo list — each item has a concrete plan below.
   calculated. *(Done: `renderClockModel()` on route `#/clocks`, wired into nav/router; explains
   each clock's start/pause/bank and renders a worked example via the real `renderOwnershipTimeline`
   so it can't drift from the calculation.)*
+- [ ] **4.7** On live refresh, if a case's Case Center **assignee maps to a Local FIT desk or HQ
+  Product Team**, auto-move the case to the matching status (`with_fit` / `with_hq`) and log a
+  history note of the change.
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
@@ -388,6 +391,54 @@ this exactly.
   legend. `node prototype/tests/run.cjs` stays green with the new `holderTotals` tests.
 - Navigate to `#/clocks`: the explainer renders, the worked-example timeline matches the detail
   page's component, and each clock's start/pause/bank description matches the handler behavior.
+
+### 4.7 — Auto-status from Case Center assignee on refresh
+
+**Goal.** When a live refresh shows a case's Case Center **assignee** is one of our Local FIT desks
+or HQ Product Teams, move the board status to the matching one (`with_fit` / `with_hq`), set the
+owner (`fitId` / `hqId`), and append a history note recording the auto change — so the board tracks
+who Case Center says is holding the case without the operator re-assigning by hand.
+
+**What exists to reuse**
+- Live records already carry the assignee: `assigneeId` (accountId) and `assigneeDept` (deptName),
+  mapped in `local/casecenter.py:159–160` (`map_record`). Pulled into the board via
+  `normalizeLiveCase` (`app.js:2698`) and the id-keyed merges in `tryLoadLiveCases` (`app.js`,
+  validated payload branch) and `addCaseById` (`app.js:2485–2514`).
+- Owner directory `window.OWNERS.{fit,hq}` (`prototype/owners.js`) — each entry has `id`, `name`,
+  and `region`/`area`. Status enums and the existing assign/escalate transitions live in
+  `handlePrompt` (`assign_fit`/`escalate_to_hq`). History logging helper `logHistory(c, op, kind,
+  detail)`; `getOwner('fit'|'hq', id)`.
+
+**Plan**
+- **Decide the assignee → owner mapping (design first).** Case Center gives an `assigneeId`/
+  `assigneeDept`, not our owner ids. Add an explicit mapping rather than guessing — recommended: an
+  alias table (e.g. `window.OWNER_ALIASES = { 'FIT APAC': 'fit-apac', '<assigneeDept>': 'hq-data',
+  … }`) keyed by the Case Center dept/account, resolving to a `window.OWNERS` id. Keep it editable
+  alongside `owners.js`. Fallback: case-insensitive match of `assigneeDept`/assignee name against
+  owner `name`/`region`/`area`.
+- **Apply on refresh, not on manual edits.** In `normalizeLiveCase` (or a small
+  `applyAssigneeRouting(c)` called right after normalize, before the merge re-applies the agent
+  layer), resolve the assignee to a `{pool:'fit'|'hq', ownerId}`. If resolved and the case is open
+  (not closed/cancelled/returned):
+  - FIT match → if `c.status !== 'with_fit'` or `c.fitId !== ownerId`: set `status='with_fit'`,
+    `fitId=ownerId`, `currentOwner='fit'`, start the FIT hold segment (`holdStartedAt`), and
+    `logHistory(c, system, 'assigned', 'Auto from Case Center assignee — <owner name>')`.
+  - HQ match → analogous to `with_hq` / `hqId` / `escalated` note.
+- **Idempotent & non-destructive:** only act when the derived owner/status differs from what's
+  already on the case (so repeated refreshes don't spam history), and never override a manual
+  `returned_to_requester`/closed state. Use a synthetic author id (e.g. `'system'`) or the current
+  operator for the history `who`.
+- **Live-only:** this runs only in live mode (served by `serve.py`); seed/demo cases are unaffected.
+
+**Tests (reuse the harness):** `applyAssigneeRouting` should be a pure function over `(case,
+OWNERS, aliases)` → mutated case + optional history entry, so it's unit-testable in
+`prototype/tests/run.cjs`: assert FIT-assignee → `with_fit`+`fitId`+history note; HQ-assignee →
+`with_hq`+`hqId`; unknown assignee → unchanged; already-correct status → no duplicate history;
+closed/returned case → untouched.
+
+**Verification:** with `serve.py` running and a mapped assignee in the Case Center data, a refresh
+moves the case into the right column, sets the owner, starts the owner clock, and adds one "Auto
+from Case Center assignee" history entry; a second refresh adds none.
 
 ## Notes
 
