@@ -39,6 +39,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Use it in your fetch_raw() JQL, e.g.  f"created >= -{int(LOOKBACK_HOURS)}h"
 LOOKBACK_HOURS = float(os.environ.get("CASE_CENTER_LOOKBACK_HOURS", "6") or "6")
 
+# When the board's "+ New case" is used, this holds the single caseId to fetch. Your
+# fetch_raw() should query just that case when it's set, e.g.:
+#     if CASE_ID:  jql = f'caseId = "{CASE_ID}"'
+#     else:        jql = f"created >= -{int(LOOKBACK_HOURS)}h"
+CASE_ID = None
+
 # >>> FILL IN: your Case Center base URL, used to build a clickable link per case.
 #     The caseId is appended to it (adjust build_case_link() below if your URL pattern
 #     differs, e.g. needs "?id="). Can also be set via the CASE_CENTER_BASE_URL env var.
@@ -204,19 +210,20 @@ def fetch_raw():
     # return x_json["data"]
 
 
-def fetch_cases(lookback_hours=None):
-    """Called by serve.py for GET /api/cases (?hours=N). Returns board-shaped case dicts.
+def fetch_cases(lookback_hours=None, case_id=None):
+    """Called by serve.py for GET /api/cases (?hours=N or ?id=XXX). Returns board-shaped dicts.
 
-    `lookback_hours` (from the board's Load control) sets the global LOOKBACK_HOURS, which
-    your fetch_raw() JQL can use. fetch_raw is also called with the value if it accepts a
-    parameter — use whichever you prefer in your query.
+    `lookback_hours` (Load control) sets the global LOOKBACK_HOURS; `case_id` ("+ New case")
+    sets the global CASE_ID. Your fetch_raw() reads those to build its JQL. fetch_raw is also
+    called with LOOKBACK_HOURS if it accepts a parameter.
     """
-    global LOOKBACK_HOURS
+    global LOOKBACK_HOURS, CASE_ID
     if lookback_hours not in (None, ""):
         try:
             LOOKBACK_HOURS = float(lookback_hours)
         except (TypeError, ValueError):
             pass
+    CASE_ID = str(case_id).strip() if case_id not in (None, "") else None
     try:
         takes_arg = len(inspect.signature(fetch_raw).parameters) >= 1
     except (TypeError, ValueError):
