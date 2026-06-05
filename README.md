@@ -28,6 +28,32 @@ node prototype/bundle.mjs
 
 The Pages workflow runs this step automatically on every deploy.
 
+## ⚠️ Local setup checklist — after you pull
+
+A few files need attention **every time you pull this repo to your local machine** (they're either
+gitignored, stubs, or get clobbered by the local virus scanner). Don't skip these or live mode
+won't work:
+
+| File | What to do |
+| ---- | ---------- |
+| `local/casecenter.py` → `fetch_raw()` | Paste your real Case Center request logic here — the committed version is a **stub**. It should return the list of raw records (`x_json["data"]`). Do **not** hardcode credentials here. |
+| `local/secrets.local.json` | **Gitignored — won't exist after a clone.** Create it and fill in your `apiKey` + `cookie`: `cp local/secrets.local.json.example local/secrets.local.json` (or set `CASE_CENTER_API_KEY` / `CASE_CENTER_COOKIE` env vars instead). |
+| `prototype/index.html` | The local **virus scan may delete parts** of this file. Re-check it after pulling and restore if needed: `git restore prototype/index.html`. |
+| `prototype/standalone.html` | Same virus-scan issue. Easiest fix is to **regenerate** it from the modular sources: `node prototype/bundle.mjs` (or `git restore prototype/standalone.html`). |
+
+Quick restore for the two HTML files in one go:
+
+```bash
+git restore prototype/index.html
+node prototype/bundle.mjs   # rebuilds standalone.html from source
+```
+
+Then run the live backend (see `local/README.md`):
+
+```bash
+python3 local/serve.py   # then open the localhost URL it prints
+```
+
 ## Take the interactive tour
 
 The prototype ships with a built-in guided tour: ~10 stepped tooltips that walk through every screen. It launches automatically the first time you load the app, and you can re-launch any time via **Take the tour →** in the sidebar footer. Use **← / →** keys to step, **Esc** to skip.
