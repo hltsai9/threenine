@@ -2812,7 +2812,23 @@ async function tryLoadLiveCases() {
 
   window.__LIVE__ = true;
   NOW = new Date(); // real time for SLA math against live timestamps
-  STATE.cases = cases.map(normalizeLiveCase);
+  const incoming = cases.map(normalizeLiveCase);
+  if (window.CASES_LIVE_CAPTURE) {
+    // data.js already holds the accumulated case store — MERGE the live query into it
+    // (update queried cases, add new ones, keep the rest) so the board shows everything
+    // data.js has, not just the current query window.
+    const byId = new Map(STATE.cases.map(c => [c.id, c]));
+    for (const nc of incoming) {
+      const old = byId.get(nc.id);
+      byId.set(nc.id, old
+        ? Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder })
+        : nc);
+    }
+    STATE.cases = [...byId.values()];
+  } else {
+    // Fresh demo seed (not a live store) → show just the live query result.
+    STATE.cases = incoming;
+  }
 
   // Re-apply the operator's local layer (queue placement, handover notes, reminders).
   try {
