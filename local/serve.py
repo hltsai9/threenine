@@ -105,6 +105,7 @@ class Handler(SimpleHTTPRequestHandler):
             print("  (client closed the connection before the response finished — ignored)")
 
     def _serve_cases(self):
+        cases = None
         try:
             q = parse_qs(urlparse(self.path).query)
             hours = q.get("hours", [None])[0]
@@ -113,25 +114,33 @@ class Handler(SimpleHTTPRequestHandler):
             with_id = sum(1 for c in cases if c.get("id"))
             scope = f"id={case_id}" if case_id else f"within {hours or 'default'}h"
             print(f"/api/cases ({scope}) -> {len(cases)} case(s) mapped ({with_id} with an id)")
-            if WRITE_DATA_JS:
-                try:
-                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
-                    if added or updated:
-                        print(f"  data.js updated: +{added} new, {updated} updated, {total} total (backup: data.js.bak)")
-                except Exception:
-                    print("  (could not write data.js)")
-                    traceback.print_exc()
             payload = json.dumps({"cases": cases}).encode("utf-8")
             status = 200
         except Exception as exc:  # surface the error to the browser console, keep server up
             traceback.print_exc()
             payload = json.dumps({"error": str(exc)}).encode("utf-8")
             status = 500
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+
+        # Send the response BEFORE writing data.js, so the (slow, backup-writing) persist step
+        # can't delay delivery or interrupt the response if the client is impatient.
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            print("  (client closed before the response finished — cases still persisted below)")
+
+        # Persist after responding (best-effort), even if the client already disconnected.
+        if status == 200 and WRITE_DATA_JS and cases is not None:
+            try:
+                added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                if added or updated:
+                    print(f"  data.js updated: +{added} new, {updated} updated, {total} total (backup: data.js.bak)")
+            except Exception:
+                print("  (could not write data.js)")
+                traceback.print_exc()
 
     def do_POST(self):  # noqa: N802
         # POST /api/save       body {"cases":[...]}      — persist operator edits into data.js
