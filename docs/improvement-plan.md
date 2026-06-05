@@ -1,9 +1,11 @@
 # Case Tracker — Code Review & Improvement Plan
 
 This document is a roadmap. It captures (1) a code-review of the current prototype with
-prioritized fixes, (2) a redesign spec for the guided site tour, and (3) an improvement +
-regeneration spec for the promo slide deck. File references use `path:line` anchors against the
-tree at the time of writing so a later implementation session can execute directly.
+prioritized fixes, (2) a redesign spec for the guided site tour, (3) an improvement +
+regeneration spec for the promo slide deck, and (4) a backlog of requested features (refresh
+buttons, Load New vs Refresh, weekly-archive splitting, and a recycle bin). File references use
+`path:line` anchors against the tree at the time of writing so a later implementation session
+can execute directly.
 
 The codebase is intentionally **zero-dependency vanilla JS + CSS** (a click-through prototype
 for an Excel-replacement case tracker), with an optional Python live-data backend in `local/`.
@@ -179,10 +181,130 @@ Direction: improve the fragile parts and regenerate; **stay on `.pptx`.**
 
 ---
 
+## 4. Feature backlog (requested)
+
+Tracked todo list — each item has a concrete plan below.
+
+- [ ] **4.1** Refresh button per case + a "refresh all stored cases" button.
+- [ ] **4.2** Rename the live-load action to **"Load New"** to distinguish loading new cases from
+  refreshing existing ones.
+- [ ] **4.3** Split the weekly archive out of `data.js` so the file doesn't grow unbounded.
+- [ ] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
+  1-week recycle bin for deleted cases.
+
+**Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
+4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
+`local/persist.py`, so they should be designed together.
+
+### 4.1 — Per-case refresh + refresh-all-stored
+
+**What exists to reuse**
+- Backend already supports single-case fetch: `GET /api/cases?id=CASE_ID`
+  (`local/serve.py:76–134` → `casecenter.fetch_cases(case_id=...)`, `local/casecenter.py:213–240`).
+- Bulk fetch by lookback: `GET /api/cases?hours=N`.
+- Frontend normalize + merge that already preserves the local agent layer (`agentStatus`,
+  `handover`, `reminder`): `normalizeLiveCase` (~`app.js:2712`) and the id-keyed merge in
+  `tryLoadLiveCases` (`app.js:2815–2831`). `showToast` (`app.js:1988–2005`), `caseById`
+  (`app.js:188`), and the http(s)-only guard (`app.js:2794`) are reusable as-is.
+
+**Plan**
+- **Per-case refresh:** add a small `⟳` icon button on each kanban card and in the reading
+  panel / case-detail header. Handler `refreshCase(id)`: `fetch('api/cases?id='+id)` →
+  `normalizeLiveCase` → merge that one case into `STATE.cases` (reuse the same overlay rule that
+  keeps the agent layer) → `render()` → toast (`Refreshed C-1041.` / failure warn).
+- **Refresh all stored:** add a toolbar button **"Refresh Existing"** next to "Load New"
+  (see 4.2). It re-pulls every currently stored case id rather than the lookback window. Backend
+  addition: accept `GET /api/cases?ids=C-1,C-2,...` in `serve.py` and pass the list through
+  `casecenter.fetch_cases`; frontend gathers `STATE.cases.map(c => c.id)`, fetches (chunk if the
+  list is long), and reuses the existing merge. Falls back to disabled on `file://`.
+- Show a spinner via the existing `showLiveLoading()/hideLiveLoading()` helpers used by
+  `reloadLiveCases` (`app.js:2865–2875`).
+
+### 4.2 — Rename "Load" → "Load New"
+
+**What exists**
+- The live-load button is `#lookback-load` with text `Load` (`app.js:737`), bound at
+  `app.js:2646–2657`, calling `reloadLiveCases()` (`app.js:2865–2875`). It loads Case Center cases
+  *created within* the lookback window.
+
+**Plan**
+- Change the button label to **"Load New"** and update the tooltip/label copy
+  (`app.js:737`) to "Pull Case Center cases **created within** this many hours (new cases)".
+- Update the success toast in `reloadLiveCases` to read `Loaded N new case(s) created within Nh.`
+- Pair it with the **"Refresh Existing"** button from 4.1 so the two flows are visually distinct:
+  *Load New* = discover new cases in a time window; *Refresh Existing* = re-pull cases already on
+  the board. Keep the element id or rename to `#lookback-load-new` consistently in the handler.
+
+### 4.3 — Split the weekly archive out of `data.js`
+
+**Problem:** `local/persist.py` rewrites the whole `window.CASES` block and never drops cases
+(`persist.py:86–164`), so `data.js` grows without bound as weeks accumulate. The frontend also
+loads every case into `STATE.cases` up front (`app.js:25`).
+
+**What exists to reuse**
+- Week catalog `window.WEEKS` (`data.js:22–27`) and `case.weekId` membership (set at creation,
+  `app.js:2712`).
+- `weekStats(weekId)` (`app.js:1131–1146`), `renderArchiveIndex` (`app.js:1148–1176`), and
+  `renderArchiveWeek` (`app.js:1178–1257`).
+
+**Plan**
+- **Storage split:** keep only the **current week + still-open carried-over cases** in `data.js`.
+  Move sealed past weeks into per-week files under `prototype/archive/<weekId>.js`, each setting
+  e.g. `(window.CASES_ARCHIVE ||= {})['W22-2026'] = [ ... ]`. Add a precomputed
+  `window.WEEK_STATS` snapshot (totals per week) so the **archive index renders without loading
+  any week's full case list**.
+- **Lazy load on demand:** `renderArchiveWeek` injects/`fetch`es the matching
+  `archive/<weekId>.js` only when that week is opened; `weekStats` reads the loaded bucket or the
+  precomputed snapshot. Index page uses `WEEK_STATS` only.
+- **Backend roll/seal step:** teach `persist.py` to partition by `weekId` on write — current/open
+  cases → `data.js`, completed weeks → `archive/<weekId>.js` — and add a "seal week" routine that
+  freezes a finished week and records its stats into the snapshot.
+- **`file://` fallback:** when there's no backend, keep loading whatever archive files are present
+  via `<script>` tags in `index.html` (alongside `data.js`), so the static demo still works.
+- This is the largest item and sets the storage shape that 4.4 builds on — design first.
+
+### 4.4 — Archive delete (bin) + foolproof double-confirm + 1-week recycle bin
+
+**What exists to reuse**
+- `showModal(html, onSubmit)` (`app.js:2007–2018`) and the **two-step danger pattern** already
+  used by `deleteOperator` (`app.js:1408–1450`, with `btn-danger`, reassign/confirm). `showToast`
+  for feedback. There is **no case-delete today** — operators/shifts/owners have delete, cases do
+  not.
+- The archive week table rows (`renderArchiveWeek`, `app.js:1178–1257`).
+
+**Plan**
+- **Bin icon:** add a `🗑` button per case row in the archive week table (and optionally a
+  per-week action). Clicking it starts the delete flow.
+- **Foolproof double-confirm:** reuse `showModal`. First modal = "Move case C-1041 to the recycle
+  bin?" (`btn-danger`, explains 7-day restore window). A *second* explicit confirmation is required
+  for **permanent** deletion (either a second modal or a typed-`DELETE` confirmation), mirroring
+  the `deleteOperator` safeguard so nothing is destroyed on a single click.
+- **Soft delete → recycle bin:** set `case.deletedAt` (ISO). Exclude cases with `deletedAt` from
+  the board (`app.js:495` filter), archive tables, and week stats. Add a **Recycle bin** route
+  (e.g. `#/archive/bin`) listing binned cases with time-remaining, a **Restore** action (clears
+  `deletedAt`) and a **Permanently delete** action (the second-confirm hard delete via
+  `STATE.cases.splice`).
+- **Auto-purge after 7 days:** on boot and on the existing periodic tick (reuse the
+  `setInterval(checkReminders, …)` cadence, `app.js:2689`), hard-remove cases whose `deletedAt` is
+  older than 7 days.
+- **Persistence:** `deletedAt` rides along in full-state `saveState` automatically. For **live
+  mode**, teach `persist.py` to honor `deletedAt` — exclude binned cases from `window.CASES`
+  (optionally into an `archive/bin.js`) and purge after 7 days — since today it merges and never
+  drops cases. This is why 4.4 must be designed alongside 4.3.
+
+**Verification (4.1–4.4)**
+- Run `python3 local/serve.py`, open localhost: per-case `⟳` updates one card and keeps its queue
+  placement/handover; "Refresh Existing" re-pulls all stored ids; "Load New" only adds cases from
+  the time window.
+- Open an archived week, bin a case → it disappears from the board/archive and appears in the
+  recycle bin with a countdown; Restore brings it back; permanent delete needs the second confirm.
+- Confirm `data.js` stays bounded after sealing a week (archive file created, index still renders
+  from the stats snapshot), and a case binned >7 days ago is purged on next boot.
+
 ## Notes
 
 - The earlier `docs/promo-slides-plan.md` references branch
   `claude/dual-status-case-kanban-WApps`; current work tracks the active development branch
   instead.
-- Implementation of §2 and §3 is intended for a follow-up session; this document is the agreed
+- Implementation of §2, §3, and §4 is intended for follow-up sessions; this document is the agreed
   scope and reference for that work.
