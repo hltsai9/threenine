@@ -128,6 +128,46 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def do_POST(self):  # noqa: N802
+        # POST /api/save  body: {"cases":[ {...} ]} or a single case dict.
+        # Persist operator edits (e.g. a handover note) into data.js.
+        try:
+            if self.path.split("?", 1)[0].rstrip("/") != "/api/save":
+                self.send_error(404, "Not found")
+                return
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            body = self.rfile.read(length) if length else b""
+            data = json.loads(body.decode("utf-8")) if body else {}
+            cases = data.get("cases") if isinstance(data, dict) and "cases" in data else data
+            if isinstance(cases, dict):
+                cases = [cases]
+            if not isinstance(cases, list):
+                cases = []
+            added = updated = 0
+            if WRITE_DATA_JS and cases:
+                added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                if added or updated:
+                    print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total")
+            payload = json.dumps({"ok": True, "added": added, "updated": updated}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception as exc:
+            traceback.print_exc()
+            try:
+                msg = json.dumps({"ok": False, "error": str(exc)}).encode("utf-8")
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+            except Exception:
+                pass
+
     def end_headers(self):
         # Never let the browser cache the app or the data while developing locally.
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")

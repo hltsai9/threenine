@@ -4175,6 +4175,7 @@ function handlePrompt(caseId, kind) {
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'handover', detail: `Handover note (${op.shift} → ${target})` });
+      saveCaseToServer(c);   // persist the note into data.js (live mode)
       showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
       render();
       return true;
@@ -4713,6 +4714,20 @@ function normalizeLiveCase(c) {
     slaStartedAt: c.createdAt || nowIso,
     createdAt: c.slaStartedAt || nowIso,
   }, c);
+}
+
+// Push an operator edit (e.g. a handover note) back to the local server so it gets written
+// into data.js. Only in live mode (served by serve.py); fire-and-forget.
+function saveCaseToServer(c) {
+  if (!window.__LIVE__ || !/^https?:$/.test(location.protocol)) return;
+  try {
+    fetch('api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cases: [c] }),
+    }).then(r => { if (!r.ok) console.warn('save to data.js failed:', r.status); })
+      .catch(e => console.warn('save to data.js failed:', e));
+  } catch (e) { /* ignore */ }
 }
 
 // Try the local backend. Returns true if live Case Center data was loaded; false otherwise

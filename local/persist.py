@@ -18,6 +18,7 @@ store are gitignored. Consider:  git update-index --skip-worktree prototype/data
 import json
 import os
 import shutil
+from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STORE = os.path.join(HERE, "cases.store.json")
@@ -72,10 +73,12 @@ def _write_data_js(path, cases):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as fh:
             text = fh.read()
-        # pristine original kept once; previous version on every write
+        # pristine original kept once; a timestamped backup of the current file each write
+        # (timestamped so refreshes don't overwrite previous backups)
         if not os.path.exists(path + ".orig"):
             shutil.copyfile(path, path + ".orig")
-        shutil.copyfile(path, path + ".bak")
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S-") + f"{datetime.now().microsecond // 1000:03d}"
+        shutil.copyfile(path, f"{path}.{ts}.bak")
 
     # Keep everything before our injected block (or before the original window.CASES = ).
     if SENTINEL in text:
