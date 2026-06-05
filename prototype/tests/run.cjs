@@ -148,9 +148,21 @@ test('holderTotals: returned case accrues requester time up to now', () => {
   const t = holderTotals(c);
   eq([t.triage, t.fit, t.requester], [1 * HOUR, 3 * HOUR, 2 * HOUR]);
 });
-test('holderTotals: no history → all zero', () => {
+test('holderTotals: open case with no history accrues triage from creation', () => {
+  // A brand-new live case (empty history) has been in first line since it was created.
   const t = holderTotals({ createdAt: iso(HOUR), status: 'new', history: [] });
-  eq([t.triage, t.fit, t.hq, t.requester], [0, 0, 0, 0]);
+  eq([t.triage, t.fit, t.hq, t.requester], [HOUR, 0, 0, 0]);
+});
+test('holderTotals: live case (no created event) — first line = assign − create', () => {
+  // Live cases arrive with an empty history; assigning to FIT adds only an 'assigned' event.
+  const c = {
+    createdAt: iso(3 * HOUR), status: 'with_fit', history: [
+      { at: iso(1 * HOUR), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC' },
+    ],
+  };
+  const t = holderTotals(c);
+  eq(t.triage, 2 * HOUR);   // assign (1h ago) − create (3h ago) = 2h on first line
+  eq(t.fit, 1 * HOUR);      // assign (1h ago) → now = 1h with FIT
 });
 
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */

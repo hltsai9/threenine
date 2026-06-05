@@ -3058,7 +3058,12 @@ function renderReadingPanel(c) {
 // { holder, start, end, label } where holder is which "hand" the case was in.
 function ownershipSegments(c) {
   const events = (c.history || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
-  if (!events.length) return [];
+  // Every case starts in first-line triage at creation. Anchor on createdAt so the triage
+  // segment exists even for live cases, which arrive with an empty history (no 'created' event)
+  // — assigning to FIT then yields first-line time = assign time − create time.
+  const createdMs = c.createdAt ? new Date(c.createdAt).getTime()
+    : (events[0] ? new Date(events[0].at).getTime() : null);
+  if (createdMs == null) return [];
 
   // Map a history event to the holder it puts the case in (null = not a handoff).
   const classify = (ev, prev) => {
@@ -3084,15 +3089,14 @@ function ownershipSegments(c) {
   };
 
   const segs = [];
-  let holder = null;
-  let start = new Date(c.createdAt || events[0].at).getTime();
+  let holder = 'triage';        // first line, from creation until the first handoff
+  let start = createdMs;
   let label = '';
   for (const ev of events) {
     const h = classify(ev, holder);
     if (h == null) continue;
-    const at = new Date(ev.at).getTime();
-    if (holder == null) { holder = h; start = Math.min(start, at); label = ev.detail || ''; continue; }
     if (h === holder) continue;
+    const at = Math.max(new Date(ev.at).getTime(), start);  // guard against out-of-order timestamps
     segs.push({ holder, start, end: at, label });
     if (h === 'done') { holder = 'done'; break; }
     holder = h; start = at; label = ev.detail || '';
