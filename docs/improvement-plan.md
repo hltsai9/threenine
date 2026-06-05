@@ -57,11 +57,12 @@ headers.
   cancel, handover, set_reminder, toggle_queue, …). On reading, the *scaffolding* repeats but the
   per-kind logic is genuinely varied (distinct fields, validation, clock math, toasts), so the
   earlier "~500 lines, single data-driven map" estimate was optimistic and a full rewrite is
-  higher-risk than billed. **Done so far** (test-guarded): the null-safe `fieldVal` helper removed
-  the 18 duplicated field reads. **Next, incrementally:** a `logHistory(c, op, kind, detail)` helper
-  for the ~13 identical `history.push({ at: new Date(NOW).toISOString(), who: op.id, … })` lines,
-  and a small modal-actions builder for the repeated Cancel/Submit footer — each landed under the
-  handler-outcome tests. A wholesale `PROMPT_HANDLERS` map remains optional and lower priority.
+  higher-risk than billed. **Done so far** (test-guarded): (a) the null-safe `fieldVal` helper
+  removed the 18 duplicated field reads; (b) a `logHistory(c, op, kind, detail)` helper replaced all
+  16 `history.push({ at: new Date(NOW).toISOString(), who: op.id, … })` boilerplate pushes.
+  **Optional next:** a small modal-actions builder for the repeated Cancel/Submit footer. A
+  wholesale `PROMPT_HANDLERS` map remains optional and lower priority given the genuine per-kind
+  variance.
 - **`renderCaseList()` is ~285 lines** — `app.js:611–895` (watchlist + header + kanban bands +
   status dropdown). Split into `renderBoardHeader()`, `renderBand()`, `renderCard()`,
   `renderStatusDropdown()`.
