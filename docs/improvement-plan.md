@@ -4,7 +4,8 @@ This document is a roadmap. It captures (1) a code-review of the current prototy
 prioritized fixes, (2) a redesign spec for the guided site tour, (3) an improvement +
 regeneration spec for the promo slide deck, and (4) a backlog of requested features (refresh
 buttons, Load New vs Refresh, weekly-archive splitting, a recycle bin, a first-line handling clock,
-a clock-model explainer page, and auto-status from the Case Center assignee). File references use
+a clock-model explainer page, auto-status from the Case Center assignee, and clock/workflow
+refinements). File references use
 `path:line` anchors against the tree at the time of writing so a later implementation session
 can execute directly.
 
@@ -213,6 +214,10 @@ Tracked todo list — each item has a concrete plan below.
 - [ ] **4.7** On live refresh, if a case's Case Center **assignee maps to a Local FIT desk or HQ
   Product Team**, auto-move the case to the matching status (`with_fit` / `with_hq`) and log a
   history note of the change.
+- [ ] **4.8** Clock model: count **Sanity Check time as requester time**, not first-line time
+  (revises 4.5 / 4.6 — First-line clock becomes triage-only).
+- [ ] **4.9** Let the **first-line agent return a New case to the requester** (add "Return to
+  requester" to the `new` status transitions).
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
@@ -439,6 +444,64 @@ closed/returned case → untouched.
 **Verification:** with `serve.py` running and a mapped assignee in the Case Center data, a refresh
 moves the case into the right column, sets the owner, starts the owner clock, and adds one "Auto
 from Case Center assignee" history entry; a second refresh adds none.
+
+### 4.8 — Count Sanity Check as requester time (revises 4.5 / 4.6)
+
+**Why.** 4.5/4.6 currently treat Sanity Check as first-line handling (the First-line clock =
+`triage + sanity`). But during Sanity Check the case is really *waiting on the requester* to confirm
+the fix — so that span should be attributed to the requester, and the First-line clock should be
+**triage only**.
+
+**What exists**
+- `holderTotals(c)` (`app.js:884–890`) returns `{ triage, fit, hq, sanity, requester }`; the
+  Sanity-Check segment is classified `sanity` in `ownershipSegments`'s `classify` (`app.js:848–849`).
+- First-line clock: `firstLineMs = hold.triage + hold.sanity` (`renderCaseDetailBody`, the 4.5
+  change) and the `renderClockModel` worked example (4.6).
+- `HOLDER_META.sanity` (`app.js:896`, label "Sanity check", `tl-sanity`).
+
+**Plan**
+- **Keep the timeline segment distinct** (so the bar still shows a "Sanity check" band) but **count
+  its time under `requester`** in `holderTotals`: fold `sanity` into `requester` in the returned
+  totals (or have `classify` map sanity → requester while preserving a sub-label for the bar).
+  Simplest low-risk option: in `holderTotals`, `tot.requester += sanitySpan` and stop exposing
+  `sanity` as a first-line contributor.
+- **First-line clock → triage only:** change `firstLineMs` to `hold.triage` and update its tooltip
+  (drop the "+ Sanity Check" breakdown). Update the `renderClockModel` table (move Sanity Check
+  under the requester/"with requester" explanation) and the worked-example numbers.
+- **SLA interaction — decide explicitly.** Today SLA only pauses on `returned_to_requester`, not
+  during `sanity_check`, so after this change `SLA = lifetime − requester` no longer holds while a
+  case is in Sanity Check. Two options: **(a)** display-only reclassification — keep SLA running
+  through Sanity Check and soften the clock-model note; or **(b)** also **pause SLA during
+  `sanity_check`** (changes `caseSlaMs` `app.js:195–203` and the move-to-sanity/verify handlers).
+  Recommend (a) first; treat (b) as a separate follow-up.
+- **Tests:** update the 4.5 `holderTotals` characterization tests so the lifecycle case attributes
+  the Sanity span to `requester` and First-line = `triage` only; the worked-example reconciliation
+  in 4.6 changes accordingly.
+
+### 4.9 — First line can return a New case to the requester
+
+**Why.** A first-line agent often needs to bounce a brand-new case back to the requester (needs
+repro steps / out of scope) *before* assigning it to FIT. Today that's impossible: `statusTransitions`
+only offers "Return to requester" from `with_fit` / `with_hq` (`app.js:1127, 1131`); a `new` case can
+only be **Assign to Local FIT** or **Cancel** (`app.js:1122–1124`).
+
+**What exists to reuse**
+- The return action is the `approaching_sla` handler (`app.js:2273`), which pauses the SLA clock,
+  sets `returned_to_requester`, and logs a `returned` history entry. It already guards
+  `if (c.currentOwner && c.holdStartedAt)`, so a New case with **no owner** returns cleanly (nothing
+  to stop). `resume` already supports coming back to `new` (unassigned), so the round-trip works.
+
+**Plan**
+- Add `t.push({ kind: 'approaching_sla', label: 'Return to requester' });` to the `case 'new':`
+  branch of `statusTransitions` (`app.js:1122–1124`).
+- **Optional rename:** `approaching_sla` is a misnomer when triggered from New. Either keep it (least
+  churn) or rename the kind to `return_to_requester` across `PROMPT_DEFS` (`app.js:396`),
+  `statusTransitions` (both existing sites), and the handler — a small, test-guarded sweep.
+- **Update Status Flow** (`renderStatusFlow`, `app.js:1864+`): add a New → Returned-to-Requester
+  arrow and a transition-table row (`app.js:1990+`) so the diagram matches.
+- **Tests:** add a `handlePrompt` outcome test — from `status:'new', currentOwner:null`, submit
+  `approaching_sla` with a reason → `status:'returned_to_requester'`, `slaPaused:true`, last history
+  kind `returned`, and no error from the null-owner path.
 
 ## Notes
 
