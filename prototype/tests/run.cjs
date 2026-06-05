@@ -105,6 +105,121 @@ test('seed: every case has a non-empty string id', () =>
 test('seed: thresholds present and numeric', () =>
   ok(typeof TH.fitIdleHours === 'number' && typeof TH.hqIdleHours === 'number'));
 
+/* ---------- action handlers (handlePrompt outcomes) ----------
+ * handlePrompt opens a modal via showModal(html, onSubmit) then mutates the case on submit.
+ * We intercept showModal/render/showToast (sloppy-mode globals are reassignable), drive
+ * onSubmit with a fake modal, and read the mutated case back via caseById. The clock is
+ * frozen, so clock math is exact. A single scratch case is reset to a known baseline per test. */
+app.render = () => {};
+const toasts = [];
+app.showToast = (m, t) => toasts.push({ m, t });
+let _modal = null;
+app.showModal = (html, onSubmit) => { _modal = { html, onSubmit }; };
+
+const FIT = app.OWNERS.fit[0].id;
+const HQ = app.OWNERS.hq[0].id;
+const SCRATCH_ID = app.CASES[0].id;
+function scratch(props) {
+  const c = app.caseById(SCRATCH_ID);
+  Object.assign(c, {
+    status: 'new', agentStatus: 'unqueued', fitId: null, hqId: null, currentOwner: null,
+    fitCannotResolve: false, slaPaused: false, slaAccumulatedMs: 0, slaStartedAt: iso(0),
+    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null, lastOwnerContact: null,
+    handover: null, reminder: null, closedAt: undefined, resolutionCode: undefined,
+    history: [], requester: 'Test Requester',
+  }, props);
+  return c;
+}
+function fakeModal(values) {
+  return {
+    querySelector: sel => {
+      const m = sel.match(/data-field="([^"]+)"/);
+      const name = m && m[1];
+      return { value: name && values[name] != null ? String(values[name]) : '' };
+    },
+  };
+}
+function submitPrompt(caseId, kind, values) {       // open + submit a modal handler
+  _modal = null; toasts.length = 0;
+  app.handlePrompt(caseId, kind);
+  const ret = _modal ? _modal.onSubmit(fakeModal(values || {})) : undefined;
+  return { opened: !!_modal, ret };
+}
+function directPrompt(caseId, kind) {               // no-modal handler
+  toasts.length = 0;
+  app.handlePrompt(caseId, kind);
+}
+const lastKind = c => c.history[c.history.length - 1].kind;
+
+test('assign_fit: routes new case to FIT and starts the hold clock', () => {
+  const c = scratch({ status: 'new', fitId: null });
+  submitPrompt(SCRATCH_ID, 'assign_fit', { fitId: FIT });
+  eq([c.status, c.currentOwner, c.fitId, lastKind(c)], ['with_fit', 'fit', FIT, 'assigned']);
+  ok(c.holdStartedAt && c.lastOwnerContact && c.lastOwnerContact.channel === 'Slack');
+});
+
+test('escalate_to_hq: stops FIT clock, starts HQ, clears cannot-resolve', () => {
+  const c = scratch({ status: 'with_fit', currentOwner: 'fit', fitId: FIT, holdStartedAt: iso(2 * HOUR), fitCannotResolve: true });
+  submitPrompt(SCRATCH_ID, 'escalate_to_hq', { hqId: HQ, reason: 'needs product' });
+  eq([c.status, c.currentOwner, c.hqId, c.fitCannotResolve, c.holdMs.fit, lastKind(c)],
+     ['with_hq', 'hq', HQ, false, 2 * HOUR, 'escalated']);
+});
+
+test('verify_fix: closes the case, banks the SLA, stops clocks', () => {
+  const c = scratch({ status: 'sanity_check', currentOwner: 'hq', hqId: HQ, holdStartedAt: iso(HOUR), slaAccumulatedMs: HOUR, slaStartedAt: iso(2 * HOUR) });
+  const { ret } = submitPrompt(SCRATCH_ID, 'verify_fix', { code: 'fixed_by_owner', note: 'confirmed' });
+  eq([ret, c.status, c.resolutionCode, c.currentOwner, c.holdStartedAt, c.holdMs.hq, c.slaAccumulatedMs, lastKind(c)],
+     [true, 'closed', 'fixed_by_owner', null, null, HOUR, 3 * HOUR, 'closed']);
+});
+
+test('verify_fix: blank note is rejected and nothing changes', () => {
+  const c = scratch({ status: 'sanity_check', currentOwner: 'hq', hqId: HQ });
+  const { ret } = submitPrompt(SCRATCH_ID, 'verify_fix', { code: 'fixed_by_owner', note: '' });
+  eq([ret, c.status, c.history.length], [false, 'sanity_check', 0]);
+});
+
+test('approaching_sla: pauses SLA and returns to requester', () => {
+  const c = scratch({ status: 'with_hq', currentOwner: 'hq', hqId: HQ, holdStartedAt: iso(HOUR), slaStartedAt: iso(3 * HOUR) });
+  submitPrompt(SCRATCH_ID, 'approaching_sla', { reason: 'need repro' });
+  eq([c.status, c.slaPaused, c.currentOwner, c.holdStartedAt, c.slaAccumulatedMs, c.holdMs.hq, lastKind(c)],
+     ['returned_to_requester', true, null, null, 3 * HOUR, HOUR, 'returned']);
+});
+
+test('resume: restarts the SLA clock and routes back to FIT', () => {
+  const c = scratch({ status: 'returned_to_requester', slaPaused: true, fitId: FIT, slaStartedAt: iso(10 * HOUR) });
+  submitPrompt(SCRATCH_ID, 'resume', { dest: 'fit', note: '' });
+  eq([c.status, c.currentOwner, c.slaPaused, c.slaStartedAt, lastKind(c)],
+     ['with_fit', 'fit', false, iso(0), 'resumed']);
+});
+
+test('cancel: marks cancelled, banks clocks, warns', () => {
+  const c = scratch({ status: 'with_fit', currentOwner: 'fit', fitId: FIT, holdStartedAt: iso(HOUR), slaStartedAt: iso(HOUR) });
+  submitPrompt(SCRATCH_ID, 'cancel', { reason: 'duplicate' });
+  eq([c.status, c.currentOwner, c.holdMs.fit, c.slaAccumulatedMs, lastKind(c)],
+     ['cancelled', null, HOUR, HOUR, 'cancelled']);
+  eq(toasts[0].t, 'warn');
+});
+
+test('toggle_queue: flips agent status both ways with history', () => {
+  const c = scratch({ status: 'with_fit', agentStatus: 'unqueued' });
+  directPrompt(SCRATCH_ID, 'toggle_queue');
+  eq([c.agentStatus, lastKind(c)], ['queued', 'queue_added']);
+  directPrompt(SCRATCH_ID, 'toggle_queue');
+  eq([c.agentStatus, lastKind(c)], ['unqueued', 'queue_removed']);
+});
+
+test('move_to_sanity_check: direct status change', () => {
+  const c = scratch({ status: 'with_hq', currentOwner: 'hq', hqId: HQ });
+  directPrompt(SCRATCH_ID, 'move_to_sanity_check');
+  eq([c.status, lastKind(c)], ['sanity_check', 'status']);
+});
+
+test('unknown / missing case id is a no-op', () => {
+  _modal = null; toasts.length = 0;
+  app.handlePrompt('NO-SUCH-CASE', 'assign_fit');
+  eq([_modal, toasts.length], [null, 0]);
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

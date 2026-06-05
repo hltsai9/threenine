@@ -81,6 +81,8 @@ function loadPrototype() {
   sandbox.document = makeDocument();
   sandbox.localStorage = makeLocalStorage();
   sandbox.navigator = { clipboard: { writeText: () => Promise.resolve() } };
+  sandbox.alert = () => {};
+  sandbox.confirm = () => true;
   sandbox.location = { hash: '#/cases', search: '', protocol: 'file:', href: 'file:///prototype/standalone.html' };
   sandbox.URLSearchParams = URLSearchParams;
   sandbox.structuredClone = structuredClone;
