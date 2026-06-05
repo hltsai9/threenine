@@ -231,8 +231,12 @@ Tracked todo list — each item has a concrete plan below.
 - [x] **4.9** Let the **first-line agent return a New case to the requester**. *(Done: "Return to
   requester" added to the `new` status transitions; Status Flow diagram + table updated; handler
   already handled the null-owner path. Test added.)*
-- [ ] **4.10** Load cases by a **created-between time window** (e.g. created between 72h and 60h
-  ago), not just "created within N hours".
+- [x] **4.10** Load cases by a **created-between time window** (e.g. created between 72h and 60h
+  ago), not just "created within N hours". *(Done: second "newer bound" input in the toolbar;
+  `liveCasesUrl(from,to)` → `?fromHours=&toHours=` (legacy `?hours=` when newer bound is 0);
+  `windowError` validation; `serve.py` parses both, `casecenter.fetch_cases` sets `LOOKBACK_HOURS`
+  + new `TO_HOURS` globals for `fetch_raw()`. Tests + Python check + UI smoke confirm the band
+  request.)*
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and

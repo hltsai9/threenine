@@ -109,10 +109,19 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             q = parse_qs(urlparse(self.path).query)
             hours = q.get("hours", [None])[0]
+            from_hours = q.get("fromHours", [None])[0]
+            to_hours = q.get("toHours", [None])[0]
             case_id = q.get("id", [None])[0]
-            cases = casecenter.fetch_cases(lookback_hours=hours, case_id=case_id)
+            # fromHours (the older bound) takes precedence over the legacy single `hours`.
+            older = from_hours if from_hours not in (None, "") else hours
+            cases = casecenter.fetch_cases(lookback_hours=older, to_hours=to_hours, case_id=case_id)
             with_id = sum(1 for c in cases if c.get("id"))
-            scope = f"id={case_id}" if case_id else f"within {hours or 'default'}h"
+            if case_id:
+                scope = f"id={case_id}"
+            elif to_hours not in (None, "", "0"):
+                scope = f"created {older or 'default'}h..{to_hours}h ago"
+            else:
+                scope = f"within {older or 'default'}h"
             print(f"/api/cases ({scope}) -> {len(cases)} case(s) mapped ({with_id} with an id)")
             payload = json.dumps({"cases": cases}).encode("utf-8")
             status = 200

@@ -375,6 +375,20 @@ test('purgeCases hard-removes from state', () => {
   ok(!app.caseById('C-PURGE'));
 });
 
+/* ---------- created-between load window (4.10) ---------- */
+test('liveCasesUrl: legacy within-N vs created-between band', () => {
+  eq(app.liveCasesUrl(72, 0), 'api/cases?hours=72');
+  eq(app.liveCasesUrl(72, 60), 'api/cases?fromHours=72&toHours=60');
+  eq(app.liveCasesUrl(0, 0), 'api/cases');
+});
+test('windowError: validates the created-between window', () => {
+  eq(app.windowError(0, 0), 'Enter a positive number of hours for the older bound.');
+  eq(app.windowError(72, -1), 'The newer bound must be 0 or more hours ago.');
+  eq(app.windowError(60, 72), 'The newer bound must be smaller than the older bound.');
+  eq(app.windowError(72, 60), null);
+  eq(app.windowError(24, 0), null);
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

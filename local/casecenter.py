@@ -39,6 +39,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # Use it in your fetch_raw() JQL, e.g.  f"created >= -{int(LOOKBACK_HOURS)}h"
 LOOKBACK_HOURS = float(os.environ.get("CASE_CENTER_LOOKBACK_HOURS", "6") or "6")
 
+# Newer bound of the query window (hours ago); 0 = up to now. With LOOKBACK_HOURS (the older
+# bound) this forms a created-between band — e.g. cases created between 72h and 60h ago. The
+# board's "Created between … h ago" control sets this per request. Use BOTH in fetch_raw(), e.g.
+#   jql = f"created >= -{int(LOOKBACK_HOURS)}h" + (f" AND created <= -{int(TO_HOURS)}h" if TO_HOURS else "")
+TO_HOURS = 0.0
+
 # When the board's "+ New case" is used, this holds the single caseId to fetch. Your
 # fetch_raw() should query just that case when it's set, e.g.:
 #     if CASE_ID:  jql = f'caseId = "{CASE_ID}"'
@@ -210,17 +216,26 @@ def fetch_raw():
     # return x_json["data"]
 
 
-def fetch_cases(lookback_hours=None, case_id=None):
-    """Called by serve.py for GET /api/cases (?hours=N or ?id=XXX). Returns board-shaped dicts.
+def fetch_cases(lookback_hours=None, case_id=None, to_hours=None):
+    """Called by serve.py for GET /api/cases (?hours=N, ?fromHours=&toHours=, or ?id=XXX).
+    Returns board-shaped dicts.
 
-    `lookback_hours` (Load control) sets the global LOOKBACK_HOURS; `case_id` ("+ New case")
+    `lookback_hours` (older bound) sets the global LOOKBACK_HOURS; `to_hours` (newer bound) sets
+    the global TO_HOURS — together they form a created-between window. `case_id` ("+ New case")
     sets the global CASE_ID. Your fetch_raw() reads those to build its JQL. fetch_raw is also
     called with LOOKBACK_HOURS if it accepts a parameter.
     """
-    global LOOKBACK_HOURS, CASE_ID
+    global LOOKBACK_HOURS, TO_HOURS, CASE_ID
     if lookback_hours not in (None, ""):
         try:
             LOOKBACK_HOURS = float(lookback_hours)
+        except (TypeError, ValueError):
+            pass
+    # Reset the newer bound each call (absent → 0 = up to now), so a band query doesn't linger.
+    TO_HOURS = 0.0
+    if to_hours not in (None, ""):
+        try:
+            TO_HOURS = float(to_hours)
         except (TypeError, ValueError):
             pass
     CASE_ID = str(case_id).strip() if case_id not in (None, "") else None

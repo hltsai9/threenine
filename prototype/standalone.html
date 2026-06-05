@@ -2247,12 +2247,33 @@ const STATE = {
   operatorId: window.CURRENT_OPERATOR_ID,
   lastListRoute: '#/cases',
   lastListLabel: 'Cases',
-  lookbackHours: 1,          // Case Center query window (hours); adjustable from the board
+  lookbackHours: 1,          // Case Center query window: older bound (hours ago)
+  lookbackToHours: 0,        // newer bound (hours ago); 0 = up to now → "within N hours"
 };
 try {
   const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
   if (lb > 0) STATE.lookbackHours = lb;
+  const lt = parseFloat(localStorage.getItem('case-tracker-lookback-to'));
+  if (lt >= 0) STATE.lookbackToHours = lt;
 } catch (e) { /* ignore */ }
+
+// Build the /api/cases query for a created-between window. With a newer bound > 0 it asks for a
+// band (created between fromHours and toHours ago); otherwise the legacy "within N hours" form.
+function liveCasesUrl(from, to) {
+  from = from || 0; to = to || 0;
+  if (!from) return 'api/cases';
+  if (to > 0) return `api/cases?fromHours=${encodeURIComponent(from)}&toHours=${encodeURIComponent(to)}`;
+  return `api/cases?hours=${encodeURIComponent(from)}`;
+}
+
+// Validate a created-between window. Returns an error string, or null if OK. The older bound must
+// be positive; the newer bound must be 0+ and strictly smaller (newer = fewer hours ago).
+function windowError(from, to) {
+  if (!(from > 0)) return 'Enter a positive number of hours for the older bound.';
+  if (!(to >= 0)) return 'The newer bound must be 0 or more hours ago.';
+  if (to >= from) return 'The newer bound must be smaller than the older bound.';
+  return null;
+}
 
 const STORAGE_KEY = 'case-tracker-state-v4';
 // In live mode (served by local/serve.py, cases come from Case Center each refresh) we
@@ -2977,8 +2998,11 @@ function renderCaseList() {
       </div>
       <div class="toolbar">
         ${/^https?:$/.test(location.protocol) ? `
-        <label class="lookback-ctl" title="Pull Case Center cases CREATED within this many hours — newly-created cases">Created within
-          <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}"> h
+        <label class="lookback-ctl" title="Pull Case Center cases CREATED in this window. Leave the newer bound at 0 for 'within N hours'; set it (e.g. 72 and 60) to pull a band created between those hours ago.">Created between
+          <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}" title="older bound — hours ago">
+          and
+          <input type="number" id="lookback-to-input" min="0" step="1" value="${STATE.lookbackToHours}" title="newer bound — hours ago (0 = now)">
+          h ago
           <button class="btn" id="lookback-load">Load New</button>
         </label>` : ''}
         <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>
@@ -5218,14 +5242,22 @@ function bindHandlers() {
   const lookbackLoad = document.getElementById('lookback-load');
   if (lookbackLoad) {
     const doLoad = () => {
-      const v = parseFloat(document.getElementById('lookback-input').value);
-      if (!(v > 0)) { showToast('Enter a positive number of hours.', 'warn'); return; }
-      STATE.lookbackHours = v;
-      try { localStorage.setItem('case-tracker-lookback', String(v)); } catch (e) { /* ignore */ }
+      const from = parseFloat(document.getElementById('lookback-input').value);
+      const toRaw = document.getElementById('lookback-to-input')?.value;
+      const to = (toRaw === '' || toRaw == null) ? 0 : parseFloat(toRaw);
+      const err = windowError(from, to);
+      if (err) { showToast(err, 'warn'); return; }
+      STATE.lookbackHours = from;
+      STATE.lookbackToHours = to;
+      try {
+        localStorage.setItem('case-tracker-lookback', String(from));
+        localStorage.setItem('case-tracker-lookback-to', String(to));
+      } catch (e) { /* ignore */ }
       reloadLiveCases();
     };
     lookbackLoad.addEventListener('click', doLoad);
     document.getElementById('lookback-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
+    document.getElementById('lookback-to-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
   }
   document.getElementById('refresh-existing')?.addEventListener('click', refreshAllStored);
   document.querySelectorAll('[data-action="bin-case"]').forEach(el => {
@@ -5404,8 +5436,7 @@ async function tryLoadLiveCases() {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
-    const url = 'api/cases' + (STATE.lookbackHours ? ('?hours=' + encodeURIComponent(STATE.lookbackHours)) : '');
-    res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    res = await fetch(liveCasesUrl(STATE.lookbackHours, STATE.lookbackToHours), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     clearTimeout(t);
   } catch (e) {
     return false; // no local backend reachable → seed/demo mode
@@ -5490,8 +5521,11 @@ async function reloadLiveCases() {
   const ok = await tryLoadLiveCases();
   hideLiveLoading();
   render();
+  const window = STATE.lookbackToHours > 0
+    ? `created between ${STATE.lookbackHours}h and ${STATE.lookbackToHours}h ago`
+    : `created within ${STATE.lookbackHours}h`;
   showToast(
-    ok ? `Loaded new cases created within ${STATE.lookbackHours}h — ${STATE.cases.length} on the board.`
+    ok ? `Loaded cases ${window} — ${STATE.cases.length} on the board.`
        : 'Could not load from Case Center (is serve.py running?).',
     ok ? 'success' : 'warn'
   );
