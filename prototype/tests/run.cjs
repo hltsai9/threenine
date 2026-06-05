@@ -307,19 +307,19 @@ test('mergeLiveCase: existing id updates Case Center fields but preserves the ag
   const c = app.caseById('C-MERGE-NEW');
   eq([c.status, c.subject, c.agentStatus, c.handover.note], ['with_hq', 'Updated subject', 'queued', 'keep me']);
 });
-test('toolbar (live): renders Load New + Refresh Existing + per-case refresh', () => {
+test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
   app.location.protocol = 'https:'; app.__LIVE__ = true;
   const html = app.renderCaseList();
   ok(html.includes('>Load New<'), 'Load New label');
   ok(html.includes('id="refresh-existing"'), 'Refresh Existing button');
   ok(html.includes('data-action="refresh-case"'), 'per-case refresh on cards');
 });
-test('toolbar (demo): no live-refresh controls without a backend', () => {
+test('toolbar (file://): refresh buttons always show; Load New stays http-only', () => {
   app.location.protocol = 'file:'; app.__LIVE__ = false;
   const html = app.renderCaseList();
-  ok(!html.includes('id="lookback-load"'), 'no look-back control on file://');
-  ok(!html.includes('id="refresh-existing"'), 'no Refresh Existing');
-  ok(!html.includes('data-action="refresh-case"'), 'no per-case refresh');
+  ok(!html.includes('id="lookback-load"'), 'no look-back "Load New" control on file://');
+  ok(html.includes('id="refresh-existing"'), 'Refresh Existing shown even on file://');
+  ok(html.includes('data-action="refresh-case"'), 'per-case refresh shown even on file://');
 });
 
 /* ---------- report ---------- */

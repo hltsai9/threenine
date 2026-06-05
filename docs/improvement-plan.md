@@ -201,7 +201,8 @@ Tracked todo list — each item has a concrete plan below.
   kanban card + reading-panel/detail actions calls `refreshCase(id)`; a "Refresh Existing" toolbar
   button calls `refreshAllStored()`. Both reuse a shared `mergeLiveCase` (validates + normalizes +
   merges one record, preserving the agent layer) and the existing `GET /api/cases?id=` endpoint —
-  no backend change needed. Live-mode only.)*
+  no backend change needed. Shown everywhere (incl. the Pages demo / `file://`); without a backend
+  a click degrades gracefully with a "no backend" toast.)*
 - [x] **4.2** Rename the live-load action to **"Load New"** to distinguish loading new cases from
   refreshing existing ones. *(Done: button relabelled "Load New", tooltip + `reloadLiveCases` toast
   reworded, paired with the new "Refresh Existing" button.)*

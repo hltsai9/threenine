@@ -744,8 +744,8 @@ function renderCaseList() {
         <label class="lookback-ctl" title="Pull Case Center cases CREATED within this many hours — newly-created cases">Created within
           <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}"> h
           <button class="btn" id="lookback-load">Load New</button>
-        </label>
-        ${window.__LIVE__ ? '<button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>' : ''}` : ''}
+        </label>` : ''}
+        <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
@@ -759,10 +759,9 @@ function renderCaseList() {
   `;
 }
 
-// Per-case ⟳ — re-fetch this one case from Case Center. Live mode only (no backend in the
-// public demo / file://), so it stays hidden unless a live load has succeeded.
+// Per-case ⟳ — re-fetch this one case from Case Center. Always shown; if there's no backend
+// (public demo / file://) the click degrades gracefully with a "no backend" toast.
 function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
-  if (!window.__LIVE__) return '';
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
   return `<button class="${cls} refresh-case-btn" data-action="refresh-case" data-case-id="${c.id}" title="Re-fetch this case from Case Center" onclick="event.stopPropagation()">⟳</button>`;
 }
@@ -2669,7 +2668,6 @@ async function addCaseById(id) {
 
 // Re-fetch a single stored case from Case Center (the per-card / reading-panel ⟳ button).
 async function refreshCase(id) {
-  if (!window.__LIVE__) return;
   showLiveLoading();
   try {
     const cases = await fetchCaseById(id);
@@ -2689,7 +2687,6 @@ async function refreshCase(id) {
 // which queries the look-back window for newly-created cases. Re-fetches by id so it picks up
 // status/owner changes on cases you already have, without changing which cases are shown.
 async function refreshAllStored() {
-  if (!window.__LIVE__) return;
   const ids = STATE.cases.map(c => c.id).filter(Boolean);
   if (!ids.length) { showToast('No stored cases to refresh.', 'info'); return; }
   showLiveLoading();
