@@ -10,27 +10,12 @@ window.THRESHOLDS = {
   shiftEndingSoonMinutes: 60,
 };
 
-window.OPERATORS = [
-  { id: 'op-da', name: 'Mia (DA)', shift: 'Day' },
-  { id: 'op-na', name: 'Ren (NA)', shift: 'Night' },
-  { id: 'op-db', name: 'Kai (DB)', shift: 'Day' },
-  { id: 'op-nb', name: 'Yui (NB)', shift: 'Night' },
-];
+// Operators & shifts (window.OPERATORS / window.SHIFTS / window.CURRENT_OPERATOR_ID)
+// live in shifts.js so the roster can be edited without touching this file.
 
-window.OWNERS = {
-  fit: [
-    { id: 'fit-apac', name: 'FIT — APAC desk',  region: 'APAC', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-apac' },
-    { id: 'fit-emea', name: 'FIT — EMEA desk',  region: 'EMEA', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-emea' },
-    { id: 'fit-amer', name: 'FIT — AMER desk',  region: 'AMER', tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-amer' },
-  ],
-  hq: [
-    { id: 'hq-identity', name: 'HQ Identity Team',  area: 'Identity / SSO', tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-data',     name: 'HQ Data Platform',  area: 'Data Platform',  tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-mobile',   name: 'HQ Mobile App',     area: 'Mobile',         tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-  ],
-};
+// Owners (window.OWNERS — Local FIT desks & HQ Product Teams) live in owners.js so the
+// directory can be edited without touching this file.
 
-window.CURRENT_OPERATOR_ID = 'op-da';
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-05T12:00:00Z', date: '2026-06-05' };
 window.CURRENT_WEEK = { id: 'W23-2026', label: 'W23 · June 1 – 7, 2026', startsAt: '2026-06-01T00:00:00Z' };
 
@@ -41,17 +26,20 @@ window.WEEKS = [
   { id: 'W20-2026', label: 'W20 · May 11 – May 17, 2026', startsAt: '2026-05-11T00:00:00Z', endsAt: '2026-05-18T00:00:00Z' },
 ];
 
-window.SHIFTS = [
-  { name: 'Day',   hoursUtc: '08:00 – 20:00 UTC', operatorIds: ['op-da', 'op-db'] },
-  { name: 'Night', hoursUtc: '20:00 – 08:00 UTC', operatorIds: ['op-na', 'op-nb'] },
-];
-
 // Each case mirrors the Excel columns plus the v1 additions from the URD.
-// status values: new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
+// Two statuses per case:
+//   status      = Case Center status (the real external status). Drives the kanban
+//                 COLUMNS. values: new | with_fit | with_hq | sanity_check |
+//                 returned_to_requester | resolved | closed | cancelled
+//   agentStatus = first-line agent status (how the agent is handling it). Drives the
+//                 top/bottom band split inside each column. values: queued | unqueued
+//                 ('queued' = in the agent's active top band). Active-week cases carry it;
+//                 seed a few as 'queued' so each column shows a populated top band.
 // flags: weekend, escalated, scheduled_ooc
 window.CASES = [
   {
     id: 'C-1041',
+    agentStatus: 'queued',
     caseLink: 'https://case-center.example/CC-58821',
     subject: 'APAC users locked out after MFA reset',
     requester: 'Hana Park',
@@ -79,6 +67,7 @@ window.CASES = [
   },
   {
     id: 'C-1042',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58800',
     subject: 'Login fails sporadically — APAC region',
     requester: 'Wei Zhang',
@@ -107,6 +96,7 @@ window.CASES = [
   },
   {
     id: 'C-1043',
+    agentStatus: 'queued',
     caseLink: 'https://case-center.example/CC-58805',
     subject: 'Bulk export from Reports stalls at 80%',
     requester: 'Marcus O’Donnell',
@@ -137,6 +127,7 @@ window.CASES = [
   },
   {
     id: 'C-1044',
+    agentStatus: 'queued',
     caseLink: 'https://case-center.example/CC-58750',
     subject: 'SAML SSO loop after IdP cert rotation',
     requester: 'Priya Sharma',
@@ -167,6 +158,7 @@ window.CASES = [
   },
   {
     id: 'C-1045',
+    agentStatus: 'queued',
     caseLink: 'https://case-center.example/CC-58702',
     subject: 'Mobile push notifications missing for iOS 18.4',
     requester: 'Ana Souza',
@@ -197,6 +189,7 @@ window.CASES = [
   },
   {
     id: 'C-1046',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58680',
     subject: 'Unknown error in Reports v3 — needs requester repro',
     requester: 'Liam Walsh',
@@ -256,6 +249,7 @@ window.CASES = [
   },
   {
     id: 'C-1048',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58840',
     subject: 'CFO laptop cannot reach VPN — exec',
     requester: 'Elena Rossi',
@@ -285,6 +279,7 @@ window.CASES = [
   },
   {
     id: 'C-1049',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58680B',
     subject: 'Slow Salesforce export — running 22h on us',
     requester: 'Yui Tanaka',
@@ -313,6 +308,7 @@ window.CASES = [
   },
   {
     id: 'C-1050',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58770',
     subject: 'Dashboard tile data stale — owned by me, no handover yet',
     requester: 'Kofi Mensah',
@@ -370,6 +366,7 @@ window.CASES = [
   },
   {
     id: 'C-1052',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58850',
     subject: 'Slack outage report — APAC weekend rotation',
     requester: 'Cheng Liu',
@@ -397,6 +394,7 @@ window.CASES = [
   },
   {
     id: 'C-1053',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58830',
     subject: 'EMEA users — Outlook calendar invites duplicated',
     requester: 'Astrid Berg',
@@ -425,6 +423,7 @@ window.CASES = [
   },
   {
     id: 'C-1054',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58712',
     subject: 'Identity provider intermittent 5xx — exec affected',
     requester: 'Daniel Field',
@@ -634,6 +633,7 @@ window.CASES = [
   // ---- Carried-over from W18 → W19 (still open) ----
   {
     id: 'C-1029',
+    agentStatus: 'unqueued',
     caseLink: 'https://case-center.example/CC-58475',
     subject: 'Intermittent push notification delays — multi-week',
     requester: 'Alicia Romero',

@@ -1,0 +1,22 @@
+# Local Case Center credentials — NEVER commit these.
+local/secrets.local.json
+**/secrets.local.json
+*.secret.json
+
+# Live Case Center data written locally — may be sensitive, do NOT commit.
+local/cases.store.json
+prototype/data.js.orig
+prototype/data.js.*.bak
+prototype/data.js.bak
+# Backups from the in-app Shift / Owners editors' Save button
+prototype/shifts.js.orig
+prototype/shifts.js.*.bak
+prototype/owners.js.orig
+prototype/owners.js.*.bak
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor cruft
+.DS_Store

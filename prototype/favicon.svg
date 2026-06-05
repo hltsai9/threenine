@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="rainbow" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"  stop-color="#ff3b30"/>
+      <stop offset="20%" stop-color="#ff9500"/>
+      <stop offset="40%" stop-color="#ffcc00"/>
+      <stop offset="60%" stop-color="#34c759"/>
+      <stop offset="80%" stop-color="#0a84ff"/>
+      <stop offset="100%" stop-color="#bf5af2"/>
+    </linearGradient>
+  </defs>
+  <polygon points="32,2 57.98,17 57.98,47 32,62 6.02,47 6.02,17"
+           fill="url(#rainbow)" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-weight="800" font-size="38" fill="#ffffff">C</text>
+</svg>

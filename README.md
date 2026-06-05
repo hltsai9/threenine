@@ -13,7 +13,7 @@ This repo holds the **User Requirements Document** and a **click-through web pro
 
 **Locally — easiest (just open a file):** double-click `prototype/standalone.html`, or open it in any browser via `file://`. It's a self-contained build of the prototype with the CSS and JS inlined, so no HTTP server or relative file fetches are needed. This is the recommended path for sharing the prototype as a single file.
 
-**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
+**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `shifts.js`, `owners.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
 
 ```bash
 cd prototype && python3 -m http.server 8000
@@ -40,32 +40,30 @@ To keep the demo stable, the prototype freezes time:
 - **Current week** = `W19 · May 4 – 10, 2026`
 - **Current operator** = Alex Chen (Day shift). Switch to Sam Patel (Night) or Jordan Kim (Day) anytime via the **Operator** dropdown in the sidebar.
 
-Because NOW sits just past the configured Day-shift cutoff, end-of-shift prompts fire on the Action Queue — the demo is intentionally calibrated to exercise the handover flow.
+Because NOW sits just past the configured Day-shift cutoff, the board's handover banner and per-card ⚠ Note buttons light up — the demo is intentionally calibrated to exercise the handover flow.
 
 ## Feature tour
 
-The sidebar has five top-level views. Counts next to each are live.
+The sidebar has four top-level views. Counts next to each are live.
 
-### 1. Action Queue (`#/queue`)
+### 1. Board (`#/cases`)
 
-The home screen — a per-operator to-do list derived from open-case state. Each case appears once with one or more **prompt rows**:
+The home screen and the single workspace where the first-line agent does everything. Each case now carries **two statuses**:
 
-| Prompt                         | Fires when                                                                    |
+- **Case Center status** — the real, external case status (sourced from the Case Center system; a future API will supply it). This drives the four kanban **columns**: New → With Local FIT → With HQ Product Team → Sanity Check / With Requester.
+- **Agent status** — how the first-line agent is handling the case. This drives the **top/bottom split** inside each column. The **top band ("My queue")** holds the cases the agent has pulled in to work right now; the **bottom band ("Backlog")** holds the rest. Clicking **+ Queue** on a card lifts it into the top band of its column (★); clicking **✓ Queued** drops it back.
+
+Each card surfaces a **one-click action** when one applies, so the old standalone Action Queue is unnecessary:
+
+| Action on card                 | Fires when                                                                    |
 | ------------------------------ | ----------------------------------------------------------------------------- |
 | **Assign to Local FIT**        | Status = New and no FIT contact yet.                                          |
 | **Chase Local FIT — no resp.** | Status = With FIT and last contact > 4h ago.                                  |
 | **Escalate to HQ Product Team**| FIT explicitly cannot resolve.                                                |
 | **Chase HQ — no response**     | Status = With HQ and last contact > 8h ago.                                   |
 | **Verify reported fix**        | Status = Sanity Check (owner says it's fixed).                                |
-| **Approaching SLA**            | Time on us > 20h and SLA clock is still running.                              |
-| **Watch escalated case**       | Case has the Escalated flag and isn't already in Sanity Check.                |
-| **End-of-shift handover note** | Shift ending soon and the open case has no fresh note for this shift.         |
 
-Thresholds are shown in the header and configurable in `prototype/data.js → THRESHOLDS`.
-
-Each chase prompt shows the owner's **time-zone chip** with their local time and office hours — green when in-hours, amber when out-of-hours. The system never gates the prompt; the operator decides.
-
-Clicking a prompt button opens a contextual modal:
+Thresholds are configurable in `prototype/data.js → THRESHOLDS`. Click any card to open the **reading panel** below, where you can change status, send reminders, set a bell, and **write the handover note** — without leaving the board. The contextual modals are unchanged:
 - **Assign to Local FIT** → pick an FIT desk.
 - **Escalate to HQ** → pick an HQ team and add a reason. FIT clock stops, HQ clock starts.
 - **Send reminder** → records contact + channel, resets the idle timer.
@@ -73,15 +71,9 @@ Clicking a prompt button opens a contextual modal:
 - **Return to requester** → pauses the SLA clock.
 - **Write handover note** → fresh note labelled `Day → Night` (or vice versa).
 
-State updates everywhere instantly: counters, status pills, history.
+**Handover, folded into the board.** There is no separate handover screen. When the shift is ending, a banner above the board reports how many open cases still need a fresh note for this shift, and every card needing one shows a **⚠ Note** button — write each straight from the board. Below the board, watchlists flag cases approaching SLA or carrying the Escalated flag. State updates everywhere instantly: counters, status pills, history.
 
-### 2. Cases (`#/cases`)
-
-Filterable table view scoped to the **current week**. Columns mirror the legacy Excel layout (Case Link, Subject, Process Time, Status) plus the v1 split (Local FIT, HQ Product Team, Status flags). Click any row to open the case detail.
-
-Use the search box to filter by subject or ID.
-
-### 3. Case Detail (`#/cases/<id>`)
+### 2. Case Detail (`#/cases/<id>`)
 
 Everything about one case:
 
@@ -89,19 +81,9 @@ Everything about one case:
 - **Handover panel** — latest note, with `Day → Night` style shift label. Yellow background if the note is stale for the current shift.
 - **Routing** — Local FIT contact, HQ Product Team contact, current owner pointer (FIT or HQ), last-contact timestamp + channel, owner office-hours chip.
 - **History** — full audit trail of state changes, assignments, escalations, handovers, comments.
-- **Action buttons** in the header that match the case's current state (e.g. With FIT → "Escalate to HQ", "Send reminder").
+- **Action buttons** in the header that match the case's current state (e.g. With FIT → "Escalate to HQ", "Send reminder", "Write handover note").
 
-### 4. Shift Handover (`#/handover`)
-
-The cutover screen for the current operator. Lists every open case the shift is responsible for, sorted by handover-note status:
-
-- **Missing** (red) — no handover note at all.
-- **Stale** (amber) — last note was for a different shift or marked stale.
-- **Current** (green) — fresh note authored during this shift by an operator on this shift.
-
-The **Complete handover** button stays disabled until every open case has a current note — enforcing the "no handover without a note" rule from the URD.
-
-### 5. Shifts (`#/shifts`)
+### 3. Shifts (`#/shifts`)
 
 Side-by-side coverage map. Each shift card shows hours, roster (with "you" highlighted), and handover stats (handed-to, notes by shift, missing for shift). Click a shift for the detail page.
 
@@ -111,37 +93,37 @@ Side-by-side coverage map. Each shift card shows hours, roster (with "you" highl
 - **Roster** with a **"View as <name>"** button that re-renders the whole app from that operator's perspective. The fastest way to see how Sam (Night) experiences the same data.
 - Three case sections: handed to this shift, missing-a-note for this shift, recent handover activity authored by this shift.
 
-### 6. Weekly Archive (`#/archive`)
+### 4. Weekly Archive (`#/archive`)
 
 Browse past weekly workbooks (W16 through current W19). Each archive card shows total cases, open / closed / cancelled counts, **carried-in** count (cases that rolled over from the previous week), bounces (cases returned to requester at least once), and median time-on-us for closed cases.
 
 **Per-week detail** (`#/archive/W18-2026`, etc.) shows the case table for that week with the same Excel-column layout, plus a `↩ Wxx` chip on cases that carried in. Past weeks are read-only-feeling but you can still drill into individual case detail.
 
-The current week is badged **Current** and offers a one-click jump back to the live Cases view.
+The current week is badged **Current** and offers a one-click jump back to the live board.
 
-### 7. Operator switcher (sidebar)
+### 5. Operator switcher (sidebar)
 
-The **Operator** row in the sidebar is a dropdown — switch between Alex (Day), Jordan (Day), Sam (Night) instantly. Every other view re-derives from that operator's perspective: the Action Queue gets re-prioritized, the Shift Handover screen targets the new shift, the "you" tag in the shift roster moves.
+The **Operator** row in the sidebar is a dropdown — switch between Mia (Day), Kai (Day), Ren (Night), Yui (Night) instantly. Everything re-derives from that operator's perspective: the board's queue and one-click actions re-prioritize, the handover banner and ⚠ Note buttons target the new shift, and the "you" tag in the shift roster moves.
 
 ## How the prototype maps to the URD
 
 | URD section              | Prototype surface                                                              |
 | ------------------------ | ------------------------------------------------------------------------------ |
-| §4.1 Case Record         | Case Detail panel, Cases table columns                                         |
-| §4.2 Lifecycle           | Status pills + state-driven action buttons; legacy Status mapped per §4.2 table|
+| §4.1 Case Record         | Case Detail panel, board cards + reading panel                                 |
+| §4.2 Lifecycle           | Case Center status drives the kanban columns; state-driven action buttons      |
 | §4.2.1 Process Time      | Two-clock panel; SLA clock = computed from state transitions                   |
-| §4.2.2 Flags             | Weekend / Escalated / Scheduled OOC chips on case rows                         |
+| §4.2.2 Flags             | Weekend / Escalated / Scheduled OOC chips on cards                             |
 | §4.3 Routing & Handoff   | Assign / Escalate / Return-to-requester modals; FIT-then-HQ flow               |
-| §4.4 Action Queue        | Action Queue view (`#/queue`) with the eight prompt types                      |
-| §4.5 Shifts & Handover   | Shift Handover screen + Shifts pages + handover-note shift labels              |
+| §4.4 Action Queue        | Per-column **top band** ("My queue") + one-click actions on cards              |
+| §4.5 Shifts & Handover   | Handover banner + ⚠ Note buttons on the board + Shifts pages                   |
 | §4.8 Reporting & Insights| Archive index per-week stats; FIT vs HQ hold split on case detail              |
 | §4.10 Weekly Workbook    | Weekly Archive views; `carriedFrom` chip on rolled-over cases                  |
 | §4.11 Import / Export    | Out of scope for prototype; column map documented in URD                       |
 
 ## What's mocked and what's not
 
-- **Mocked**: all data (operators, owner directory, cases, history). Persistence — state is in-memory only and resets on reload. Notifications, email, Slack. Authentication. The "Complete handover" button just shows an alert. Process Time is computed locally; v2 will source it from the case-center API.
-- **Real**: the lifecycle rules, action-queue derivation thresholds, FIT-then-HQ flow, two-clock arithmetic, and shift-handover gating logic. These are the design decisions worth reviewing.
+- **Mocked**: all data (operators, owner directory, cases, history). Persistence — state is in-memory only and resets on reload. Notifications, email, Slack. Authentication. The Case Center status is seeded locally; v2 will source the real status (and Process Time) from the case-center API while the agent status stays local.
+- **Real**: the lifecycle rules, the two-status model (Case Center status vs agent status), the one-click action thresholds, FIT-then-HQ flow, two-clock arithmetic, and handover awareness. These are the design decisions worth reviewing.
 
 ## Persistence and resetting
 
@@ -157,7 +139,9 @@ Your changes (assignments, status moves, handover notes, operator switches) are 
 │   ├── index.html               # SPA shell (modular dev entry point)
 │   ├── styles.css               # all styles
 │   ├── app.js                   # router + render + handlers
-│   ├── data.js                  # seed: operators, owners, weeks, shifts, cases
+│   ├── data.js                  # seed: weeks, cases, thresholds, clock
+│   ├── shifts.js                # roster: operators, shifts, default operator (edit here)
+│   ├── owners.js                # FIT desks & HQ teams (edit here / via the Owners page)
 │   ├── tour.js                  # interactive guided tour
 │   ├── bundle.mjs               # build script: produces standalone.html
 │   ├── standalone.html          # self-contained single-file build (file://-safe)

@@ -1,22 +1,79 @@
 // Case Tracker prototype — single-file SPA.
-// Renders four views (Action Queue, Cases, Case Detail, Shift Handover)
+// Renders the kanban board (Cases), Case Detail, Shifts and Archive views
 // against the seed data in data.js. State is in-memory; reload resets.
+//
+// Two statuses per case:
+//   c.status      = Case Center status (real external status; drives kanban columns).
+//   c.agentStatus = first-line agent status ('queued' | 'unqueued'; drives the
+//                   top/bottom band split inside each column).
+
+// === CONFIG ===
+// How long to wait for the live /api/cases call (talking to Case Center) before giving up
+// and falling back to seed data. Increase this if your on-prem Case Center is slow.
+// Adjust without editing this file by adding ?liveTimeout=SECONDS to the URL,
+// e.g.  http://127.0.0.1:8787/?liveTimeout=60   (60 seconds)
+const LIVE_FETCH_TIMEOUT_MS = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('liveTimeout');
+    if (q != null && q !== '' && !isNaN(+q)) return Math.max(1000, +q * 1000);
+  } catch (e) { /* ignore */ }
+  if (typeof window.LIVE_FETCH_TIMEOUT_MS === 'number') return window.LIVE_FETCH_TIMEOUT_MS;
+  return 30000;   // default: 30 seconds  ← edit this number to change the default
+})();
 
 const STATE = {
   cases: window.CASES.map(c => structuredClone(c)),
   operatorId: window.CURRENT_OPERATOR_ID,
-  lastListRoute: '#/queue',
-  lastListLabel: 'Action Queue',
+  lastListRoute: '#/cases',
+  lastListLabel: 'Cases',
+  lookbackHours: 1,          // Case Center query window (hours); adjustable from the board
 };
+try {
+  const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
+  if (lb > 0) STATE.lookbackHours = lb;
+} catch (e) { /* ignore */ }
 
-const STORAGE_KEY = 'case-tracker-state-v2';
+const STORAGE_KEY = 'case-tracker-state-v4';
+// In live mode (served by local/serve.py, cases come from Case Center each refresh) we
+// persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
+// so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
+const AGENT_KEY = 'case-tracker-agent-v1';
+
+// The agent-owned fields that survive a live data refresh.
+function agentLayerFromState() {
+  const map = {};
+  for (const c of STATE.cases) {
+    map[c.id] = { agentStatus: c.agentStatus, handover: c.handover, reminder: c.reminder };
+  }
+  return map;
+}
+
+function applyAgentLayer(map) {
+  for (const c of STATE.cases) {
+    const a = map[c.id];
+    if (!a) { if (c.agentStatus == null) c.agentStatus = 'unqueued'; continue; }
+    if (a.agentStatus != null) c.agentStatus = a.agentStatus;
+    if (a.handover !== undefined) c.handover = a.handover;
+    if (a.reminder !== undefined) c.reminder = a.reminder;
+  }
+}
 
 function saveState() {
   try {
+    if (window.__LIVE__) {
+      localStorage.setItem(AGENT_KEY, JSON.stringify({
+        v: 1,
+        operatorId: STATE.operatorId,
+        agent: agentLayerFromState(),
+      }));
+      persistChangedCases();   // push any operator edits to data.js via the local server
+      return;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 2,
+      v: 4,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
+      anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
     }));
   } catch (e) { /* SecurityError on some file:// origins, ignore */ }
 }
@@ -26,8 +83,9 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 2 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 4 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
+    if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
       STATE.operatorId = parsed.operatorId;
     }
@@ -38,18 +96,87 @@ function loadState() {
 }
 
 function resetState() {
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(AGENT_KEY);
+  } catch (e) { /* ignore */ }
+  // In live mode the source of truth is Case Center — reload to re-pull fresh data.
+  if (window.__LIVE__) { location.reload(); return; }
   STATE.cases = window.CASES.map(c => structuredClone(c));
+  anchorFreshSeed();   // re-anchor the pristine seed on the real current time
+  // Restore the roster to the data.js values (the editor mutates these in place).
+  window.OPERATORS = structuredClone(SEED_ROSTER.operators);
+  window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
+  window.CURRENT_OPERATOR_ID = SEED_ROSTER.currentOperatorId;
+  window.OWNERS = structuredClone(SEED_OWNERS);
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
-  STATE.lastListRoute = '#/queue';
-  STATE.lastListLabel = 'Action Queue';
+  STATE.lastListRoute = '#/cases';
+  STATE.lastListLabel = 'Cases';
   render();
 }
 
-loadState();
+// Pristine copy of the roster as defined in data.js, so "Reset to seed" can undo
+// any in-session edits made with the shift editor.
+const SEED_ROSTER = {
+  operators: structuredClone(window.OPERATORS),
+  shifts: structuredClone(window.SHIFTS),
+  currentOperatorId: window.CURRENT_OPERATOR_ID,
+};
+// Pristine owner directory, so "Reset to seed" can undo in-session Owners-editor changes.
+const SEED_OWNERS = structuredClone(window.OWNERS);
 
 const HOUR = 3600 * 1000;
-const NOW = window.NOW;
+
+// The demo clock. The seed in data.js is authored around SEED_ANCHOR; on boot we shift
+// every seed timestamp by a single offset so "now" lands on the real current time — this
+// keeps all the curated durations (SLA, idle, shift-ending) intact while making timestamps
+// real and never in the future. Live mode (Case Center) sets NOW to real time directly.
+let NOW = window.NOW;
+const SEED_ANCHOR = window.NOW.getTime();
+const SEED_CURRENT_SHIFT = structuredClone(window.CURRENT_SHIFT);
+
+function shiftIso(v, off) { return v ? new Date(new Date(v).getTime() + off).toISOString() : v; }
+function shiftCaseTimes(c, off) {
+  c.createdAt = shiftIso(c.createdAt, off);
+  c.slaStartedAt = shiftIso(c.slaStartedAt, off);
+  c.holdStartedAt = shiftIso(c.holdStartedAt, off);
+  if (c.closedAt) c.closedAt = shiftIso(c.closedAt, off);
+  if (c.lastOwnerContact) c.lastOwnerContact.at = shiftIso(c.lastOwnerContact.at, off);
+  if (c.handover) c.handover.at = shiftIso(c.handover.at, off);
+  if (c.reminder) c.reminder.fireAt = shiftIso(c.reminder.fireAt, off);
+  (c.history || []).forEach(h => { h.at = shiftIso(h.at, off); });
+}
+function applyShiftToCurrentShift(off) {
+  window.CURRENT_SHIFT = structuredClone(SEED_CURRENT_SHIFT);
+  window.CURRENT_SHIFT.endsAtUtc = shiftIso(SEED_CURRENT_SHIFT.endsAtUtc, off);
+}
+// Shift the pristine seed (already cloned into STATE.cases) so it anchors on real now.
+function anchorFreshSeed() {
+  // data.js written from live Case Center data: board-shaped cases with real timestamps.
+  // Normalize them (fills weekId/agentStatus/etc. like a live fetch) and don't time-shift.
+  if (window.CASES_LIVE_CAPTURE) {
+    STATE.cases = window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
+    STATE.anchorOffset = 0;
+    applyShiftToCurrentShift(0);
+    NOW = new Date();
+    return;
+  }
+  const off = Date.now() - SEED_ANCHOR;
+  STATE.cases.forEach(c => shiftCaseTimes(c, off));
+  STATE.anchorOffset = off;
+  applyShiftToCurrentShift(off);
+  NOW = new Date();
+}
+function seedBoot(loadedFromStorage) {
+  if (loadedFromStorage && typeof STATE.anchorOffset === 'number' && !window.CASES_LIVE_CAPTURE) {
+    applyShiftToCurrentShift(STATE.anchorOffset); // restored cases already carry this offset
+    NOW = new Date();
+  } else {
+    anchorFreshSeed();
+  }
+}
+
+seedBoot(loadState());
 
 /* ---------- Helpers ---------- */
 
@@ -90,6 +217,19 @@ function fmtDuration(ms) {
 }
 // Reminders use real wall-clock time (vs. frozen NOW used for case state).
 function realNow() { return new Date(); }
+
+// Live wall-clock shown in the sidebar — local-first (UTC kept on hover for reference).
+function updateClock() {
+  const t = document.getElementById('clock-time');
+  const d = document.getElementById('clock-date');
+  if (!t || !d) return;
+  const now = realNow();
+  t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  d.textContent = `${date}${LOCAL_TZ ? ' · ' + LOCAL_TZ : ''}`;
+  const wrap = t.closest('.sidebar-clock');
+  if (wrap) wrap.title = `UTC ${now.toISOString().slice(11, 16)}`;
+}
 function fmtUntil(iso) {
   const diff = new Date(iso).getTime() - realNow().getTime();
   if (diff <= 0) return 'due now';
@@ -117,12 +257,53 @@ function fmtRelative(iso) {
   if (diff < 60_000) return 'just now';
   return `${fmtDuration(diff)} ago`;
 }
+// Viewer's local timezone abbreviation (e.g. "PDT", "GMT+8"), computed once.
+const LOCAL_TZ = (() => {
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value || '';
+  } catch (e) { return ''; }
+})();
+
+// Absolute case timestamps are shown in the viewer's LOCAL time (case timestamps are
+// stored as ISO UTC; this renders them where the operator actually is).
 function fmtAbsolute(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  const date = d.toISOString().slice(0, 10);
-  const time = d.toISOString().slice(11, 16);
-  return `${date} ${time}Z`;
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${date} ${time}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+}
+// Compact local "M/D HH:MM" for timeline transition markers (full time on hover).
+function fmtClockShort(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// Local HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
+function fmtLocalTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+}
+// Render a "HH:MM – HH:MM UTC" coverage window in local time (display only; the roster
+// still stores the canonical UTC text). Falls back to the raw string if unparseable.
+function fmtShiftHoursLocal(hoursUtc) {
+  const m = String(hoursUtc || '').match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
+  if (!m) return hoursUtc || '—';
+  const base = new Date();
+  const toLocal = (h, min) => {
+    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), +h, +min));
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  return `${toLocal(m[1], m[2])} – ${toLocal(m[3], m[4])}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({
@@ -161,51 +342,44 @@ function statusLabel(s) {
   })[s] || s;
 }
 
-/* ---------- Action queue derivation ---------- */
+// Visible status label. Live Case Center cases carry ccStatusLabel (the raw
+// caseStatus + caseSubstatus, e.g. "In-Progress Wait User"); seed cases fall back to the
+// board enum label. The pill COLOR still uses the mapped enum (c.status).
+function displayStatus(c) {
+  return (c && c.ccStatusLabel) || statusLabel(c.status);
+}
 
-function deriveQueue() {
-  // Operator-curated: only cases the operator has explicitly added (c.queue = true).
-  // For each queued case we still derive the primary action (chase, escalate, etc.)
-  // so the card has a one-click CTA where one applies.
-  const groups = [];
-  for (const c of STATE.cases) {
-    if (!c.queue) continue;
-    if (['closed', 'cancelled', 'resolved'].includes(c.status)) continue;
+// Agent status: has the first-line agent pulled this case into their active queue?
+// Drives the top (queued) vs bottom (rest) band split inside each kanban column.
+function isQueued(c) { return c.agentStatus === 'queued'; }
 
-    const ownerIdleHrs = c.lastOwnerContact
-      ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
-      : Infinity;
+/* ---------- Action derivation ---------- */
 
-    const prompts = [];
-    if (c.status === 'new' && !c.fitId) {
-      prompts.push({ caseId: c.id, kind: 'assign_fit' });
-    }
-    if (c.status === 'with_fit' && c.fitCannotResolve) {
-      prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
-    } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
-      prompts.push({ caseId: c.id, kind: 'chase_fit' });
-    }
-    if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
-      prompts.push({ caseId: c.id, kind: 'chase_hq' });
-    }
-    if (c.status === 'sanity_check') {
-      prompts.push({ caseId: c.id, kind: 'verify_fix' });
-    }
+// Derive the one-click actions that apply to a single case, given its status and how
+// long the current owner has been idle. Used to put a primary CTA on kanban cards.
+function derivePromptsForCase(c) {
+  if (['closed', 'cancelled', 'resolved'].includes(c.status)) return [];
 
-    groups.push({ case: c, prompts });
+  const ownerIdleHrs = c.lastOwnerContact
+    ? (NOW.getTime() - new Date(c.lastOwnerContact.at).getTime()) / HOUR
+    : Infinity;
+
+  const prompts = [];
+  if (c.status === 'new' && !c.fitId) {
+    prompts.push({ caseId: c.id, kind: 'assign_fit' });
   }
-
-  // Cases with an action come first, then by priority, then by age.
-  const pri = { high: 0, medium: 1, low: 2 };
-  groups.sort((a, b) => {
-    const hasA = a.prompts.length > 0 ? 0 : 1;
-    const hasB = b.prompts.length > 0 ? 0 : 1;
-    if (hasA !== hasB) return hasA - hasB;
-    const p = pri[a.case.priority] - pri[b.case.priority];
-    if (p !== 0) return p;
-    return new Date(a.case.slaStartedAt) - new Date(b.case.slaStartedAt);
-  });
-  return groups;
+  if (c.status === 'with_fit' && c.fitCannotResolve) {
+    prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
+  } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_fit' });
+  }
+  if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_hq' });
+  }
+  if (c.status === 'sanity_check') {
+    prompts.push({ caseId: c.id, kind: 'verify_fix' });
+  }
+  return prompts;
 }
 
 const PROMPT_DEFS = {
@@ -227,16 +401,16 @@ function navigate(hash) {
 }
 
 function currentRoute() {
-  const h = location.hash || '#/queue';
+  const h = location.hash || '#/cases';
   if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
   if (h.startsWith('#/cases')) return { name: 'cases' };
-  if (h.startsWith('#/handover')) return { name: 'handover' };
   if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
   if (h.startsWith('#/archive')) return { name: 'archive' };
   if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
+  if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
-  return { name: 'queue' };
+  return { name: 'cases' };
 }
 
 window.addEventListener('hashchange', render);
@@ -245,10 +419,9 @@ window.addEventListener('hashchange', render);
 
 function labelForRoute(route) {
   switch (route.name) {
-    case 'queue': return 'Action Queue';
     case 'cases': return 'Cases';
-    case 'handover': return 'Shift Handover';
     case 'shifts': return 'Shifts';
+    case 'owners': return 'Owners';
     case 'shiftDetail': return `${route.shift} shift`;
     case 'archive': return 'Weekly Archive';
     case 'archiveWeek': {
@@ -265,26 +438,26 @@ function render() {
   const route = currentRoute();
   // Remember the last list-style view so the case detail can offer a contextual back link.
   if (route.name !== 'detail') {
-    STATE.lastListRoute = location.hash || '#/queue';
+    STATE.lastListRoute = location.hash || '#/cases';
     STATE.lastListLabel = labelForRoute(route);
   }
   const main = document.getElementById('main');
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const active = ({
-    queue: 'queue', cases: 'cases', detail: 'cases', handover: 'handover',
+    cases: 'cases', detail: 'cases',
     archive: 'archive', archiveWeek: 'archive',
     shifts: 'shifts', shiftDetail: 'shifts',
+    owners: 'owners',
     flow: 'flow',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
-  if (route.name === 'queue') main.innerHTML = renderQueue();
-  else if (route.name === 'cases') main.innerHTML = renderCaseList();
+  if (route.name === 'cases') main.innerHTML = renderCaseList();
   else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
-  else if (route.name === 'handover') main.innerHTML = renderHandover();
   else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
   else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
+  else if (route.name === 'owners') main.innerHTML = renderOwnersPage();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
   bindHandlers();
@@ -296,131 +469,50 @@ function renderSidebar() {
     STATE.operatorId = window.CURRENT_OPERATOR_ID;
   }
   const op = getOperator(STATE.operatorId);
-  // Operator switcher
+  // Operator switcher — repopulate options every render so roster edits show up;
+  // attach the change listener only once.
   const sw = document.getElementById('op-switcher');
-  if (sw && sw.dataset.populated !== '1') {
+  if (sw) {
     sw.innerHTML = window.OPERATORS
       .map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
       .join('');
-    sw.addEventListener('change', () => {
-      STATE.operatorId = sw.value;
-      render();
-    });
-    sw.dataset.populated = '1';
+    if (sw.dataset.bound !== '1') {
+      sw.addEventListener('change', () => {
+        STATE.operatorId = sw.value;
+        render();
+      });
+      sw.dataset.bound = '1';
+    }
+    sw.value = STATE.operatorId;
   }
-  if (sw) sw.value = STATE.operatorId;
 
   document.getElementById('op-shift').textContent = op.shift;
-  document.getElementById('op-ends').textContent = window.CURRENT_SHIFT.endsAtUtc.slice(11, 16) + 'Z';
+  document.getElementById('op-ends').textContent = fmtLocalTime(window.CURRENT_SHIFT.endsAtUtc);
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
+  updateClock();
 
-  const queueGroups = deriveQueue();
-  document.getElementById('nav-queue-count').textContent = queueGroups.length;
   document.getElementById('nav-cases-count').textContent =
     STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
-  document.getElementById('nav-handover-count').textContent =
-    STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status)
-      && (!c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift)
-    ).length;
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
+  const navOwners = document.getElementById('nav-owners-count');
+  if (navOwners) navOwners.textContent = (window.OWNERS.fit.length + window.OWNERS.hq.length);
   const navArchive = document.getElementById('nav-archive-count');
   if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
 
-/* ---------- Action Queue view ---------- */
-
-function renderQueue() {
-  const groups = deriveQueue();
-  const sla = approachingSlaCases();
-  const escalated = escalatedCases();
-  const handoverPending = handoverPendingCases();
-  const dueReminders = STATE.cases.filter(c =>
-    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
-  );
-  const pendingReminders = STATE.cases.filter(c =>
-    c.reminder && !c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
-  );
-
-  const remindersSection = dueReminders.length > 0 ? `
-    <div class="reminders-due">
-      <div class="reminders-due-header">${BELL_SVG} Reminders due <span class="muted">(${dueReminders.length})</span></div>
-      ${dueReminders.map(c => `
-        <div class="reminder-row">
-          <div>
-            <div class="row-flex">
-              <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-              <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-              <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
-            </div>
-            <div class="reminder-subject">${escapeHtml(c.subject)}</div>
-            ${c.reminder.note ? `<div class="reminder-note">"${escapeHtml(c.reminder.note)}"</div>` : ''}
-          </div>
-          <div class="reminder-actions">
-            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="snooze_reminder">Snooze 5m</button>
-            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="dismiss_reminder">Dismiss</button>
-            <a class="btn btn-primary" href="#/cases/${c.id}">Open case →</a>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  ` : '';
-
-  const banner = handoverPending.length > 0 ? `
-    <div class="queue-banner">
-      <div>
-        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} need a handover note for ${escapeHtml(getOperator(STATE.operatorId).shift)} shift before cutover.
-      </div>
-      <a href="#/handover" class="btn btn-primary">Open Shift Handover →</a>
-    </div>
-  ` : '';
-
-  const cards = groups.length === 0
-    ? `<div class="queue-empty">
-        <div style="font-weight:500; margin-bottom:6px;">Your queue is empty.</div>
-        <div style="font-size:13px;">Add cases from the <a href="#/cases">Cases page</a> using the <span class="mono">+ Queue</span> button to track them here.</div>
-      </div>`
-    : groups.map(g => renderQueueCard(g.case, g.prompts)).join('');
-
-  const watchlist = renderWatchlists(sla, escalated);
-
-  const actionable = groups.filter(g => g.prompts.length > 0).length;
-  const subtitleParts = [];
-  if (dueReminders.length > 0) subtitleParts.push(`${dueReminders.length} reminder${dueReminders.length === 1 ? '' : 's'} due`);
-  if (groups.length > 0) {
-    subtitleParts.push(`${groups.length} case${groups.length === 1 ? '' : 's'} in your queue${actionable > 0 ? ` (${actionable} actionable)` : ''}`);
-  }
-  if (pendingReminders.length > 0) subtitleParts.push(`${pendingReminders.length} reminder${pendingReminders.length === 1 ? '' : 's'} scheduled`);
-  if (sla.length > 0) subtitleParts.push(`${sla.length} approaching SLA`);
-  if (escalated.length > 0) subtitleParts.push(`${escalated.length} escalated`);
-
-  return `
-    <div class="page-header">
-      <div>
-        <h1>Action Queue</h1>
-        <div class="subtitle">${subtitleParts.join(' · ') || 'All clear.'}</div>
-      </div>
-      <div class="toolbar">
-        <span class="muted tiny">Thresholds: FIT idle &gt; ${window.THRESHOLDS.fitIdleHours}h, HQ idle &gt; ${window.THRESHOLDS.hqIdleHours}h, approaching SLA &gt; ${window.THRESHOLDS.approachingSlaHours}h</span>
-      </div>
-    </div>
-    ${remindersSection}
-    ${banner}
-    ${cards}
-    ${watchlist}
-  `;
-}
+/* ---------- Shared action helpers ---------- */
 
 const BELL_SVG = `<svg class="bell-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
 
 function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
   if (['closed', 'cancelled'].includes(c.status)) return '';
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
-  const inQ = c.queue;
+  const inQ = isQueued(c);
   const label = size === 'tiny'
     ? (inQ ? '✓ Queued' : '+ Queue')
     : (inQ ? '✓ Remove from queue' : '+ Add to queue');
-  const title = inQ ? 'Remove from your Action Queue' : 'Add to your Action Queue';
+  const title = inQ ? 'Remove from your queue (move to bottom band)' : 'Add to your queue (move to top band)';
   return `<button class="${cls} queue-toggle${inQ ? ' in-queue' : ''}" data-action="prompt" data-case-id="${c.id}" data-kind="toggle_queue" title="${escapeHtml(title)}" onclick="event.stopPropagation()">${escapeHtml(label)}</button>`;
 }
 
@@ -457,16 +549,24 @@ function escalatedCases() {
   });
 }
 
-function handoverPendingCases() {
+// True when an open case lacks a fresh handover note authored during the current shift.
+// Mirrors the rule from the old Shift Handover page: every open case must carry a note
+// written by someone on the current shift. Writing one (from a card or the reading panel)
+// clears the indicator.
+function needsHandoverNote(c) {
+  if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
+  if (!c.handover || c.handover.staleForCurrentShift) return true;
   const op = getOperator(STATE.operatorId);
+  const author = getOperator(c.handover.author);
+  return !author || author.shift !== op.shift;
+}
+
+function handoverPendingCases() {
   const shiftEndsSoon =
     (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
     window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
   if (!shiftEndsSoon) return [];
-  return STATE.cases.filter(c => {
-    if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
-    return !c.handover || c.handover.staleForCurrentShift || c.handover.to !== op.shift;
-  });
+  return STATE.cases.filter(needsHandoverNote);
 }
 
 function renderWatchlists(sla, escalated) {
@@ -477,7 +577,7 @@ function renderWatchlists(sla, escalated) {
       <a class="watch-row" href="#/cases/${c.id}">
         <span class="mono muted">${c.id}</span>
         <span class="watch-subject">${escapeHtml(c.subject)}</span>
-        <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+        <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
         <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
       </a>
     `;
@@ -497,54 +597,6 @@ function renderWatchlists(sla, escalated) {
   return `<div class="watchlist">${slaSection}${escSection}</div>`;
 }
 
-function renderQueueCard(c, prompts) {
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
-  const onUs = fmtDuration(caseSlaMs(c));
-  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
-  const ownerLine = owner ? `
-    Owner: <strong>${escapeHtml(owner.name)}</strong>
-    ${renderTzHint(owner)}
-    · last contact ${fmtRelative(c.lastOwnerContact?.at)}
-  ` : `<span class="muted">Unassigned</span>`;
-
-  const primary = prompts[0];
-  const primaryBtn = primary ? `
-    <button class="btn btn-primary queue-primary-btn" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}">
-      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
-      ${escapeHtml(PROMPT_DEFS[primary.kind].label)}
-    </button>
-  ` : `<span class="muted tiny" style="text-align:center;">No immediate action.</span>`;
-
-  return `
-    <div class="card queue-card">
-      <div class="queue-row">
-        <div>
-          <div class="row-flex">
-            <a href="#/cases/${c.id}" class="mono muted">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-            <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
-            ${flags}
-          </div>
-          <div class="queue-subject">${escapeHtml(c.subject)}</div>
-          <div class="queue-meta">
-            ${ownerLine}
-            <span>·</span>
-            <span>On us: <strong>${onUs}</strong></span>
-            <span>·</span>
-            <a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">case-center ↗</a>
-          </div>
-        </div>
-        <div class="queue-action">
-          ${primaryBtn}
-          ${renderBellButton(c, 'queue')}
-          ${renderQueueToggleButton(c, 'tiny')}
-          <a class="btn btn-ghost" href="#/cases/${c.id}">Open case →</a>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function renderTzHint(owner) {
   if (!owner) return '';
   const local = ownerLocalNow(owner);
@@ -562,6 +614,9 @@ function renderCaseList() {
   const closedCount = STATE.cases
     .filter(c => c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
 
+  // Columns = Case Center status (the real external status). Each column splits into a
+  // top band (cases the first-line agent has queued / is actively working) and a bottom
+  // band (everything else in that status) — the row dimension is the agent status.
   const columns = [
     { id: 'new',    label: 'New',                              statuses: ['new'] },
     { id: 'fit',    label: 'With Local FIT',                   statuses: ['with_fit'] },
@@ -569,15 +624,29 @@ function renderCaseList() {
     { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
   ];
 
+  const sortCases = (a, b) => {
+    const pri = { high: 0, medium: 1, low: 2 };
+    const p = pri[a.priority] - pri[b.priority];
+    if (p !== 0) return p;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  };
+
+  const band = (cases, cls, header, emptyText) => `
+    <div class="kanban-band ${cls}">
+      <div class="kanban-band-header">
+        <span>${escapeHtml(header)}</span>
+        <span class="kanban-band-count">${cases.length}</span>
+      </div>
+      ${cases.length === 0
+        ? `<div class="kanban-empty">${escapeHtml(emptyText)}</div>`
+        : cases.map(renderKanbanCard).join('')}
+    </div>
+  `;
+
   const kanban = columns.map(col => {
-    const colCases = allCases
-      .filter(c => col.statuses.includes(c.status))
-      .sort((a, b) => {
-        const pri = { high: 0, medium: 1, low: 2 };
-        const p = pri[a.priority] - pri[b.priority];
-        if (p !== 0) return p;
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
+    const colCases = allCases.filter(c => col.statuses.includes(c.status)).sort(sortCases);
+    const top = colCases.filter(isQueued);
+    const bottom = colCases.filter(c => !isQueued(c));
     return `
       <div class="kanban-column" data-col-id="${col.id}">
         <div class="kanban-col-header">
@@ -585,9 +654,8 @@ function renderCaseList() {
           <span class="kanban-count">${colCases.length}</span>
         </div>
         <div class="kanban-col-body">
-          ${colCases.length === 0
-            ? '<div class="kanban-empty">No cases.</div>'
-            : colCases.map(renderKanbanCard).join('')}
+          ${band(top, 'kanban-band-top', 'My queue', 'Nothing queued.')}
+          ${band(bottom, 'kanban-band-bottom', 'Backlog', 'No cases.')}
         </div>
       </div>
     `;
@@ -598,19 +666,86 @@ function renderCaseList() {
   const validSelection = selected && selected.weekId === window.CURRENT_WEEK.id;
   const readingPanel = renderReadingPanel(validSelection ? selected : null);
 
+  const queuedCount = allCases.filter(isQueued).length;
+
+  // Handover awareness — replaces the old standalone Shift Handover page. When the shift
+  // is ending, surface how many open cases still need a fresh note; the agent writes them
+  // straight from the cards / reading panel below.
+  const handoverPending = handoverPendingCases();
+  const handoverBanner = handoverPending.length > 0 ? `
+    <div class="kanban-handover-banner">
+      <div>
+        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note. Write each from its card or the reading panel.
+      </div>
+    </div>
+  ` : '';
+
+  const dueReminders = STATE.cases.filter(c =>
+    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
+  );
+  const remindersBanner = dueReminders.length > 0 ? `
+    <div class="reminders-due">
+      <div class="reminders-due-header">${BELL_SVG} Reminders due <span class="muted">(${dueReminders.length})</span></div>
+      ${dueReminders.map(c => `
+        <div class="reminder-row">
+          <div>
+            <div class="row-flex">
+              <a class="mono" href="#/cases/${c.id}">${c.id}</a>
+              <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
+              <span class="muted tiny">${escapeHtml(fmtOverdue(c.reminder.fireAt))}</span>
+            </div>
+            <div class="reminder-subject">${escapeHtml(c.subject)}</div>
+            ${c.reminder.note ? `<div class="reminder-note">"${escapeHtml(c.reminder.note)}"</div>` : ''}
+          </div>
+          <div class="reminder-actions">
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="snooze_reminder">Snooze 5m</button>
+            <button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="dismiss_reminder">Dismiss</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const watchlist = renderWatchlists(approachingSlaCases(), escalatedCases());
+
+  // Live-mode banner so the board is never silently empty when running on Case Center data.
+  const liveBanner = window.__LIVE__ ? (() => {
+    const total = STATE.cases.length;
+    const shown = allCases.length;
+    const hidden = total - shown;
+    let msg;
+    if (total === 0) {
+      msg = 'Live · Case Center returned <strong>0 cases</strong>. Check your <span class="mono">fetch_raw()</span> query / filters.';
+    } else if (shown === 0) {
+      msg = `Live · loaded <strong>${total}</strong> case${total === 1 ? '' : 's'} from Case Center, but ${total === 1 ? 'it is' : 'all are'} closed/cancelled — the board only shows active cases.`;
+    } else {
+      msg = `Live · <strong>${shown}</strong> active case${shown === 1 ? '' : 's'} from Case Center${hidden ? ` · ${hidden} closed/cancelled hidden` : ''}.`;
+    }
+    return `<div class="kanban-live-banner">${msg}</div>`;
+  })() : '';
+
   return `
     <div class="page-header">
       <div>
-        <h1>Cases · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
-        <div class="subtitle">${allCases.length} open · ${closedCount} closed/cancelled this week. Click a card to read; use <span class="mono">+ Queue</span> to track it.</div>
+        <h1>Board · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
+        <div class="subtitle">${allCases.length} open · ${queuedCount} in your queue · ${closedCount} closed/cancelled this week. Columns are the Case Center status; <span class="mono">+ Queue</span> lifts a card into your top band.</div>
       </div>
       <div class="toolbar">
+        ${/^https?:$/.test(location.protocol) ? `
+        <label class="lookback-ctl" title="Pull Case Center cases created within this many hours">Created within
+          <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}"> h
+          <button class="btn" id="lookback-load">Load</button>
+        </label>` : ''}
         <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
         <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
       </div>
     </div>
+    ${liveBanner}
+    ${remindersBanner}
+    ${handoverBanner}
     <div class="kanban">${kanban}</div>
     <div class="reading-panel">${readingPanel}</div>
+    ${watchlist}
   `;
 }
 
@@ -621,6 +756,21 @@ function renderKanbanCard(c) {
   const bellState = c.reminder
     ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
     : '';
+
+  // Primary one-click action for this case, if one applies (assign / chase / escalate / verify).
+  const primary = derivePromptsForCase(c)[0];
+  const primaryBtn = primary ? `
+    <button class="btn-tiny kanban-cta" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}" title="${escapeHtml(PROMPT_DEFS[primary.kind].label)}" onclick="event.stopPropagation()">
+      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
+      ${escapeHtml(PROMPT_DEFS[primary.kind].action)}
+    </button>
+  ` : '';
+
+  // Handover affordance — write a fresh shift note straight from the card.
+  const handoverBtn = needsHandoverNote(c) ? `
+    <button class="btn-tiny kanban-handover-btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover" title="Write a handover note for this shift" onclick="event.stopPropagation()">⚠ Note</button>
+  ` : '';
+
   return `
     <div class="kanban-card ${isSel ? 'is-selected' : ''}" data-action="kanban-select" data-case-id="${c.id}">
       <div class="kanban-card-head">
@@ -628,16 +778,18 @@ function renderKanbanCard(c) {
         <div class="kanban-card-head-right">
           <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
           ${bellState}
-          ${c.queue ? '<span class="kanban-queued" title="In your Action Queue">★</span>' : ''}
+          ${isQueued(c) ? '<span class="kanban-queued" title="In your queue">★</span>' : ''}
         </div>
       </div>
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
       <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
       <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : '<span class="muted">unassigned</span>'}</span>
+        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assigneeId ? escapeHtml(c.assigneeId) : '<span class="muted">unassigned</span>')}</span>
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
+        ${primaryBtn}
+        ${handoverBtn}
         ${renderQueueToggleButton(c, 'tiny')}
       </div>
     </div>
@@ -656,7 +808,7 @@ function renderReadingPanel(c) {
       <div>
         <div class="row-flex">
           <a class="mono muted" href="#/cases/${c.id}">${c.id}</a>
-          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
           ${flags}
         </div>
@@ -671,13 +823,132 @@ function renderReadingPanel(c) {
 
 /* ---------- Case Detail view ---------- */
 
+/* ---------- Ownership timeline (who held the case, when) ---------- */
+
+// Reconstruct the ordered possession segments from a case's history. Each segment is
+// { holder, start, end, label } where holder is which "hand" the case was in.
+function ownershipSegments(c) {
+  const events = (c.history || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
+  if (!events.length) return [];
+
+  // Map a history event to the holder it puts the case in (null = not a handoff).
+  const classify = (ev, prev) => {
+    const d = (ev.detail || '').toLowerCase();
+    switch (ev.kind) {
+      case 'created': return 'triage';
+      case 'assigned': return 'fit';      // assignment is always to Local FIT
+      case 'escalated': return 'hq';
+      case 'returned': return 'requester';
+      case 'closed': case 'cancelled': return 'done';
+      case 'status': case 'resumed': {    // ambiguous — read the detail
+        if (/sanity check/.test(d)) return 'sanity';
+        if (/\bhq\b|product team/.test(d)) return 'hq';
+        if (/local fit|→ fit|\bfit\b/.test(d)) return 'fit';
+        if (/requester|returned/.test(d)) return 'requester';
+        if (/resolved|closed/.test(d)) return 'done';
+        if (/unassigned|\bnew\b/.test(d)) return 'triage';
+        return prev;
+      }
+      default: return null;               // reminder / handover / note / flag / reassigned
+    }
+  };
+
+  const segs = [];
+  let holder = null;
+  let start = new Date(c.createdAt || events[0].at).getTime();
+  let label = '';
+  for (const ev of events) {
+    const h = classify(ev, holder);
+    if (h == null) continue;
+    const at = new Date(ev.at).getTime();
+    if (holder == null) { holder = h; start = Math.min(start, at); label = ev.detail || ''; continue; }
+    if (h === holder) continue;
+    segs.push({ holder, start, end: at, label });
+    if (h === 'done') { holder = 'done'; break; }
+    holder = h; start = at; label = ev.detail || '';
+  }
+  if (holder && holder !== 'done') {
+    const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
+    const end = terminal ? start : NOW.getTime();
+    segs.push({ holder, start, end: Math.max(end, start), label });
+  }
+  return segs;
+}
+
+// Total time spent in each holder, summed from the ownership segments (history-derived).
+function holderTotals(c) {
+  const tot = { triage: 0, fit: 0, hq: 0, sanity: 0, requester: 0 };
+  for (const s of ownershipSegments(c)) {
+    if (s.holder in tot) tot[s.holder] += Math.max(0, s.end - s.start);
+  }
+  return tot;
+}
+
+const HOLDER_META = {
+  triage:    { label: 'First line',       cls: 'tl-triage' },
+  fit:       { label: 'Local FIT',        cls: 'tl-fit' },
+  hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
+  sanity:    { label: 'Sanity check',     cls: 'tl-sanity' },
+  requester: { label: 'With requester',   cls: 'tl-requester' },
+  done:      { label: 'Closed',           cls: 'tl-done' },
+};
+
+function renderOwnershipTimeline(c) {
+  const segs = ownershipSegments(c);
+  if (segs.length === 0) {
+    return '<div class="muted tiny">The timeline appears here as the case moves between owners.</div>';
+  }
+  const first = segs[0].start;
+  const last = segs[segs.length - 1].end;
+  const span = Math.max(1, last - first);
+
+  const bar = segs.map(s => {
+    const m = HOLDER_META[s.holder] || HOLDER_META.triage;
+    const dur = s.end - s.start;
+    const pct = (dur / span) * 100;
+    const tip = `${m.label} · ${fmtDuration(dur)} · from ${fmtAbsolute(new Date(s.start).toISOString())}${s.label ? ' · ' + s.label : ''}`;
+    return `<div class="tl-seg ${m.cls}" style="width:${pct}%" title="${escapeHtml(tip)}">${pct > 14 ? escapeHtml(m.label) : ''}</div>`;
+  }).join('');
+
+  const totals = holderTotals(c);
+  const legend = Object.keys(totals).filter(k => totals[k] > 0).map(k => {
+    const m = HOLDER_META[k] || HOLDER_META.triage;
+    return `<span class="tl-key"><span class="tl-dot ${m.cls}"></span>${escapeHtml(m.label)} <span class="muted">${fmtDuration(totals[k])}</span></span>`;
+  }).join('');
+
+  const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
+  // A timestamp marker at every transition (segment start) plus the end (now / closed).
+  const bounds = segs.map(s => s.start).concat([last]);
+  let prevPct = -99;
+  const marks = bounds.map((b, i) => {
+    const pct = ((b - first) / span) * 100;
+    const isEnd = i === bounds.length - 1;
+    const label = (isEnd && !terminal) ? 'now' : fmtClockShort(new Date(b).toISOString());
+    const row = (pct - prevPct < 7) ? 1 : 0;  // stagger markers that sit too close together
+    prevPct = pct;
+    const horiz = pct <= 1 ? 'left:0;text-align:left'
+      : pct >= 99 ? 'left:100%;transform:translateX(-100%);text-align:right'
+        : `left:${pct}%;transform:translateX(-50%)`;
+    return `<span class="tl-mark" style="${horiz};top:${row * 13}px" title="${escapeHtml(fmtAbsolute(new Date(b).toISOString()))}">${escapeHtml(label)}</span>`;
+  }).join('');
+
+  return `
+    <div class="timeline" role="img" aria-label="Ownership timeline">${bar}</div>
+    <div class="tl-marks">${marks}</div>
+    <div class="tl-legend">${legend}</div>
+  `;
+}
+
 function renderCaseDetailBody(c) {
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
 
   const slaMs = caseSlaMs(c);
-  const fitMs = caseHoldMs(c, 'fit');
-  const hqMs = caseHoldMs(c, 'hq');
+  // FIT/HQ time spent is derived from the ownership timeline so the clocks and the
+  // timeline legend always agree (same source: the case history).
+  const hold = holderTotals(c);
+  const fitMs = hold.fit;
+  const hqMs = hold.hq;
 
   const handoverHtml = c.handover ? `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
@@ -702,19 +973,28 @@ function renderCaseDetailBody(c) {
       <div>
         <div class="card"><div class="card-body">
           <div class="detail-section">
-            <h3>Two clocks</h3>
+            <h3>Clocks</h3>
             <div class="clock-grid">
               <div class="clock">
-                <div class="label">SLA clock (time on us)</div>
+                <div class="label">SLA · time on us</div>
                 <div class="value">${fmtDuration(slaMs)}</div>
                 <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
               </div>
               <div class="clock">
-                <div class="label">Owner-hold totals</div>
-                <div class="value mono" style="font-size:13px;">FIT ${fmtDuration(fitMs)} · HQ ${fmtDuration(hqMs)}</div>
-                <div class="state ${c.currentOwner ? 'running' : ''}">${c.currentOwner ? `Active: ${c.currentOwner.toUpperCase()}` : 'No active owner'}</div>
+                <div class="label">Local FIT</div>
+                <div class="value">${fmtDuration(fitMs)}</div>
+                <div class="state ${c.currentOwner === 'fit' ? 'running' : ''}">${c.currentOwner === 'fit' ? 'Holding now' : 'Idle'}</div>
+              </div>
+              <div class="clock">
+                <div class="label">HQ Product Team</div>
+                <div class="value">${fmtDuration(hqMs)}</div>
+                <div class="state ${c.currentOwner === 'hq' ? 'running' : ''}">${c.currentOwner === 'hq' ? 'Holding now' : 'Idle'}</div>
               </div>
             </div>
+          </div>
+          <div class="detail-section">
+            <h3>Ownership timeline</h3>
+            ${renderOwnershipTimeline(c)}
           </div>
           <div class="detail-section">
             <h3>Handover (latest)</h3>
@@ -735,15 +1015,16 @@ function renderCaseDetailBody(c) {
         <div class="card"><div class="card-body">
           <div class="detail-section">
             <h3>Routing</h3>
-            <div class="detail-row"><span class="k">Requester</span><span class="v">${escapeHtml(c.requester)}</span></div>
+            <div class="detail-row"><span class="k">Requester</span><span class="v">${c.requester ? escapeHtml(c.requester) : '<span class="muted">—</span>'}${c.requesterDept ? ` <span class="muted">· ${escapeHtml(c.requesterDept)}</span>` : ''}</span></div>
+            ${c.reporterId ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporterId)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
+            ${c.assigneeId ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assigneeId)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
             <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
-            <div class="detail-row"><span class="k">Current owner</span><span class="v">${c.currentOwner ? c.currentOwner.toUpperCase() : '<span class="muted">unassigned</span>'}</span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
           <div class="detail-section">
             <h3>Filing</h3>
-            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(statusLabel(c.status))}</span></div>
+            <div class="detail-row"><span class="k">Status</span><span class="v">${escapeHtml(displayStatus(c))}</span></div>
             <div class="detail-row"><span class="k">Case type</span><span class="v">${escapeHtml(c.caseType)}</span></div>
             <div class="detail-row"><span class="k">Week</span><span class="v">${escapeHtml(c.weekId)}</span></div>
             <div class="detail-row"><span class="k">Created</span><span class="v">${fmtAbsolute(c.createdAt)} · ${escapeHtml(c.createdBy)}</span></div>
@@ -769,7 +1050,7 @@ function renderCaseDetail(id) {
         <div class="row-flex">
           <a class="btn-link" href="${escapeHtml(STATE.lastListRoute)}">← ${escapeHtml(STATE.lastListLabel)}</a>
           <span class="mono muted">${c.id}</span>
-          <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+          <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
           ${flags}
         </div>
@@ -843,61 +1124,6 @@ function statusTransitions(c) {
     t.push({ kind: 'cancel', label: 'Cancel case', danger: true });
   }
   return t;
-}
-
-/* ---------- Shift Handover view ---------- */
-
-function renderHandover() {
-  const op = getOperator(STATE.operatorId);
-  const open = STATE.cases.filter(c => !['closed', 'cancelled', 'new'].includes(c.status));
-  const fresh = open.filter(c => c.handover && !c.handover.staleForCurrentShift && c.handover.author === op.id);
-  const stale = open.filter(c => c.handover && (c.handover.staleForCurrentShift || c.handover.author !== op.id));
-  const missing = open.filter(c => !c.handover);
-
-  const rows = [...missing, ...stale, ...fresh].map(c => {
-    let status = '<span class="note-status fresh">Note current</span>';
-    if (!c.handover) status = '<span class="note-status missing">No note</span>';
-    else if (c.handover.staleForCurrentShift || c.handover.author !== op.id) {
-      status = `<span class="note-status stale">Stale (${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)})</span>`;
-    }
-    return `
-      <div class="case-row">
-        <div>
-          <div class="row-flex">
-            <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
-          </div>
-          <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
-          <div class="meta">On us: ${fmtDuration(caseSlaMs(c))} · last contact ${fmtRelative(c.lastOwnerContact?.at)}</div>
-        </div>
-        <div>${status}</div>
-        <div>
-          <button class="btn btn-primary" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write note</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const blockers = missing.length + stale.length;
-
-  return `
-    <div class="page-header">
-      <div>
-        <h1>Shift Handover</h1>
-        <div class="subtitle">Manual cutover. Every open case must have a note authored during this shift.</div>
-      </div>
-    </div>
-    <div class="handover-bar">
-      <div class="progress-text">
-        <strong>${fresh.length}</strong> of <strong>${open.length}</strong> open cases have a current ${op.shift}-shift note.
-        ${blockers > 0 ? `<span class="muted"> · ${blockers} pending.</span>` : ''}
-      </div>
-      <div>
-        <button class="btn btn-primary" id="complete-handover" ${blockers > 0 ? 'disabled' : ''}>Complete handover</button>
-      </div>
-    </div>
-    <div class="handover-list">${rows || '<div class="queue-empty">No open cases requiring handover.</div>'}</div>
-  `;
 }
 
 /* ---------- Weekly Archive ---------- */
@@ -975,7 +1201,7 @@ function renderArchiveWeek(weekId) {
         <td>${escapeHtml(c.requester)}</td>
         <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
-        <td><span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span> ${flags}${carry}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
       </tr>
@@ -1042,6 +1268,450 @@ function shiftStats(shiftName) {
   return { handedTo, handedFrom, writtenByShift, missingForShift, opIds };
 }
 
+/* ---------- Roster editor (Shifts page) ---------- */
+
+// Unique operator id suggested from a name (prefers initials in parentheses, e.g.
+// "Sam (SA)" -> op-sa), unique against the current operators.
+function makeOpId(name, exceptIndex) {
+  const paren = (String(name).match(/\(([^)]+)\)/) || [])[1];
+  const base = (paren || name || 'op').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 12) || 'op';
+  const want = 'op-' + base;
+  const taken = new Set(window.OPERATORS.filter((_, i) => i !== exceptIndex).map(o => o.id));
+  if (!taken.has(want)) return want;
+  let n = 2; while (taken.has(want + n)) n++;
+  return want + n;
+}
+
+// Keep each shift's operatorIds derived from operators' shift assignment.
+function syncShiftRosters() {
+  window.SHIFTS.forEach(s => {
+    s.operatorIds = window.OPERATORS.filter(o => o.shift === s.name).map(o => o.id);
+  });
+}
+
+// How many records would be orphaned if this operator id were removed.
+function operatorRefCounts(id) {
+  let created = 0, history = 0, handover = 0;
+  for (const c of STATE.cases) {
+    if (c.createdBy === id) created++;
+    if (c.handover && c.handover.author === id) handover++;
+    for (const h of (c.history || [])) if (h.who === id) history++;
+  }
+  return { created, history, handover, total: created + history + handover };
+}
+
+function rosterSnippet() {
+  const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const ops = window.OPERATORS.map(o => `  { id: ${q(o.id)}, name: ${q(o.name)}, shift: ${q(o.shift)} },`).join('\n');
+  const shifts = window.SHIFTS.map(s => {
+    const roster = window.OPERATORS.filter(o => o.shift === s.name).map(o => q(o.id));
+    return `  { name: ${q(s.name)}, hoursUtc: ${q(s.hoursUtc)}, operatorIds: [${roster.join(', ')}] },`;
+  }).join('\n');
+  const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
+    ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
+  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};`;
+}
+
+function rosterWarnings() {
+  const w = [];
+  const ids = window.OPERATORS.map(o => o.id);
+  [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate operator ID: ${id}` }));
+  window.OPERATORS.forEach(o => {
+    if (!String(o.name).trim()) w.push({ err: 1, msg: 'An operator is missing a name.' });
+    if (!window.SHIFTS.some(s => s.name === o.shift)) w.push({ err: 1, msg: `Operator "${o.name || o.id}" is on a shift that doesn't exist.` });
+  });
+  const sn = window.SHIFTS.map(s => s.name);
+  [...new Set(sn.filter((n, i) => n && sn.indexOf(n) !== i))].forEach(n => w.push({ err: 1, msg: `Duplicate shift name: ${n}` }));
+  window.SHIFTS.forEach(s => { if (s.name && !window.OPERATORS.some(o => o.shift === s.name)) w.push({ err: 0, msg: `Shift "${s.name}" has no operators.` }); });
+  return w;
+}
+
+function renderRosterEditor() {
+  const shiftRows = window.SHIFTS.map((s, i) => `
+    <tr data-si="${i}">
+      <td><input data-sf="name" value="${escapeHtml(s.name)}" placeholder="Day"></td>
+      <td><input data-sf="hoursUtc" value="${escapeHtml(s.hoursUtc)}" placeholder="08:00 – 20:00 UTC"></td>
+      <td class="re-x"><button class="btn-ghost re-del-shift" data-si="${i}" title="Remove shift">✕</button></td>
+    </tr>`).join('');
+  const shiftOpts = window.SHIFTS.map(s => s.name);
+  const opRows = window.OPERATORS.map((o, i) => {
+    const refs = operatorRefCounts(o.id);
+    const sel = shiftOpts.map(n => `<option value="${escapeHtml(n)}"${n === o.shift ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')
+      + (shiftOpts.includes(o.shift) ? '' : `<option selected value="${escapeHtml(o.shift)}">${escapeHtml(o.shift)} (missing)</option>`);
+    return `
+    <tr data-oi="${i}">
+      <td><input data-of="name" value="${escapeHtml(o.name)}" placeholder="Sam (SA)"></td>
+      <td><select data-of="shift">${sel}</select></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id)}" placeholder="op-…"></td>
+      <td class="re-refs tiny ${refs.total ? '' : 'muted'}" title="cases created · history entries · handover notes referencing this operator">${refs.total ? refs.total + ' ref' + (refs.total === 1 ? '' : 's') : '—'}</td>
+      <td class="re-x"><button class="btn-ghost re-del-op" data-oi="${i}" title="Remove operator">✕</button></td>
+    </tr>`;
+  }).join('');
+  const curOpts = window.OPERATORS.map(o => `<option value="${escapeHtml(o.id)}"${o.id === window.CURRENT_OPERATOR_ID ? ' selected' : ''}>${escapeHtml(o.name)} — ${escapeHtml(o.shift)}</option>`).join('');
+  const warns = rosterWarnings();
+  const warnHtml = warns.length
+    ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
+    : `<div class="re-ok">✓ ${window.OPERATORS.length} operator(s) across ${window.SHIFTS.length} shift(s).</div>`;
+
+  return `
+  <div class="card roster-editor" id="roster-editor">
+    <div class="card-header">
+      <span>Edit shifts &amp; operators</span>
+      <span class="muted tiny">Session only · paste the snippet into <code>shifts.js</code> to keep changes · "Reset to seed" undoes them</span>
+    </div>
+    <div class="card-body">
+      <div class="detail-section">
+        <h3>Shifts</h3>
+        <table class="re-table"><thead><tr><th>Shift</th><th>Hours (UTC)</th><th class="re-x"></th></tr></thead><tbody>${shiftRows}</tbody></table>
+        <div class="re-actions"><button class="btn" id="re-add-shift">+ Add shift</button></div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Operators</h3>
+        <table class="re-table"><thead><tr><th>Name</th><th>Shift</th><th>ID</th><th>Refs</th><th class="re-x"></th></tr></thead><tbody>${opRows}</tbody></table>
+        <div class="re-actions">
+          <button class="btn" id="re-add-op">+ Add operator</button>
+          <span class="muted tiny" style="margin-left:auto">Default operator ("you")</span>
+          <select id="re-current" class="re-select">${curOpts}</select>
+        </div>
+      </div>
+
+      ${warnHtml}
+
+      <div class="detail-section" style="margin-bottom:0">
+        <div class="re-out-head">
+          <h3 style="margin:0">Snippet for <code>shifts.js</code></h3>
+          <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="re-save">Save to shifts.js</button> ' : ''}<button class="btn" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
+        </div>
+        <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Foolproof operator removal: never delete the last operator; reassign or knowingly
+// orphan any records that reference the operator; move the "default operator" if needed.
+function deleteOperator(i) {
+  const o = window.OPERATORS[i];
+  if (!o) return;
+  if (window.OPERATORS.length <= 1) { showToast('At least one operator is required.', 'warn'); return; }
+
+  const refs = operatorRefCounts(o.id);
+  const isDefault = window.CURRENT_OPERATOR_ID === o.id || STATE.operatorId === o.id;
+  const others = window.OPERATORS.filter((_, j) => j !== i);
+  const reassignOpts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)} (${escapeHtml(x.shift)})</option>`).join('');
+  const refBox = refs.total
+    ? `<div class="re-refbox"><strong>${escapeHtml(o.name || o.id)}</strong> is referenced by:
+         <ul><li>${refs.created} case(s) created</li><li>${refs.history} history entr${refs.history === 1 ? 'y' : 'ies'}</li><li>${refs.handover} active handover note(s)</li></ul></div>`
+    : '<div class="muted tiny">No cases reference this operator — safe to remove.</div>';
+
+  showModal(`
+    <h3>Delete operator “${escapeHtml(o.name || o.id)}”?</h3>
+    <div class="modal-sub mono tiny">${escapeHtml(o.id)}${isDefault ? ' · current default operator' : ''}</div>
+    ${refBox}
+    ${refs.total ? `
+      <div class="re-modesel">
+        <div style="font-weight:600;margin:10px 0 4px">What happens to those records?</div>
+        <label class="re-radio"><input type="radio" name="re-mode" value="reassign" checked> <span>Reassign them to another operator <span class="muted">(recommended — no broken references)</span></span></label>
+        <select data-field="to">${reassignOpts}</select>
+        <label class="re-radio"><input type="radio" name="re-mode" value="orphan"> <span>Delete anyway <span class="muted">— leaves records pointing at the removed ID</span></span></label>
+      </div>
+    ` : `<input type="hidden" data-field="to" value="${escapeHtml(others[0].id)}">`}
+    ${isDefault ? '<div class="muted tiny" style="margin-top:8px">The default operator will move to the reassignment target (or the first remaining operator).</div>' : ''}
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-danger" data-modal-submit>Delete operator</button>
+    </div>`,
+    (m) => {
+      const modeEl = m.querySelector('input[name="re-mode"]:checked');
+      const mode = modeEl ? modeEl.value : 'reassign';
+      const toField = m.querySelector('[data-field="to"]');
+      const toId = toField ? toField.value : others[0].id;
+      const reassign = refs.total > 0 && mode === 'reassign';
+      if (reassign) {
+        for (const c of STATE.cases) {
+          if (c.createdBy === o.id) c.createdBy = toId;
+          if (c.handover && c.handover.author === o.id) c.handover.author = toId;
+          for (const h of (c.history || [])) if (h.who === o.id) h.who = toId;
+        }
+      }
+      const idx = window.OPERATORS.findIndex(x => x.id === o.id);
+      window.OPERATORS.splice(idx, 1);
+      const fallback = reassign ? toId : window.OPERATORS[0].id;
+      if (window.CURRENT_OPERATOR_ID === o.id) window.CURRENT_OPERATOR_ID = fallback;
+      if (STATE.operatorId === o.id) STATE.operatorId = fallback;
+      syncShiftRosters();
+      showToast(
+        `Operator removed${refs.total ? (reassign ? `; records reassigned to ${getOperator(toId)?.name || toId}` : '; references left pointing at the old ID') : ''}.`,
+        refs.total && !reassign ? 'warn' : 'success'
+      );
+      render();
+      return true;
+    });
+}
+
+function deleteShift(i) {
+  const s = window.SHIFTS[i];
+  if (!s) return;
+  if (window.SHIFTS.length <= 1) { showToast('At least one shift is required.', 'warn'); return; }
+  const members = window.OPERATORS.filter(o => o.shift === s.name);
+  if (members.length === 0) {
+    showModal(`<h3>Delete shift “${escapeHtml(s.name)}”?</h3>
+      <div class="modal-sub">No operators are on this shift.</div>
+      <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Delete shift</button></div>`,
+      () => {
+        window.SHIFTS.splice(window.SHIFTS.findIndex(x => x === s), 1);
+        syncShiftRosters(); showToast('Shift deleted.', 'info'); render(); return true;
+      });
+    return;
+  }
+  const opts = window.SHIFTS.filter((_, j) => j !== i).map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('');
+  showModal(`<h3>Delete shift “${escapeHtml(s.name)}”?</h3>
+    <div class="modal-sub">${members.length} operator(s) are on this shift; move them first.</div>
+    <label>Reassign operators to</label>
+    <select data-field="to">${opts}</select>
+    <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Reassign &amp; delete</button></div>`,
+    (m) => {
+      const to = m.querySelector('[data-field="to"]').value;
+      members.forEach(o => { o.shift = to; });
+      window.SHIFTS.splice(window.SHIFTS.findIndex(x => x === s), 1);
+      syncShiftRosters(); showToast(`Shift deleted; ${members.length} operator(s) moved to ${to}.`, 'success'); render(); return true;
+    });
+}
+
+function bindRosterEditor() {
+  const ed = document.getElementById('roster-editor');
+  if (!ed) return;
+  const refreshOutput = () => { const ta = document.getElementById('roster-output'); if (ta) ta.value = rosterSnippet(); };
+
+  // Text inputs update the live roster but DON'T re-render (so typing keeps focus).
+  ed.querySelectorAll('input[data-sf]').forEach(inp => inp.addEventListener('input', () => {
+    const i = +inp.closest('tr').dataset.si, f = inp.dataset.sf;
+    if (f === 'name') {
+      const old = window.SHIFTS[i].name;
+      window.SHIFTS[i].name = inp.value;
+      window.OPERATORS.forEach(o => { if (o.shift === old) o.shift = inp.value; });
+      syncShiftRosters();
+    } else {
+      window.SHIFTS[i][f] = inp.value;
+    }
+    refreshOutput();
+  }));
+  ed.querySelectorAll('input[data-of]').forEach(inp => inp.addEventListener('input', () => {
+    const tr = inp.closest('tr');
+    const i = +tr.dataset.oi, f = inp.dataset.of, o = window.OPERATORS[i];
+    if (f === 'name') {
+      o.name = inp.value;
+      // Auto-suggest the id from the name until the user edits the id directly.
+      if (!o._idEdited) {
+        o.id = o.name.trim() ? makeOpId(o.name, i) : '';
+        const idInput = tr.querySelector('input[data-of="id"]');
+        if (idInput) idInput.value = o.id;
+      }
+    } else if (f === 'id') {
+      o.id = inp.value;
+      o._idEdited = true;
+    } else {
+      o[f] = inp.value;
+    }
+    refreshOutput();
+  }));
+  ed.querySelectorAll('select[data-of="shift"]').forEach(sel => sel.addEventListener('change', () => {
+    const i = +sel.closest('tr').dataset.oi;
+    window.OPERATORS[i].shift = sel.value;
+    syncShiftRosters();
+    refreshOutput();
+  }));
+  document.getElementById('re-current')?.addEventListener('change', e => { window.CURRENT_OPERATOR_ID = e.target.value; refreshOutput(); });
+  document.getElementById('re-add-shift')?.addEventListener('click', () => { window.SHIFTS.push({ name: '', hoursUtc: '', operatorIds: [] }); render(); });
+  document.getElementById('re-add-op')?.addEventListener('click', () => {
+    // id starts blank and auto-derives from the name as you type (until edited directly).
+    window.OPERATORS.push({ id: '', name: '', shift: window.SHIFTS[0] ? window.SHIFTS[0].name : '', _idEdited: false });
+    syncShiftRosters(); render();
+  });
+  ed.querySelectorAll('.re-del-shift').forEach(btn => btn.addEventListener('click', () => deleteShift(+btn.dataset.si)));
+  ed.querySelectorAll('.re-del-op').forEach(btn => btn.addEventListener('click', () => deleteOperator(+btn.dataset.oi)));
+  document.getElementById('re-save')?.addEventListener('click', () => saveJsFile('shifts', rosterSnippet(), 'shifts.js'));
+  document.getElementById('re-copy')?.addEventListener('click', async () => {
+    const ta = document.getElementById('roster-output');
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', ''); }
+    const c = document.getElementById('re-copied'); if (c) { c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200); }
+  });
+}
+
+/* ---------- Owners editor (Owners page) ---------- */
+
+function makeOwnerId(pool, name, exceptIndex) {
+  // Drop boilerplate words so "FIT — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
+  const cleaned = String(name || '').toLowerCase().replace(/\b(fit|hq|desk|team|product|the)\b/g, ' ');
+  const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || pool;
+  const want = pool + '-' + base;
+  const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
+  if (!taken.has(want)) return want;
+  let n = 2; while (taken.has(want + n)) n++;
+  return want + n;
+}
+
+function ownerRefCounts(pool, id) {
+  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  let n = 0;
+  for (const c of STATE.cases) if (c[field] === id) n++;
+  return n;
+}
+
+function ownersSnippet() {
+  const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const fit = window.OWNERS.fit.map(o =>
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+  const hq = window.OWNERS.hq.map(o =>
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+  return `window.OWNERS = {\n  fit: [\n${fit}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
+}
+
+function ownersWarnings() {
+  const w = [];
+  ['fit', 'hq'].forEach(pool => {
+    const ids = window.OWNERS[pool].map(o => o.id);
+    [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate ${pool.toUpperCase()} id: ${id}` }));
+    window.OWNERS[pool].forEach(o => {
+      if (!String(o.name).trim()) w.push({ err: 1, msg: `A ${pool.toUpperCase()} owner is missing a name.` });
+      if (!String(o.id).trim()) w.push({ err: 1, msg: `A ${pool.toUpperCase()} owner is missing an id.` });
+    });
+  });
+  return w;
+}
+
+function renderOwnerRows(pool) {
+  const key = pool === 'fit' ? 'region' : 'area';
+  return window.OWNERS[pool].map((o, i) => {
+    const refs = ownerRefCounts(pool, o.id);
+    return `
+    <tr data-pool="${pool}" data-oi="${i}">
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'FIT — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
+      <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
+      <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
+      <td><input data-of="channel" value="${escapeHtml(o.channel || '')}" placeholder="Slack / JIRA"></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool}-…"></td>
+      <td class="re-refs tiny ${refs ? '' : 'muted'}" title="cases routed to this owner">${refs ? refs + ' ref' + (refs === 1 ? '' : 's') : '—'}</td>
+      <td class="re-x"><button class="btn-ghost re-del-owner" data-pool="${pool}" data-oi="${i}" title="Remove">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOwnersTable(pool, label, regionLabel) {
+  return `
+    <div class="detail-section">
+      <h3>${escapeHtml(label)}</h3>
+      <div class="re-scroll"><table class="re-table"><thead><tr>
+        <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
+      </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'FIT desk' : 'HQ team'}</button></div>
+    </div>`;
+}
+
+function renderOwnersPage() {
+  const warns = ownersWarnings();
+  const warnHtml = warns.length
+    ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
+    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} FIT desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+  return `
+    <div class="page-header"><div>
+      <h1>Owners</h1>
+      <div class="subtitle">Local FIT desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
+    </div></div>
+    <div class="card roster-editor" id="owners-editor">
+      <div class="card-header"><span>Edit FIT desks &amp; HQ teams</span></div>
+      <div class="card-body">
+        ${renderOwnersTable('fit', 'Local FIT desks', 'Region')}
+        ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
+        ${warnHtml}
+        <div class="detail-section" style="margin-bottom:0">
+          <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
+            <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="owners-save">Save to owners.js</button> ' : ''}<button class="btn" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
+          <textarea class="re-output" id="owners-output" readonly spellcheck="false">${escapeHtml(ownersSnippet())}</textarea>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Foolproof delete: reassign the cases routed to this owner, or knowingly orphan them.
+function deleteOwner(pool, i) {
+  const o = window.OWNERS[pool][i];
+  if (!o) return;
+  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  const kind = pool === 'fit' ? 'FIT desk' : 'HQ team';
+  const refs = ownerRefCounts(pool, o.id);
+  const others = window.OWNERS[pool].filter((_, j) => j !== i);
+  const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
+  const refBox = refs
+    ? `<div class="re-refbox"><strong>${escapeHtml(o.name || o.id)}</strong> is routed ${refs} case${refs === 1 ? '' : 's'}.</div>`
+    : '<div class="muted tiny">No cases are routed to this owner — safe to remove.</div>';
+  showModal(`
+    <h3>Delete ${kind} “${escapeHtml(o.name || o.id)}”?</h3>
+    <div class="modal-sub mono tiny">${escapeHtml(o.id)}</div>
+    ${refBox}
+    ${refs ? (others.length ? `
+      <div class="re-modesel">
+        <div style="font-weight:600;margin:10px 0 4px">What about those cases?</div>
+        <label class="re-radio"><input type="radio" name="own-mode" value="reassign" checked> <span>Reassign them to another ${kind}</span></label>
+        <select data-field="to">${opts}</select>
+        <label class="re-radio"><input type="radio" name="own-mode" value="orphan"> <span>Delete anyway <span class="muted">— those cases lose their ${pool.toUpperCase()} owner</span></span></label>
+      </div>` : `<div class="muted tiny" style="margin-top:8px">No other ${kind} to reassign to — those cases will lose their ${pool.toUpperCase()} owner.</div>`) : ''}
+    <div class="modal-actions"><button class="btn" data-modal-cancel>Cancel</button><button class="btn btn-danger" data-modal-submit>Delete</button></div>`,
+    (m) => {
+      const modeEl = m.querySelector('input[name="own-mode"]:checked');
+      const mode = modeEl ? modeEl.value : 'orphan';
+      const toEl = m.querySelector('[data-field="to"]');
+      if (refs && mode === 'reassign' && toEl) {
+        const toId = toEl.value;
+        for (const c of STATE.cases) if (c[field] === o.id) c[field] = toId;
+      } else if (refs) {
+        for (const c of STATE.cases) if (c[field] === o.id) c[field] = null;
+      }
+      const idx = window.OWNERS[pool].indexOf(o);
+      if (idx >= 0) window.OWNERS[pool].splice(idx, 1);
+      showToast(`Removed ${o.name || o.id}.`, (refs && mode !== 'reassign') ? 'warn' : 'success');
+      render();
+      return true;
+    });
+}
+
+function bindOwnersEditor() {
+  const ed = document.getElementById('owners-editor');
+  if (!ed) return;
+  const refresh = () => { const ta = document.getElementById('owners-output'); if (ta) ta.value = ownersSnippet(); };
+  ed.querySelectorAll('input[data-of]').forEach(inp => inp.addEventListener('input', () => {
+    const tr = inp.closest('tr');
+    const pool = tr.dataset.pool, i = +tr.dataset.oi, f = inp.dataset.of, o = window.OWNERS[pool][i];
+    if (f === 'name') {
+      o.name = inp.value;
+      if (!o._idEdited) { o.id = o.name.trim() ? makeOwnerId(pool, o.name, i) : ''; const idIn = tr.querySelector('input[data-of="id"]'); if (idIn) idIn.value = o.id; }
+    } else if (f === 'id') {
+      o.id = inp.value; o._idEdited = true;
+    } else {
+      o[f] = inp.value;
+    }
+    refresh();
+  }));
+  ed.querySelectorAll('[data-add-owner]').forEach(btn => btn.addEventListener('click', () => {
+    const pool = btn.dataset.addOwner;
+    window.OWNERS[pool].push(pool === 'fit'
+      ? { id: '', name: '', region: '', tz: 'America/Phoenix', office: '08:00–17:00', channel: '', _idEdited: false }
+      : { id: '', name: '', area: '', tz: 'Asia/Taipei', office: '09:00–18:00', channel: '', _idEdited: false });
+    render();
+  }));
+  ed.querySelectorAll('.re-del-owner').forEach(btn => btn.addEventListener('click', () => deleteOwner(btn.dataset.pool, +btn.dataset.oi)));
+  document.getElementById('owners-save')?.addEventListener('click', () => saveJsFile('owners', ownersSnippet(), 'owners.js'));
+  document.getElementById('owners-copy')?.addEventListener('click', async () => {
+    const ta = document.getElementById('owners-output');
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch (_) { ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly', ''); }
+    const c = document.getElementById('owners-copied'); if (c) { c.classList.add('show'); setTimeout(() => c.classList.remove('show'), 1200); }
+  });
+}
+
 function renderShiftsIndex() {
   const cards = window.SHIFTS.map(sh => {
     const s = shiftStats(sh.name);
@@ -1054,7 +1724,7 @@ function renderShiftsIndex() {
     return `
       <a class="shift-card ${isCurrent ? 'is-current' : ''}" href="#/shifts/${encodeURIComponent(sh.name)}">
         <div class="shift-name">${escapeHtml(sh.name)} shift ${isCurrent ? '<span class="badge-current">On now</span>' : ''}</div>
-        <div class="shift-hours">${escapeHtml(sh.hoursUtc)}</div>
+        <div class="shift-hours" title="${escapeHtml(sh.hoursUtc)}">${escapeHtml(fmtShiftHoursLocal(sh.hoursUtc))}</div>
         <div class="roster">${ops}</div>
         <div class="stats">
           <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Handed to</div></div>
@@ -1072,6 +1742,7 @@ function renderShiftsIndex() {
       </div>
     </div>
     <div class="shift-grid">${cards}</div>
+    ${renderRosterEditor()}
   `;
 }
 
@@ -1095,7 +1766,7 @@ function renderShiftDetail(shiftName) {
         <div>
           <div class="row-flex">
             <a class="mono" href="#/cases/${c.id}">${c.id}</a>
-            <span class="pill pill-${c.status}">${escapeHtml(statusLabel(c.status))}</span>
+            <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           </div>
           <div style="font-weight:500; margin-top:4px;">${escapeHtml(c.subject)}</div>
         </div>
@@ -1138,7 +1809,7 @@ function renderShiftDetail(shiftName) {
           ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}
         </div>
         <h1 style="margin-top:8px">${escapeHtml(sh.name)} shift</h1>
-        <div class="subtitle">${escapeHtml(sh.hoursUtc)} · handover boundary with ${escapeHtml(otherShift)} shift</div>
+        <div class="subtitle" title="${escapeHtml(sh.hoursUtc)}">${escapeHtml(fmtShiftHoursLocal(sh.hoursUtc))} · handover boundary with ${escapeHtml(otherShift)} shift</div>
       </div>
     </div>
 
@@ -1689,14 +2360,15 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'toggle_queue') {
-    c.queue = !c.queue;
+    const nowQueued = !isQueued(c);
+    c.agentStatus = nowQueued ? 'queued' : 'unqueued';
     c.history.push({
       at: new Date(NOW).toISOString(),
       who: op.id,
-      kind: c.queue ? 'queue_added' : 'queue_removed',
-      detail: c.queue ? 'Added to Action Queue' : 'Removed from Action Queue',
+      kind: nowQueued ? 'queue_added' : 'queue_removed',
+      detail: nowQueued ? 'Added to agent queue (top band)' : 'Removed from agent queue (back to backlog)',
     });
-    showToast(c.queue ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
+    showToast(nowQueued ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
     render();
     return;
   }
@@ -1783,98 +2455,57 @@ function handlePrompt(caseId, kind) {
 }
 
 function handleNewCase(op) {
+  if (!/^https?:$/.test(location.protocol)) {
+    showToast('Adding a case by ID requires running the board via serve.py.', 'warn');
+    return;
+  }
   showModal(`
-    <h3>Create a new case</h3>
-    <div class="modal-sub">Starts in <span class="pill pill-new">New</span>. Use the Change status… dropdown to assign it to Local FIT once created.</div>
-    <label>Subject *</label>
-    <input type="text" data-field="subject" placeholder="What's the issue?">
-    <label>Requester *</label>
-    <input type="text" data-field="requester" placeholder="Name of the person / team who reported it">
-    <label>Case-center link</label>
-    <input type="text" data-field="caseLink" placeholder="https://case-center.example/CC-…">
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      <div>
-        <label>Priority</label>
-        <select data-field="priority">
-          <option value="low">low</option>
-          <option value="medium" selected>medium</option>
-          <option value="high">high</option>
-        </select>
-      </div>
-      <div>
-        <label>Case type</label>
-        <select data-field="caseType">
-          <option value="access">access</option>
-          <option value="data">data</option>
-          <option value="network">network</option>
-          <option value="mobile">mobile</option>
-          <option value="productivity">productivity</option>
-          <option value="service">service</option>
-          <option value="other">other</option>
-        </select>
-      </div>
-    </div>
-    <label>Flags</label>
-    <div style="display:flex; gap:14px; padding:4px 0;">
-      <label class="inline-check"><input type="checkbox" data-field="weekend"> Weekend case</label>
-      <label class="inline-check"><input type="checkbox" data-field="escalated"> Escalated (watch)</label>
-    </div>
-    <label>Notes</label>
-    <textarea data-field="notes" placeholder="Anything important to capture upfront…"></textarea>
+    <h3>Add a case by ID</h3>
+    <div class="modal-sub">Pulls this case from Case Center by its ID and adds it to the board.</div>
+    <label>Case ID *</label>
+    <input type="text" data-field="caseId" placeholder="e.g. 581234">
     <div class="modal-actions">
       <button class="btn" data-modal-cancel>Cancel</button>
-      <button class="btn btn-primary" data-modal-submit>Create case</button>
+      <button class="btn btn-primary" data-modal-submit>Fetch &amp; add</button>
     </div>
   `, (modal) => {
-    const subject = modal.querySelector('[data-field="subject"]').value.trim();
-    const requester = modal.querySelector('[data-field="requester"]').value.trim();
-    if (!subject || !requester) { alert('Subject and Requester are required.'); return false; }
-
-    const nums = STATE.cases
-      .map(c => parseInt((c.id || '').replace(/^C-/, ''), 10))
-      .filter(n => !isNaN(n));
-    const newId = `C-${Math.max(1040, ...nums) + 1}`;
-    const nowIso = new Date(NOW).toISOString().replace('.000Z', 'Z');
-
-    const flags = [];
-    if (modal.querySelector('[data-field="weekend"]').checked) flags.push('weekend');
-    if (modal.querySelector('[data-field="escalated"]').checked) flags.push('escalated');
-
-    const newCase = {
-      id: newId,
-      caseLink: modal.querySelector('[data-field="caseLink"]').value.trim() || `https://case-center.example/CC-${newId.replace('C-', '')}`,
-      subject,
-      requester,
-      fitId: null,
-      hqId: null,
-      currentOwner: null,
-      status: 'new',
-      flags,
-      priority: modal.querySelector('[data-field="priority"]').value,
-      caseType: modal.querySelector('[data-field="caseType"]').value,
-      weekId: window.CURRENT_WEEK.id,
-      slaStartedAt: nowIso,
-      slaPaused: false,
-      slaAccumulatedMs: 0,
-      holdMs: { fit: 0, hq: 0 },
-      holdStartedAt: null,
-      lastOwnerContact: null,
-      handover: null,
-      notes: modal.querySelector('[data-field="notes"]').value.trim(),
-      createdAt: nowIso,
-      createdBy: op.id,
-      history: [
-        { at: nowIso, who: op.id, kind: 'created', detail: 'Case created manually' },
-      ],
-    };
-
-    STATE.cases.unshift(newCase);
-    STATE.kanbanSelected = newId;
-    showToast(`Created ${newId}. It's in the New column on the Cases page.`, 'success');
-    if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
-    render();
+    const id = modal.querySelector('[data-field="caseId"]').value.trim();
+    if (!id) { alert('Enter a case ID.'); return false; }
+    addCaseById(id);   // async; modal closes now
     return true;
   });
+}
+
+// Fetch one case from Case Center by id (GET /api/cases?id=…) and add/merge it into the board.
+async function addCaseById(id) {
+  showLiveLoading();
+  try {
+    const res = await fetch('api/cases?id=' + encodeURIComponent(id), { headers: { Accept: 'application/json' } });
+    hideLiveLoading();
+    if (!res.ok) { showToast(`Couldn't fetch ${id} (HTTP ${res.status}).`, 'warn'); return; }
+    const data = await res.json();
+    const cases = (Array.isArray(data) ? data : (data && data.cases)) || [];
+    if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
+    let added = 0;
+    for (const raw of cases) {
+      const nc = normalizeLiveCase(raw);
+      const i = STATE.cases.findIndex(c => c.id === nc.id);
+      if (i >= 0) {
+        const old = STATE.cases[i];   // keep the local agent layer when updating
+        STATE.cases[i] = Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder });
+      } else {
+        STATE.cases.unshift(nc);
+        added++;
+      }
+      STATE.kanbanSelected = nc.id;
+    }
+    if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
+    render();
+    showToast(`${added ? 'Added' : 'Updated'} ${cases[0].id} from Case Center.`, 'success');
+  } catch (e) {
+    hideLiveLoading();
+    showToast('Could not reach Case Center (is serve.py running?).', 'warn');
+  }
 }
 
 function handleReassign(caseId, type) {
@@ -1960,10 +2591,6 @@ function handleReassign(caseId, type) {
   });
 }
 
-function handleCompleteHandover() {
-  alert('Handover marked complete. (Prototype: in a real build this would notify the incoming shift.)');
-}
-
 /* ---------- Bind handlers after render ---------- */
 
 function bindHandlers() {
@@ -1997,7 +2624,6 @@ function bindHandlers() {
       render();
     });
   });
-  document.getElementById('complete-handover')?.addEventListener('click', handleCompleteHandover);
   const resetLink = document.getElementById('reset-state');
   if (resetLink && resetLink.dataset.bound !== '1') {
     resetLink.addEventListener('click', e => {
@@ -2015,6 +2641,20 @@ function bindHandlers() {
       render();
     });
   });
+  bindRosterEditor();
+  bindOwnersEditor();
+  const lookbackLoad = document.getElementById('lookback-load');
+  if (lookbackLoad) {
+    const doLoad = () => {
+      const v = parseFloat(document.getElementById('lookback-input').value);
+      if (!(v > 0)) { showToast('Enter a positive number of hours.', 'warn'); return; }
+      STATE.lookbackHours = v;
+      try { localStorage.setItem('case-tracker-lookback', String(v)); } catch (e) { /* ignore */ }
+      reloadLiveCases();
+    };
+    lookbackLoad.addEventListener('click', doLoad);
+    document.getElementById('lookback-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
+  }
   const filter = document.getElementById('case-filter');
   if (filter) {
     filter.addEventListener('input', () => {
@@ -2048,8 +2688,206 @@ function checkReminders() {
 
 setInterval(checkReminders, 10000);
 setTimeout(checkReminders, 200);
+setInterval(updateClock, 1000);
+
+/* ---------- Live data (Case Center via local/serve.py) ---------- */
+
+// Fill any board fields the API omits with safe defaults, so a partial Case Center record
+// can't crash the renderer. The Python adapter (local/casecenter.py) maps Case Center
+// statuses into the board's status enum; everything else falls back here.
+function normalizeLiveCase(c) {
+  const nowIso = new Date(NOW).toISOString();
+  return Object.assign({
+    flags: [],
+    priority: 'medium',
+    caseType: 'access',
+    fitId: null, hqId: null, currentOwner: null,
+    slaPaused: false, slaAccumulatedMs: 0,
+    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    lastOwnerContact: null,
+    handover: null,
+    reminder: undefined,
+    agentStatus: 'unqueued',
+    history: [],
+    weekId: window.CURRENT_WEEK.id,   // default to current week so live cases show on the board
+    caseLink: '',
+    requester: '',
+    notes: '',
+    subject: '(no subject)',
+    slaStartedAt: c.createdAt || nowIso,
+    createdAt: c.slaStartedAt || nowIso,
+  }, c);
+}
+
+// Push operator edits back to the local server so they get written into data.js.
+// Fire-and-forget; only in live mode (served by serve.py).
+// Tiny corner indicator: setSaveStatus('saving' | 'saved' | 'error', label?).
+let _saveStatusTimer = null;
+function setSaveStatus(state, label) {
+  let el = document.getElementById('save-status');
+  if (!el) { el = document.createElement('div'); el.id = 'save-status'; document.body.appendChild(el); }
+  clearTimeout(_saveStatusTimer);
+  if (state === 'saving') {
+    el.className = 'show saving';
+    el.innerHTML = '<span class="live-spinner"></span> ' + escapeHtml(label || 'Saving…');
+  } else if (state === 'saved') {
+    el.className = 'show saved';
+    el.textContent = '✓ ' + (label || 'Saved');
+    _saveStatusTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  } else if (state === 'error') {
+    el.className = 'show error';
+    el.textContent = '⚠ ' + (label || 'Save failed');
+    _saveStatusTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+function saveCasesToServer(cases) {
+  if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !cases.length) return;
+  setSaveStatus('saving');
+  try {
+    fetch('api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cases }),
+    }).then(r => setSaveStatus(r.ok ? 'saved' : 'error'))
+      .catch(() => setSaveStatus('error'));
+  } catch (e) { setSaveStatus('error'); }
+}
+
+// Save a generated snippet to shifts.js / owners.js via the local server (Save buttons).
+function saveJsFile(file, snippet, label) {
+  if (!/^https?:$/.test(location.protocol)) { showToast('Run the board via serve.py to save files.', 'warn'); return; }
+  setSaveStatus('saving', 'Saving ' + label + '…');
+  fetch('api/save-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file, js: snippet }),
+  }).then(r => {
+    if (r.ok) { setSaveStatus('saved', 'Saved ' + label); showToast(label + ' saved.', 'success'); }
+    else { setSaveStatus('error'); showToast('Save failed (' + r.status + ').', 'warn'); }
+  }).catch(() => { setSaveStatus('error'); showToast('Save failed — is serve.py running?', 'warn'); });
+}
+
+// Persist ANY case that changed since the last save (queue, status, assignment, reminder,
+// handover note, …). Called from saveState() in live mode; diffs against a snapshot so only
+// changed cases are sent.
+function persistChangedCases() {
+  if (!window.__LIVE__) return;
+  if (!STATE._savedSnapshot) STATE._savedSnapshot = {};
+  const changed = [];
+  for (const c of STATE.cases) {
+    if (!c.id) continue;
+    const j = JSON.stringify(c);
+    if (STATE._savedSnapshot[c.id] !== j) {
+      STATE._savedSnapshot[c.id] = j;
+      changed.push(c);
+    }
+  }
+  saveCasesToServer(changed);
+}
+
+// Try the local backend. Returns true if live Case Center data was loaded; false otherwise
+// (public Pages demo, file://, or backend down) — in which case the seed data stays.
+async function tryLoadLiveCases() {
+  // Only meaningful when served over http(s) (i.e. by local/serve.py). Skip for file://
+  // and avoid a noisy console error when someone just opens standalone.html directly.
+  if (!/^https?:$/.test(location.protocol)) return false;
+  let res;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
+    const url = 'api/cases' + (STATE.lookbackHours ? ('?hours=' + encodeURIComponent(STATE.lookbackHours)) : '');
+    res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    clearTimeout(t);
+  } catch (e) {
+    return false; // no local backend reachable → seed/demo mode
+  }
+  if (!res.ok) return false;
+  let data;
+  try { data = await res.json(); } catch (e) { return false; }
+  const cases = Array.isArray(data) ? data : (data && data.cases);
+  if (!Array.isArray(cases)) return false;
+
+  window.__LIVE__ = true;
+  NOW = new Date(); // real time for SLA math against live timestamps
+  const incoming = cases.map(normalizeLiveCase);
+  if (window.CASES_LIVE_CAPTURE) {
+    // data.js already holds the accumulated case store — MERGE the live query into it
+    // (update queried cases, add new ones, keep the rest) so the board shows everything
+    // data.js has, not just the current query window.
+    const byId = new Map(STATE.cases.map(c => [c.id, c]));
+    for (const nc of incoming) {
+      const old = byId.get(nc.id);
+      byId.set(nc.id, old
+        ? Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder })
+        : nc);
+    }
+    STATE.cases = [...byId.values()];
+  } else {
+    // Fresh demo seed (not a live store) → show just the live query result.
+    STATE.cases = incoming;
+  }
+
+  // Re-apply the operator's local layer (queue placement, handover notes, reminders).
+  try {
+    const raw = localStorage.getItem(AGENT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
+        STATE.operatorId = parsed.operatorId;
+      }
+      applyAgentLayer(parsed.agent || {});
+    }
+  } catch (e) { /* ignore corrupt local layer */ }
+  // Baseline for change-detection: the server already has this data, so only later edits POST.
+  STATE._savedSnapshot = {};
+  for (const c of STATE.cases) if (c.id) STATE._savedSnapshot[c.id] = JSON.stringify(c);
+  return true;
+}
 
 /* ---------- Boot ---------- */
 
-if (!location.hash) location.hash = '#/queue';
-render();
+// Small overlay shown while the live Case Center fetch is in flight.
+function showLiveLoading() {
+  if (document.getElementById('live-loading')) return;
+  const el = document.createElement('div');
+  el.id = 'live-loading';
+  el.innerHTML = '<span class="live-spinner"></span> Loading cases from Case Center…';
+  document.body.appendChild(el);
+}
+function hideLiveLoading() {
+  document.getElementById('live-loading')?.remove();
+}
+
+// Re-fetch live cases (used by the "Load" button after changing the look-back window).
+async function reloadLiveCases() {
+  showLiveLoading();
+  const ok = await tryLoadLiveCases();
+  hideLiveLoading();
+  render();
+  showToast(
+    ok ? `Loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} created within ${STATE.lookbackHours}h.`
+       : 'Could not load from Case Center (is serve.py running?).',
+    ok ? 'success' : 'warn'
+  );
+}
+
+async function boot() {
+  if (!location.hash) location.hash = '#/cases';
+  render(); // immediate paint from seed / saved state
+  // Show a loading indicator only if the live fetch is actually slow (avoids a flash when
+  // there's no backend, e.g. the public Pages site).
+  let loaderTimer = null;
+  if (/^https?:$/.test(location.protocol)) loaderTimer = setTimeout(showLiveLoading, 250);
+  const live = await tryLoadLiveCases();
+  if (loaderTimer) clearTimeout(loaderTimer);
+  hideLiveLoading();
+  if (live) {
+    render(); // repaint with live Case Center data + merged agent layer
+    showToast(`Live: loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} from Case Center.`, 'success');
+  }
+}
+
+boot();

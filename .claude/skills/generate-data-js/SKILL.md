@@ -7,22 +7,65 @@ description: Generate or refresh prototype/data.js (seed data for the Case Track
 
 `prototype/data.js` is the seed dataset the SPA boots from. It declares everything via `window.*` globals (no modules, no build step). After editing it you **must** rerun `node prototype/bundle.mjs` so `prototype/standalone.html` picks up the change.
 
+> **Roster and owners live in separate files.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are in **`prototype/shifts.js`**; `window.OWNERS` (FIT desks & HQ teams) is in **`prototype/owners.js`**. Both can be edited via in-app editors (Shifts page / Owners page). Do **not** put them in data.js. Keep ids you reference from data.js (`createdBy`, history `who`, `fitId`, `hqId`) consistent with those files.
+
 ## File contract
 
-The file must define these globals, in this order:
+`data.js` must define these globals, in this order:
 
 | Global | Type | Purpose |
 | --- | --- | --- |
 | `window.NOW` | `Date` | Frozen "now" the app uses for SLA math, idle clocks, office-hours coloring. Pick a wall-clock time on the demo day. |
 | `window.THRESHOLDS` | object | `fitIdleHours`, `hqIdleHours`, `approachingSlaHours`, `shiftEndingSoonMinutes`. |
-| `window.OPERATORS` | array | `{ id, name, shift }`. Shift must be `'Day'` or `'Night'`. |
-| `window.OWNERS` | `{ fit: [...], hq: [...] }` | FIT desks (Phoenix TZ) and HQ teams (Taipei TZ). |
-| `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
-| `window.CURRENT_SHIFT` | object | `{ name, endsAtUtc, date }`. |
+| `window.CURRENT_SHIFT` | object | `{ name, endsAtUtc, date }`. `name` must match a shift in shifts.js. |
 | `window.CURRENT_WEEK` | object | `{ id, label, startsAt }`. |
 | `window.WEEKS` | array | Past + current ISO weeks. Mark the current one with `isCurrent: true`. |
-| `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
 | `window.CASES` | array | The case records — see schema below. |
+
+`shifts.js` defines the roster (edit there, not here):
+
+| Global | Type | Purpose |
+| --- | --- | --- |
+| `window.OPERATORS` | array | `{ id, name, shift }`. Shift must match a `SHIFTS` name. |
+| `window.SHIFTS` | array | `[ { name: 'Day', hoursUtc, operatorIds }, { name: 'Night', ... } ]`. |
+| `window.CURRENT_OPERATOR_ID` | string | Must match an id in `OPERATORS`. |
+
+`owners.js` defines the owner directory (edit there / via the Owners page):
+
+| Global | Type | Purpose |
+| --- | --- | --- |
+| `window.OWNERS` | `{ fit: [...], hq: [...] }` | FIT desks `{id,name,region,tz,office,channel}` (Phoenix TZ) and HQ teams `{id,name,area,tz,office,channel}` (Taipei TZ). |
+
+## Relationship to Case Center (live data)
+
+In production the board reads **live cases from the on-prem Case Center** via a small local
+server (`local/serve.py` → `local/casecenter.py` → `GET /api/cases`). `data.js` is the
+**seed / demo fallback** used on GitHub Pages, over `file://`, and whenever the local server
+isn't running. Generate seed cases that *mirror* what Case Center returns so the demo matches
+reality.
+
+**Two statuses per case** (keep this split when seeding):
+- `status` = the **Case Center status** (real, external) → drives the kanban **columns**.
+- `agentStatus` = the **first-line agent's** local handling state (`queued`/`unqueued`) →
+  drives the top/bottom band split. This never comes from Case Center.
+
+**Case Center → board mapping** (`map_record()` in `local/casecenter.py`):
+
+| Case Center field | board field |
+| --- | --- |
+| `caseId` | `id` |
+| `subject` | `subject` |
+| `caseStatus` + `caseSubstatus` | `status` (via `STATUS_MAP`) |
+| `caseLevel` | `priority` |
+| `createDateTime` | `createdAt` / `slaStartedAt` |
+| `assignee.accountId` | `assigneeId` |
+
+Fields the live feed does **not** supply today are local/demo-only — keep them in the seed
+(they make the prototype fully featured), but know they're synthesized for the demo:
+`agentStatus`, `handover`, `reminder`, FIT/HQ routing (`fitId`/`hqId`/`currentOwner`), and
+`history` (which powers the **ownership timeline** and the **FIT-vs-HQ time** split on the
+case detail). Open work to populate these from Case Center is tracked in
+`local/TODO-casecenter-mapping.md`.
 
 ## Conventions (do not break)
 
@@ -41,6 +84,11 @@ The file must define these globals, in this order:
   - `status: 'sanity_check'` ⇒ owner stays whoever pushed the resolution (`'hq'` for escalated cases, `'fit'` for FIT-resolved ones).
   - `status: 'returned_to_requester'` ⇒ `slaPaused: true`, `currentOwner: null`, `holdStartedAt: null`.
   - `status: 'closed' | 'cancelled'` ⇒ `currentOwner: null`, `holdStartedAt: null`.
+- **`agentStatus`** on every active-week case (`'queued' | 'unqueued'`). Independent of
+  `status`: it is the first-line agent's handling state and drives the top/bottom band
+  split on the board. Seed a few active cases (ideally one per column — a `new`, a
+  `with_fit`, a `with_hq`, a `sanity_check`) as `'queued'` so each column's top band is
+  populated on first load. Terminal/historical cases can omit it (treated as unqueued).
 
 ## Case schema
 
@@ -53,7 +101,11 @@ The file must define these globals, in this order:
   fitId: 'fit-apac' | null,             // must match OWNERS.fit[].id
   hqId: 'hq-identity' | null,           // must match OWNERS.hq[].id
   currentOwner: 'fit' | 'hq' | null,
-  status: 'with_fit',                   // see enum above
+  status: 'with_fit',                   // Case Center status — drives kanban COLUMNS; see enum above
+  agentStatus: 'unqueued',              // first-line agent status — 'queued' | 'unqueued'.
+                                        //   'queued' = in the agent's active top band; drives the
+                                        //   top/bottom row split inside each column. Active-week
+                                        //   cases carry it; seed a few as 'queued'.
   flags: [],                            // 'weekend' | 'escalated' | 'scheduled_ooc'
   priority: 'low' | 'medium' | 'high',
   caseType: 'access' | 'data' | 'mobile' | 'network' | 'service' | 'productivity',
@@ -101,7 +153,14 @@ The file must define these globals, in this order:
 }
 ```
 
-`history.kind` values: `created | assigned | escalated | returned | status | flag | closed | cancelled | note | rolled_over`.
+`history.kind` values: `created | assigned | escalated | returned | resumed | status | reassigned | flag | handover | note | reminder | closed | cancelled | rolled_over`.
+
+The **ownership timeline** and **FIT vs HQ time** on the case detail are reconstructed from
+`history` (see `ownershipSegments()` in `app.js`): `created` → first line, `assigned` →
+Local FIT, `escalated` → HQ, `returned` → with requester, `status`/`resumed` parsed from
+`detail` (e.g. `'→ Sanity Check'`, `'… HQ …'`), `closed`/`cancelled` → done. So give cases
+**realistic, chronologically-spaced history chains** — the timeline width and per-owner
+totals come straight from these timestamps.
 
 ## Coverage to aim for
 
@@ -112,7 +171,7 @@ A good seed exercises every UI surface. Spread cases across:
 - **Idle thresholds** — one FIT case past `fitIdleHours`, one HQ case past `hqIdleHours` to drive the watchlist.
 - **SLA** — one case past `approachingSlaHours` (drives the SLA watchlist banner).
 - **Handover freshness** — at least one case with `staleForCurrentShift: true` so the cutover-blocked rule shows.
-- **Escalation history** — one case with a full `created → assigned → escalated → status` chain (drives Status Flow demo).
+- **Escalation history** — one case with a full `created → assigned → escalated → status` chain, with realistic gaps between timestamps (drives the Status Flow demo **and** the ownership timeline / FIT-vs-HQ split — vary the gaps so the timeline segments differ in width).
 - **Carry-over** — one case with `carriedFrom` set, dated into a prior `weekId` to show rollover.
 - **Historical weeks** — a handful of `closed`/`cancelled` cases in W-1, W-2, W-3 to populate Weekly Archive medians.
 
@@ -120,7 +179,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 
 ## Generation recipe
 
-1. **Pick the demo NOW.** A weekday mid-shift time is best (e.g. Friday 13:00 UTC). All other timestamps anchor off it.
+1. **Pick the demo NOW.** A weekday mid-shift time is best (e.g. Friday 13:00 UTC). All other timestamps anchor off it. (At load the app shifts every seed timestamp by one offset so "now" lands on the viewer's real current time — so authoring everything *relative to* `window.NOW` is what keeps the scenario correct and free of future timestamps.)
 2. **Build the calendar.** Set `CURRENT_WEEK` to the ISO week containing NOW. Add 3 prior weeks to `WEEKS`. Use `'W{NN}-{YYYY}'` ids.
 3. **Decide the active operator and shift.** `CURRENT_OPERATOR_ID` + `CURRENT_SHIFT.endsAtUtc` (typically NOW − 1h to show "ends soon" coloring, or NOW + a few hours).
 4. **Write active cases first** (current week), then historical closed/cancelled cases for prior weeks.
@@ -129,7 +188,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
    ```bash
    node prototype/bundle.mjs
    ```
-7. **Sanity-check in the browser**: open `prototype/index.html`, verify the operator dropdown is populated, kanban shows cases in expected columns, and the Action Queue is empty (queue is operator-curated).
+7. **Sanity-check in the browser**: open `prototype/index.html`, verify the operator dropdown is populated, the board shows cases in expected columns (Case Center status), and each column's top band ("My queue") holds the cases you seeded as `agentStatus: 'queued'`.
 
 ## Common mistakes to avoid
 
@@ -139,7 +198,8 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 - `weekId` that doesn't match a `WEEKS[].id` — case won't appear in Weekly Archive.
 - Using local time instead of UTC `Z` suffix — SLA math is off by the TZ offset.
 - Forgetting to rerun `bundle.mjs` — GitHub Pages serves stale `standalone.html` but local `file://` users see the old data.
-- Bumping the case schema without bumping `STORAGE_KEY` in `app.js` — returning users get stuck with stale localStorage. If you add/remove top-level fields on `CASES`, change the key (e.g. `case-tracker-state-v2` → `v3`).
+- Bumping the case schema without bumping `STORAGE_KEY` in `app.js` — returning users get stuck with stale localStorage. If you add/remove top-level fields on `CASES`, change the key. Precedent: adding `agentStatus` bumped `case-tracker-state-v2` → `v3` (also bump the `v:` value in `saveState`/`loadState`).
+- Forgetting `agentStatus` on active-week cases, or seeding none as `'queued'` — every column's top band renders empty and the board looks half-broken.
 
 ## Quick reference: seed checklist
 
@@ -151,6 +211,7 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 [ ] WEEKS: current + 3 prior, ids match what cases reference
 [ ] SHIFTS: Day + Night with operatorIds
 [ ] CASES covers: new, with_fit, with_hq, sanity_check, returned_to_requester, closed, cancelled
+[ ] agentStatus on active-week cases; a few 'queued' (ideally one per column)
 [ ] At least one weekend flag, one escalated flag
 [ ] One stale handover, one carried-over case
 [ ] All FIT/HQ ids reference OWNERS

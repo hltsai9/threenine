@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Case Tracker — Prototype</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,21 +15,17 @@
       <span class="badge">prototype</span>
     </div>
     <nav class="nav">
-      <a href="#/queue" data-route="queue">
-        <span>Action Queue</span>
-        <span class="count" id="nav-queue-count">—</span>
-      </a>
       <a href="#/cases" data-route="cases">
-        <span>Cases</span>
+        <span>Board</span>
         <span class="count" id="nav-cases-count">—</span>
-      </a>
-      <a href="#/handover" data-route="handover">
-        <span>Shift Handover</span>
-        <span class="count" id="nav-handover-count">—</span>
       </a>
       <a href="#/shifts" data-route="shifts">
         <span>Shifts</span>
         <span class="count" id="nav-shifts-count">—</span>
+      </a>
+      <a href="#/owners" data-route="owners">
+        <span>Owners</span>
+        <span class="count" id="nav-owners-count">—</span>
       </a>
       <a href="#/archive" data-route="archive">
         <span>Weekly Archive</span>
@@ -38,6 +35,10 @@
         <span>Status Flow</span>
       </a>
     </nav>
+    <div class="sidebar-clock">
+      <div class="clock-time" id="clock-time">—</div>
+      <div class="clock-date" id="clock-date">—</div>
+    </div>
     <div class="shift-info">
       <div class="kv">
         <span class="k">Operator</span>
@@ -60,6 +61,8 @@
 </div>
 <div id="modal-root"></div>
 <script src="data.js"></script>
+<script src="shifts.js"></script>
+<script src="owners.js"></script>
 <script src="app.js"></script>
 <script src="tour.js"></script>
 </body>
