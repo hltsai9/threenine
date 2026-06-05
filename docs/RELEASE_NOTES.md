@@ -12,6 +12,9 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Added
 
+- **Reminder "at a specific time."** The *Remind me* modal now offers a time picker in addition to
+  the relative presets — set a reminder to fire at a clock time (e.g. **05:30**), today or tomorrow
+  if it's already past. A specific time wins over the preset when set.
 - **Recycle bin for cases (4.4).** A 🗑 button on each Weekly-Archive row soft-deletes a case;
   a new **Recycle bin** page (`#/archive/bin`) lists deleted cases with time-remaining and offers
   **Restore** or a second-confirm **Delete forever**. Foolproof two-step delete (bin → permanent),
