@@ -21,6 +21,11 @@ const LIVE_FETCH_TIMEOUT_MS = (() => {
   return 30000;   // default: 30 seconds  ← edit this number to change the default
 })();
 
+// Polling cadences (ms). Kept here so all timing lives in one place.
+const REMINDER_POLL_MS = 10000;        // how often to sweep for due reminders
+const REMINDER_FIRST_RUN_MS = 200;     // first reminder sweep shortly after boot
+const CLOCK_TICK_MS = 1000;            // sidebar clock refresh
+
 const STATE = {
   cases: window.CASES.map(c => structuredClone(c)),
   operatorId: window.CURRENT_OPERATOR_ID,
@@ -2686,9 +2691,9 @@ function checkReminders() {
   if (firedAny) render();
 }
 
-setInterval(checkReminders, 10000);
-setTimeout(checkReminders, 200);
-setInterval(updateClock, 1000);
+setInterval(checkReminders, REMINDER_POLL_MS);
+setTimeout(checkReminders, REMINDER_FIRST_RUN_MS);
+setInterval(updateClock, CLOCK_TICK_MS);
 
 /* ---------- Live data (Case Center via local/serve.py) ---------- */
 
@@ -2810,9 +2815,26 @@ async function tryLoadLiveCases() {
   const cases = Array.isArray(data) ? data : (data && data.cases);
   if (!Array.isArray(cases)) return false;
 
+  // Validate the payload before trusting it: a usable case is a plain object with a
+  // non-empty string id. Malformed rows would otherwise render as ghost cards, or collapse
+  // together under the id-keyed merge below (every id-less row sharing the `undefined` key).
+  const valid = [];
+  let dropped = 0;
+  for (const raw of cases) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)
+        && typeof raw.id === 'string' && raw.id.trim()) valid.push(raw);
+    else dropped++;
+  }
+  if (dropped) {
+    console.warn(`Case Center: ignored ${dropped} malformed case record(s) (missing id or not an object).`);
+    showToast(`Ignored ${dropped} malformed case record${dropped === 1 ? '' : 's'} from Case Center.`, 'warn');
+  }
+  // Rows came back but none were usable → keep what we already have rather than blanking the board.
+  if (cases.length && !valid.length) return false;
+
   window.__LIVE__ = true;
   NOW = new Date(); // real time for SLA math against live timestamps
-  const incoming = cases.map(normalizeLiveCase);
+  const incoming = valid.map(normalizeLiveCase);
   if (window.CASES_LIVE_CAPTURE) {
     // data.js already holds the accumulated case store — MERGE the live query into it
     // (update queried cases, add new ones, keep the rest) so the board shows everything

@@ -34,19 +34,22 @@ headers.
 
 #### P0 — Robustness / correctness (do first; low risk)
 
-- **Live Case Center payload not validated before render** — `app.js:2794–2832`
-  (`tryLoadLiveCases()`). It checks `Array.isArray(cases)` but then assumes each case's shape; a
-  malformed field yields a blank board. Fix: validate required fields per case, drop/flag bad
-  rows, and show a specific error toast instead of failing silently.
-- **Event listeners re-bound on every render** — `bindHandlers()` (~`app.js:2594–2670`) is called
-  from `render()` (~`app.js:463`); only some handlers guard with `dataset.bound`. Rapid route
-  changes can stack duplicate listeners. Fix: move to event delegation on a single stable root
-  (e.g. `#main`/`body`), or bind once at boot.
-- **Roster editor double-binding** — `bindRosterEditor()` (~`app.js:1488–1535`) attaches input
-  listeners with no dedupe guard. Same fix as above.
+- **[DONE] Live Case Center payload not validated before render** — `tryLoadLiveCases()`. It
+  checked `Array.isArray(cases)` but then trusted each row's shape; a `null`/non-object/id-less
+  record became a ghost card and collapsed the id-keyed merge (all id-less rows sharing the
+  `undefined` key). Now validates each row (plain object + non-empty string `id`), drops bad ones,
+  `console.warn`s + toasts a count, and keeps existing cases if nothing usable came back.
+- **[RE-ASSESSED] Event listeners re-bound on every render** — original concern overstated. `render()`
+  replaces `#main.innerHTML` wholesale (`app.js:455–463`), so listeners on those nodes are
+  discarded with the old DOM — re-binding is correct, not a leak. The only persistent-element
+  handlers (`op-switcher` `app.js:479`, `reset-state` `app.js:2628`) already guard with
+  `dataset.bound`, and `bindRosterEditor()` operates inside the replaced `#main` subtree. **No fix
+  required**; revisit only if event delegation is wanted as a perf/clarity refactor under P1.
 - **Modal inputs read without null-guards** — e.g. `app.js:2045`
-  (`modal.querySelector('[data-field="fitId"]').value`). Guard against missing nodes before
-  mutating the case.
+  (`modal.querySelector('[data-field="fitId"]').value`), ~18 sites. Low runtime risk (the field
+  markup is built in the same handler), so **deferred to after the test net** — a small
+  `fieldVal(modal, name)` helper applied across the sites is safest once characterization tests
+  exist (see sequencing).
 
 #### P1 — Duplication / refactor (do after a test net exists)
 
@@ -59,10 +62,11 @@ headers.
 - **`renderCaseList()` is ~285 lines** — `app.js:611–895` (watchlist + header + kanban bands +
   status dropdown). Split into `renderBoardHeader()`, `renderBand()`, `renderCard()`,
   `renderStatusDropdown()`.
-- **Magic numbers / config scattered** — `setInterval(checkReminders, 10000)` (`app.js:2689`),
-  `setInterval(updateClock, 1000)` (`app.js:2691`), `grid-template-columns: 240px 1fr`
-  (`styles.css:34`). Collect timing/layout constants into a single `CONFIG` object near the top of
-  `app.js` (thresholds already live in `window.THRESHOLDS` — extend that pattern).
+- **Magic numbers / config scattered** — **[PARTLY DONE]** the reminder/clock timers
+  (`setInterval(checkReminders, …)`, `setInterval(updateClock, …)`, `setTimeout(checkReminders, …)`)
+  are now named constants (`REMINDER_POLL_MS`, `REMINDER_FIRST_RUN_MS`, `CLOCK_TICK_MS`) in the
+  existing `// === CONFIG ===` block at the top of `app.js`. Still to do: layout magics such as
+  `grid-template-columns: 240px 1fr` (`styles.css:34`).
 - **`styles.css` has no section structure** — add banner comments (`/* ---- Kanban ---- */`) or
   split into logical partials; group sidebar / nav / buttons / kanban / modals / tour.
 
