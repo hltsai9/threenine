@@ -298,14 +298,24 @@ test('mergeLiveCase: new id is added + normalized', () => {
   const c = app.caseById('C-MERGE-NEW');
   eq([c.status, c.subject, c.agentStatus], ['with_fit', 'New one', 'unqueued']);
 });
-test('mergeLiveCase: existing id updates Case Center fields but preserves the agent layer', () => {
+test('mergeLiveCase: refresh updates CC fields but preserves all operator work', () => {
+  // Simulate operator work on the case: assigned to FIT, notes, history, clocks, queue, handover.
   const c0 = app.caseById('C-MERGE-NEW');
-  c0.agentStatus = 'queued';
-  c0.handover = { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false };
-  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'Updated subject', status: 'with_hq' });
+  Object.assign(c0, {
+    status: 'with_fit', fitId: 'fit-apac', currentOwner: 'fit', agentStatus: 'queued',
+    notes: 'operator notes', slaAccumulatedMs: 3 * HOUR, holdMs: { fit: HOUR, hq: 0 },
+    history: [{ at: iso(2 * HOUR), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC' }],
+    handover: { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false },
+  });
+  // Case Center sends back the raw record (In-Progress → 'new', no routing/history).
+  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'Updated subject', status: 'new', priority: 'high', ccStatusLabel: 'In-Progress' });
   eq(r.added, false);
   const c = app.caseById('C-MERGE-NEW');
-  eq([c.status, c.subject, c.agentStatus, c.handover.note], ['with_hq', 'Updated subject', 'queued', 'keep me']);
+  // CC-owned fields refreshed:
+  eq([c.subject, c.priority, c.ccStatusLabel], ['Updated subject', 'high', 'In-Progress']);
+  // Operator work preserved (NOT reset to the 'new' that In-Progress maps to):
+  eq([c.status, c.fitId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.fit, c.history.length, c.handover.note],
+     ['with_fit', 'fit-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
 });
 test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
   app.location.protocol = 'https:'; app.__LIVE__ = true;

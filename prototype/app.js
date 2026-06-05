@@ -2621,15 +2621,14 @@ function handleNewCase(op) {
 function mergeLiveCase(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)
       || typeof raw.id !== 'string' || !raw.id.trim()) return null;
-  const nc = normalizeLiveCase(raw);
-  const i = STATE.cases.findIndex(c => c.id === nc.id);
+  const i = STATE.cases.findIndex(c => c.id === raw.id);
   if (i >= 0) {
-    const old = STATE.cases[i];   // keep the local agent layer when updating
-    STATE.cases[i] = Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder });
-    return { id: nc.id, added: false };
+    // Existing case: refresh only the Case Center–owned fields, preserve all operator work.
+    overlayLiveCase(STATE.cases[i], raw);
+    return { id: raw.id, added: false };
   }
-  STATE.cases.unshift(nc);
-  return { id: nc.id, added: true };
+  STATE.cases.unshift(normalizeLiveCase(raw));   // brand-new case: full normalize
+  return { id: raw.id, added: true };
 }
 
 // Fetch one case from Case Center by id (GET /api/cases?id=…). Returns the parsed cases array,
@@ -2921,6 +2920,22 @@ function normalizeLiveCase(c) {
   }, c);
 }
 
+// Fields Case Center authoritatively owns — these are refreshed onto an existing case. Everything
+// else (board status, FIT/HQ routing, history, notes, clocks, queue, handover, reminder, flags)
+// is operator-local and is PRESERVED across a refresh, so re-fetching a case never wipes the work
+// you've done on it. Notably `status` is preserved: once you've moved a case to With FIT / HQ /
+// Sanity Check, a refresh won't snap it back to the column its raw Case Center status maps to.
+const CC_OWNED_FIELDS = [
+  'subject', 'ccStatusLabel', 'priority', 'caseLink',
+  'requester', 'requesterDept', 'reporterId', 'reporterDept', 'assigneeId', 'assigneeDept',
+];
+function overlayLiveCase(existing, raw) {
+  for (const k of CC_OWNED_FIELDS) {
+    if (raw[k] !== undefined) existing[k] = raw[k];
+  }
+  return existing;
+}
+
 // Push operator edits back to the local server so they get written into data.js.
 // Fire-and-forget; only in live mode (served by serve.py).
 // Tiny corner indicator: setSaveStatus('saving' | 'saved' | 'error', label?).
@@ -3031,22 +3046,20 @@ async function tryLoadLiveCases() {
 
   window.__LIVE__ = true;
   NOW = new Date(); // real time for SLA math against live timestamps
-  const incoming = valid.map(normalizeLiveCase);
   if (window.CASES_LIVE_CAPTURE) {
-    // data.js already holds the accumulated case store — MERGE the live query into it
-    // (update queried cases, add new ones, keep the rest) so the board shows everything
-    // data.js has, not just the current query window.
+    // data.js already holds the accumulated case store — MERGE the live query into it: refresh
+    // Case Center fields on cases we already have (preserving operator work), add brand-new
+    // cases, and keep the rest, so the board shows everything data.js has — not just the query.
     const byId = new Map(STATE.cases.map(c => [c.id, c]));
-    for (const nc of incoming) {
-      const old = byId.get(nc.id);
-      byId.set(nc.id, old
-        ? Object.assign(nc, { agentStatus: old.agentStatus, handover: old.handover, reminder: old.reminder })
-        : nc);
+    for (const raw of valid) {
+      const existing = byId.get(raw.id);
+      if (existing) overlayLiveCase(existing, raw);
+      else byId.set(raw.id, normalizeLiveCase(raw));
     }
     STATE.cases = [...byId.values()];
   } else {
     // Fresh demo seed (not a live store) → show just the live query result.
-    STATE.cases = incoming;
+    STATE.cases = valid.map(normalizeLiveCase);
   }
 
   // Re-apply the operator's local layer (queue placement, handover notes, reminders).
