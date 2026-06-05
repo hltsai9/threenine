@@ -248,6 +248,33 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   font-size: 13px;
   color: #1e3a8a;
 }
+/* live-fetch loading overlay */
+#live-loading {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--sidebar);
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(17, 24, 39, .25);
+}
+.live-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, .35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: live-spin .7s linear infinite;
+}
+@keyframes live-spin { to { transform: rotate(360deg); } }
 .watchlist {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));

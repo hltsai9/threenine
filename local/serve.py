@@ -55,9 +55,14 @@ def resolve_webroot():
 
 WEBROOT, WEBROOT_OK = resolve_webroot()
 
+# Write fetched live cases into prototype/data.js (backup + merge). On by default; set
+# CASE_TRACKER_WRITE_DATA_JS=0 to disable.
+WRITE_DATA_JS = os.environ.get("CASE_TRACKER_WRITE_DATA_JS", "1") not in ("0", "false", "False", "")
+
 # Import the adapter that talks to your on-prem Case Center.
 sys.path.insert(0, HERE)
 import casecenter  # noqa: E402
+import persist     # noqa: E402
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -103,6 +108,14 @@ class Handler(SimpleHTTPRequestHandler):
             cases = casecenter.fetch_cases()
             with_id = sum(1 for c in cases if c.get("id"))
             print(f"/api/cases -> {len(cases)} case(s) mapped ({with_id} with an id)")
+            if WRITE_DATA_JS:
+                try:
+                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"))
+                    if added or updated:
+                        print(f"  data.js updated: +{added} new, {updated} updated, {total} total (backup: data.js.bak)")
+                except Exception:
+                    print("  (could not write data.js)")
+                    traceback.print_exc()
             payload = json.dumps({"cases": cases}).encode("utf-8")
             status = 200
         except Exception as exc:  # surface the error to the browser console, keep server up

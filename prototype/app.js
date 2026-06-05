@@ -143,6 +143,15 @@ function applyShiftToCurrentShift(off) {
 }
 // Shift the pristine seed (already cloned into STATE.cases) so it anchors on real now.
 function anchorFreshSeed() {
+  // data.js written from live Case Center data: board-shaped cases with real timestamps.
+  // Normalize them (fills weekId/agentStatus/etc. like a live fetch) and don't time-shift.
+  if (window.CASES_LIVE_CAPTURE) {
+    STATE.cases = window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
+    STATE.anchorOffset = 0;
+    applyShiftToCurrentShift(0);
+    NOW = new Date();
+    return;
+  }
   const off = Date.now() - SEED_ANCHOR;
   STATE.cases.forEach(c => shiftCaseTimes(c, off));
   STATE.anchorOffset = off;
@@ -150,7 +159,7 @@ function anchorFreshSeed() {
   NOW = new Date();
 }
 function seedBoot(loadedFromStorage) {
-  if (loadedFromStorage && typeof STATE.anchorOffset === 'number') {
+  if (loadedFromStorage && typeof STATE.anchorOffset === 'number' && !window.CASES_LIVE_CAPTURE) {
     applyShiftToCurrentShift(STATE.anchorOffset); // restored cases already carry this offset
     NOW = new Date();
   } else {
@@ -2587,10 +2596,28 @@ async function tryLoadLiveCases() {
 
 /* ---------- Boot ---------- */
 
+// Small overlay shown while the live Case Center fetch is in flight.
+function showLiveLoading() {
+  if (document.getElementById('live-loading')) return;
+  const el = document.createElement('div');
+  el.id = 'live-loading';
+  el.innerHTML = '<span class="live-spinner"></span> Loading cases from Case Center…';
+  document.body.appendChild(el);
+}
+function hideLiveLoading() {
+  document.getElementById('live-loading')?.remove();
+}
+
 async function boot() {
   if (!location.hash) location.hash = '#/cases';
   render(); // immediate paint from seed / saved state
+  // Show a loading indicator only if the live fetch is actually slow (avoids a flash when
+  // there's no backend, e.g. the public Pages site).
+  let loaderTimer = null;
+  if (/^https?:$/.test(location.protocol)) loaderTimer = setTimeout(showLiveLoading, 250);
   const live = await tryLoadLiveCases();
+  if (loaderTimer) clearTimeout(loaderTimer);
+  hideLiveLoading();
   if (live) {
     render(); // repaint with live Case Center data + merged agent layer
     showToast(`Live: loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} from Case Center.`, 'success');

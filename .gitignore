@@ -3,6 +3,11 @@ local/secrets.local.json
 **/secrets.local.json
 *.secret.json
 
+# Live Case Center data written locally — may be sensitive, do NOT commit.
+local/cases.store.json
+prototype/data.js.orig
+prototype/data.js.bak
+
 # Python
 __pycache__/
 *.pyc
