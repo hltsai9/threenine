@@ -2229,7 +2229,7 @@ const LIVE_FETCH_TIMEOUT_MS = (() => {
     if (q != null && q !== '' && !isNaN(+q)) return Math.max(1000, +q * 1000);
   } catch (e) { /* ignore */ }
   if (typeof window.LIVE_FETCH_TIMEOUT_MS === 'number') return window.LIVE_FETCH_TIMEOUT_MS;
-  return 30000;   // default: 30 seconds  ← edit this number to change the default
+  return 300000;  // default: 300 seconds (5 minutes)  ← edit this number to change the default
 })();
 
 // Polling cadences (ms). Kept here so all timing lives in one place.
