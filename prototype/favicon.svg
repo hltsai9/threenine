@@ -9,9 +9,9 @@
       <stop offset="100%" stop-color="#bf5af2"/>
     </linearGradient>
   </defs>
-  <polygon points="32,1 58.85,16.5 58.85,47.5 32,63 5.15,47.5 5.15,16.5"
-           fill="url(#rainbow)" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
-  <text x="32" y="34" text-anchor="middle" dominant-baseline="central"
+  <polygon points="32,2 57.98,17 57.98,47 32,62 6.02,47 6.02,17"
+           fill="url(#rainbow)" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+  <text x="32" y="33" text-anchor="middle" dominant-baseline="central"
         font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-weight="900" font-size="50" fill="#ffffff">C</text>
+        font-weight="800" font-size="38" fill="#ffffff">C</text>
 </svg>
