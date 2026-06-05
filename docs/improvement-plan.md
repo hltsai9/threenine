@@ -72,13 +72,15 @@ headers.
 
 #### P2 — Tooling / safety net
 
-- **No automated tests.** This is the single biggest blocker to the P1 refactors — there is no
-  regression net. Add a tiny zero-dep test runner (or Vitest, accepting one dev-only dependency)
-  and write **characterization tests first** for the pure functions, before any refactor:
-  - SLA / hold-time math — `app.js:190–207`
-  - status & action-prompt derivation — `app.js:353–383`
-  - office-hours / owner checks — `app.js:314–331`
-  - date/time formatting helpers
+- **[DONE] No automated tests.** A zero-dependency characterization harness now exists under
+  `prototype/tests/` (`node prototype/tests/run.cjs`, 37 tests). `load-prototype.cjs` evaluates
+  the browser globals in a Node `vm` with a DOM shim and a **frozen clock** (pinned to the seed
+  `NOW`, so the time-shift offset is 0 and `NOW`-relative math is deterministic); `run.cjs` holds
+  the tests. Verified to catch regressions (a deliberate `fmtDuration` break fails the run).
+  Covered: `fmtDuration`, `statusLabel`/`displayStatus`/`isQueued`, `caseSlaMs`, `caseHoldMs`
+  (`app.js:195–210`), `derivePromptsForCase` (`app.js:365–388`), `needsHandoverNote`
+  (`app.js:561–567`), plus seed structural sanity. This is the safety net the P1 refactors depend
+  on. Next: extend coverage to office-hours/owner checks (`app.js:314–331`) and `fmtRelative`.
 - **XSS audit of hand-built modal HTML** — `app.js:1414–1420` concatenates conditional HTML.
   `escapeHtml()` (`app.js:308`) is used widely and correctly; confirm every interpolation in these
   modal strings is escaped.
