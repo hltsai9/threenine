@@ -2024,6 +2024,14 @@ function showModal(html, onSubmit) {
 
 /* ---------- Action handlers ---------- */
 
+// Null-safe read of a modal form field's value. Guards against a field being renamed or
+// removed from a modal's markup without its onSubmit being updated (returns '' rather than
+// throwing on a missing node).
+function fieldVal(modal, name) {
+  const el = modal && modal.querySelector(`[data-field="${name}"]`);
+  return el ? el.value : '';
+}
+
 function handlePrompt(caseId, kind) {
   const op = getOperator(STATE.operatorId);
 
@@ -2047,7 +2055,7 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Assign</button>
       </div>
     `, (modal) => {
-      const fitId = modal.querySelector('[data-field="fitId"]').value;
+      const fitId = fieldVal(modal, 'fitId');
       c.fitId = fitId;
       c.currentOwner = 'fit';
       c.status = 'with_fit';
@@ -2076,8 +2084,8 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Escalate</button>
       </div>
     `, (modal) => {
-      const hqId = modal.querySelector('[data-field="hqId"]').value;
-      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      const hqId = fieldVal(modal, 'hqId');
+      const reason = fieldVal(modal, 'reason').trim();
       // stop FIT clock, start HQ clock
       if (c.currentOwner === 'fit' && c.holdStartedAt) {
         c.holdMs.fit += new Date(NOW) - new Date(c.holdStartedAt);
@@ -2110,7 +2118,7 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Send reminder</button>
       </div>
     `, (modal) => {
-      const msg = modal.querySelector('[data-field="msg"]').value.trim();
+      const msg = fieldVal(modal, 'msg').trim();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind: 'reminder', detail: `Reminder via ${channel}${msg ? ': ' + msg : ''}` });
       const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
@@ -2138,8 +2146,8 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Close case</button>
       </div>
     `, (modal) => {
-      const code = modal.querySelector('[data-field="code"]').value;
-      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const code = fieldVal(modal, 'code');
+      const note = fieldVal(modal, 'note').trim();
       if (!note) { alert('Resolution note is required.'); return false; }
       // stop active clocks
       if (c.currentOwner && c.holdStartedAt) {
@@ -2172,7 +2180,7 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Return to requester</button>
       </div>
     `, (modal) => {
-      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      const reason = fieldVal(modal, 'reason').trim();
       if (!reason) { alert('A reason is required.'); return false; }
       // stop owner clock, freeze SLA
       if (c.currentOwner && c.holdStartedAt) {
@@ -2207,7 +2215,7 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Save note</button>
       </div>
     `, (modal) => {
-      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const note = fieldVal(modal, 'note').trim();
       if (!note) { alert('Handover note is required.'); return false; }
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
@@ -2239,8 +2247,8 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Resume</button>
       </div>
     `, (modal) => {
-      const dest = modal.querySelector('[data-field="dest"]').value;
-      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const dest = fieldVal(modal, 'dest');
+      const note = fieldVal(modal, 'note').trim();
 
       // Resume SLA clock: open a new running segment from NOW.
       c.slaPaused = false;
@@ -2302,8 +2310,8 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-primary" data-modal-submit>Close case</button>
       </div>
     `, (modal) => {
-      const code = modal.querySelector('[data-field="code"]').value;
-      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const code = fieldVal(modal, 'code');
+      const note = fieldVal(modal, 'note').trim();
       if (!note) { alert('Resolution note is required.'); return false; }
 
       if (c.currentOwner && c.holdStartedAt) {
@@ -2344,7 +2352,7 @@ function handlePrompt(caseId, kind) {
         <button class="btn btn-danger" data-modal-submit>Confirm cancel</button>
       </div>
     `, (modal) => {
-      const reason = modal.querySelector('[data-field="reason"]').value.trim();
+      const reason = fieldVal(modal, 'reason').trim();
       if (!reason) { alert('A reason is required.'); return false; }
 
       if (c.currentOwner && c.holdStartedAt) {
@@ -2405,8 +2413,8 @@ function handlePrompt(caseId, kind) {
         </div>
       </div>
     `, (modal) => {
-      const minutes = parseInt(modal.querySelector('[data-field="when"]').value, 10);
-      const note = modal.querySelector('[data-field="note"]').value.trim();
+      const minutes = parseInt(fieldVal(modal, 'when'), 10);
+      const note = fieldVal(modal, 'note').trim();
       const fireAt = new Date(realNow().getTime() + minutes * 60000).toISOString();
       c.reminder = {
         fireAt,
@@ -2474,7 +2482,7 @@ function handleNewCase(op) {
       <button class="btn btn-primary" data-modal-submit>Fetch &amp; add</button>
     </div>
   `, (modal) => {
-    const id = modal.querySelector('[data-field="caseId"]').value.trim();
+    const id = fieldVal(modal, 'caseId').trim();
     if (!id) { alert('Enter a case ID.'); return false; }
     addCaseById(id);   // async; modal closes now
     return true;
@@ -2539,8 +2547,8 @@ function handleReassign(caseId, type) {
       <button class="btn btn-primary" data-modal-submit>Save</button>
     </div>
   `, (modal) => {
-    const newId = modal.querySelector('[data-field="ownerId"]').value || null;
-    const reason = modal.querySelector('[data-field="reason"]').value.trim();
+    const newId = fieldVal(modal, 'ownerId') || null;
+    const reason = fieldVal(modal, 'reason').trim();
     if (newId === currentId) return true;
 
     const oldOwner = currentId ? getOwner(type, currentId) : null;

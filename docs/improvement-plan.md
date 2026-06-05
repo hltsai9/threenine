@@ -45,20 +45,23 @@ headers.
   handlers (`op-switcher` `app.js:479`, `reset-state` `app.js:2628`) already guard with
   `dataset.bound`, and `bindRosterEditor()` operates inside the replaced `#main` subtree. **No fix
   required**; revisit only if event delegation is wanted as a perf/clarity refactor under P1.
-- **Modal inputs read without null-guards** — e.g. `app.js:2045`
-  (`modal.querySelector('[data-field="fitId"]').value`), ~18 sites. Low runtime risk (the field
-  markup is built in the same handler), so **deferred to after the test net** — a small
-  `fieldVal(modal, name)` helper applied across the sites is safest once characterization tests
-  exist (see sequencing).
+- **[DONE] Modal inputs read without null-guards** — all 18 `modal.querySelector('[data-field=…]').value`
+  reads now go through a null-safe `fieldVal(modal, name)` helper (`app.js`, just above
+  `handlePrompt`), applied once the handler-outcome tests were in place. Returns `''` for a missing
+  node instead of throwing if a field is renamed/removed without updating its `onSubmit`.
 
 #### P1 — Duplication / refactor (do after a test net exists)
 
-- **`handlePrompt()` action blocks are ~70% duplicated** — `app.js:2020–2541`, nine
-  `if (kind === '...')` branches (assign_fit, escalate_to_hq, chase_fit, chase_hq, verify_fix,
-  approaching_sla, end_of_shift_handover, …). Each builds a similar modal, reads fields, mutates
-  the case, pushes history, toasts, and re-renders. Fix: extract a data-driven `PROMPT_HANDLERS`
-  map (config per kind: title, fields, mutation, history-verb) + one generic runner. ~500 lines
-  recoverable.
+- **[RE-ASSESSED / IN PROGRESS] `handlePrompt()` action blocks** — `app.js`, ~17 `kind` branches
+  (assign_fit, escalate_to_hq, chase_*, verify_fix, approaching_sla, resume, close_resolved,
+  cancel, handover, set_reminder, toggle_queue, …). On reading, the *scaffolding* repeats but the
+  per-kind logic is genuinely varied (distinct fields, validation, clock math, toasts), so the
+  earlier "~500 lines, single data-driven map" estimate was optimistic and a full rewrite is
+  higher-risk than billed. **Done so far** (test-guarded): the null-safe `fieldVal` helper removed
+  the 18 duplicated field reads. **Next, incrementally:** a `logHistory(c, op, kind, detail)` helper
+  for the ~13 identical `history.push({ at: new Date(NOW).toISOString(), who: op.id, … })` lines,
+  and a small modal-actions builder for the repeated Cancel/Submit footer — each landed under the
+  handler-outcome tests. A wholesale `PROMPT_HANDLERS` map remains optional and lower priority.
 - **`renderCaseList()` is ~285 lines** — `app.js:611–895` (watchlist + header + kanban bands +
   status dropdown). Split into `renderBoardHeader()`, `renderBand()`, `renderCard()`,
   `renderStatusDropdown()`.
