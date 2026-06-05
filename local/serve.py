@@ -159,12 +159,16 @@ class Handler(SimpleHTTPRequestHandler):
                     cases = [cases]
                 if not isinstance(cases, list):
                     cases = []
+                purge_ids = data.get("purgeIds") if isinstance(data, dict) else None
+                purge_ids = [i for i in purge_ids if i] if isinstance(purge_ids, list) else []
                 added = updated = 0
-                if WRITE_DATA_JS and cases:
+                if WRITE_DATA_JS and (cases or purge_ids):
                     # source="operator": these edits are authoritative and fully overwrite.
-                    added, updated, total = persist.persist_cases(cases, os.path.join(WEBROOT, "data.js"), source="operator")
+                    added, updated, total = persist.persist_cases(
+                        cases, os.path.join(WEBROOT, "data.js"), source="operator", purge_ids=purge_ids)
                     if added or updated:
-                        print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total")
+                        print(f"  data.js saved from operator edit: +{added} new, {updated} updated, {total} total"
+                              + (f" ({len(purge_ids)} purged)" if purge_ids else ""))
                 result = {"ok": True, "added": added, "updated": updated}
             elif path == "/api/save-file":
                 fpath = persist.write_js_file(WEBROOT, data.get("file"), data.get("js", ""))

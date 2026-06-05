@@ -344,6 +344,37 @@ test('toolbar (file://): refresh buttons always show; Load New stays http-only',
   ok(html.includes('data-action="refresh-case"'), 'per-case refresh shown even on file://');
 });
 
+/* ---------- recycle bin (4.4) ---------- */
+const REAL_HOUR = 3600 * 1000;
+test('isBinned / binExpired / binMsRemaining', () => {
+  const fresh = { deletedAt: new Date(Date.now() - REAL_HOUR).toISOString() };
+  const old = { deletedAt: new Date(Date.now() - 8 * 24 * REAL_HOUR).toISOString() };
+  ok(app.isBinned(fresh) && app.isBinned(old) && !app.isBinned({}));
+  ok(!app.binExpired(fresh) && app.binExpired(old));
+  ok(app.binMsRemaining(fresh) > 0 && app.binMsRemaining(old) === 0);
+});
+test('binned case is hidden from board, archive stats and week table', () => {
+  const id = app.CASES.find(c => !['closed', 'cancelled'].includes(c.status)).id;
+  const c = app.caseById(id);
+  const wk = c.weekId;
+  const before = app.weekStats(wk).total;
+  const boardBefore = app.renderCaseList().includes(`data-case-id="${id}"`);
+  c.deletedAt = new Date().toISOString();
+  const after = app.weekStats(wk).total;
+  const boardAfter = app.renderCaseList().includes(`data-case-id="${id}"`);
+  eq([after, boardBefore, boardAfter], [before - 1, true, false]);
+  // and it shows up in the recycle bin view
+  ok(app.renderRecycleBin().includes(id));
+  c.deletedAt = null; // restore for other tests
+});
+test('purgeCases hard-removes from state', () => {
+  app.mergeLiveCase({ id: 'C-PURGE', subject: 'Bye', status: 'new' });
+  ok(app.caseById('C-PURGE'));
+  app.__LIVE__ = false; // skip the server call in tests
+  app.purgeCases(['C-PURGE']);
+  ok(!app.caseById('C-PURGE'));
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

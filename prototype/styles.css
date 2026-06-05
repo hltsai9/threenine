@@ -406,6 +406,11 @@ h2 { font-size: 16px; margin: 24px 0 12px; }
   font-family: inherit;
 }
 .btn-tiny:hover { background: #eef2ff; border-color: var(--accent); }
+.btn-tiny.btn-danger { color: var(--danger); border-color: var(--border); }
+.btn-tiny.btn-danger:hover { background: #fef2f2; border-color: var(--danger); }
+.col-actions { white-space: nowrap; text-align: right; }
+.bin-btn { color: var(--text-muted); }
+.bin-btn:hover { color: var(--danger); border-color: var(--danger); background: #fef2f2; }
 
 .queue-toggle {
   white-space: nowrap;

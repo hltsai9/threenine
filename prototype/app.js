@@ -131,6 +131,8 @@ const SEED_ROSTER = {
 const SEED_OWNERS = structuredClone(window.OWNERS);
 
 const HOUR = 3600 * 1000;
+const DAY = 24 * HOUR;
+const RECYCLE_BIN_MS = 7 * DAY;   // deleted cases are kept in the recycle bin for 7 days
 
 // The demo clock. The seed in data.js is authored around SEED_ANCHOR; on boot we shift
 // every seed timestamp by a single offset so "now" lands on the real current time — this
@@ -191,6 +193,18 @@ function getOwner(type, id) {
   return (type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq).find(o => o.id === id) || null;
 }
 function caseById(id) { return STATE.cases.find(c => c.id === id); }
+
+// Recycle bin: a binned case carries a `deletedAt` ISO timestamp. Binned cases are hidden from
+// the board, archive and all stats, and live only in the recycle bin until 7 days pass (then
+// they're purged). Bin timing uses real wall-clock time (like reminders), not the demo clock.
+function isBinned(c) { return !!c.deletedAt; }
+function binMsRemaining(c) {
+  if (!c.deletedAt) return 0;
+  return Math.max(0, RECYCLE_BIN_MS - (realNow().getTime() - new Date(c.deletedAt).getTime()));
+}
+function binExpired(c) {
+  return !!c.deletedAt && (realNow().getTime() - new Date(c.deletedAt).getTime()) >= RECYCLE_BIN_MS;
+}
 
 function caseSlaMs(c) {
   // Total accumulated SLA time, including the running segment if currently running.
@@ -409,6 +423,7 @@ function currentRoute() {
   const h = location.hash || '#/cases';
   if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
   if (h.startsWith('#/cases')) return { name: 'cases' };
+  if (h === '#/archive/bin') return { name: 'recycleBin' };
   if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
   if (h.startsWith('#/archive')) return { name: 'archive' };
   if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
@@ -430,6 +445,7 @@ function labelForRoute(route) {
     case 'owners': return 'Owners';
     case 'shiftDetail': return `${route.shift} shift`;
     case 'archive': return 'Weekly Archive';
+    case 'recycleBin': return 'Recycle bin';
     case 'archiveWeek': {
       const w = window.WEEKS.find(w => w.id === route.id);
       return w ? w.label : 'Archive';
@@ -452,7 +468,7 @@ function render() {
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const active = ({
     cases: 'cases', detail: 'cases',
-    archive: 'archive', archiveWeek: 'archive',
+    archive: 'archive', archiveWeek: 'archive', recycleBin: 'archive',
     shifts: 'shifts', shiftDetail: 'shifts',
     owners: 'owners',
     flow: 'flow',
@@ -464,6 +480,7 @@ function render() {
   else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
   else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
   else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
+  else if (route.name === 'recycleBin') main.innerHTML = renderRecycleBin();
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
   else if (route.name === 'owners') main.innerHTML = renderOwnersPage();
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
@@ -501,7 +518,7 @@ function renderSidebar() {
   updateClock();
 
   document.getElementById('nav-cases-count').textContent =
-    STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
+    STATE.cases.filter(c => !c.deletedAt && !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
   const navOwners = document.getElementById('nav-owners-count');
@@ -545,6 +562,7 @@ function renderBellButton(c, ctx) {
 
 function approachingSlaCases() {
   return STATE.cases.filter(c => {
+    if (c.deletedAt) return false;
     if (['closed', 'cancelled', 'resolved'].includes(c.status)) return false;
     if (c.slaPaused) return false;
     return caseSlaMs(c) / HOUR > window.THRESHOLDS.approachingSlaHours;
@@ -553,6 +571,7 @@ function approachingSlaCases() {
 
 function escalatedCases() {
   return STATE.cases.filter(c => {
+    if (c.deletedAt) return false;
     if (['closed', 'cancelled', 'resolved'].includes(c.status)) return false;
     return c.flags?.includes('escalated');
   });
@@ -563,6 +582,7 @@ function escalatedCases() {
 // written by someone on the current shift. Writing one (from a card or the reading panel)
 // clears the indicator.
 function needsHandoverNote(c) {
+  if (c.deletedAt) return false;
   if (['closed', 'cancelled', 'new'].includes(c.status)) return false;
   if (!c.handover || c.handover.staleForCurrentShift) return true;
   const op = getOperator(STATE.operatorId);
@@ -619,9 +639,9 @@ function renderTzHint(owner) {
 
 function renderCaseList() {
   const allCases = STATE.cases
-    .filter(c => c.weekId === window.CURRENT_WEEK.id && !['closed', 'cancelled'].includes(c.status));
+    .filter(c => !c.deletedAt && c.weekId === window.CURRENT_WEEK.id && !['closed', 'cancelled'].includes(c.status));
   const closedCount = STATE.cases
-    .filter(c => c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
+    .filter(c => !c.deletedAt && c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
 
   // Columns = Case Center status (the real external status). Each column splits into a
   // top band (cases the first-line agent has queued / is actively working) and a bottom
@@ -690,7 +710,7 @@ function renderCaseList() {
   ` : '';
 
   const dueReminders = STATE.cases.filter(c =>
-    c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
+    !c.deletedAt && c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
   );
   const remindersBanner = dueReminders.length > 0 ? `
     <div class="reminders-due">
@@ -1164,7 +1184,7 @@ function statusTransitions(c) {
 /* ---------- Weekly Archive ---------- */
 
 function weekStats(weekId) {
-  const cases = STATE.cases.filter(c => c.weekId === weekId);
+  const cases = STATE.cases.filter(c => !c.deletedAt && c.weekId === weekId);
   const total = cases.length;
   const open = cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
   const closed = cases.filter(c => c.status === 'closed').length;
@@ -1199,11 +1219,15 @@ function renderArchiveIndex() {
       </a>
     `;
   }).join('');
+  const binnedCount = STATE.cases.filter(c => c.deletedAt).length;
   return `
     <div class="page-header">
       <div>
         <h1>Weekly Archive</h1>
         <div class="subtitle">Browse past weekly workbooks. Each week is a snapshot — cases that carried over move to the next week's filing.</div>
+      </div>
+      <div class="toolbar">
+        <a class="btn" href="#/archive/bin">🗑 Recycle bin${binnedCount ? ` <span class="count">${binnedCount}</span>` : ''}</a>
       </div>
     </div>
     <div class="archive-grid">${cards}</div>
@@ -1218,7 +1242,7 @@ function renderArchiveWeek(weekId) {
   }
   const s = weekStats(weekId);
   const cases = STATE.cases
-    .filter(c => c.weekId === weekId)
+    .filter(c => !c.deletedAt && c.weekId === weekId)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const rows = cases.length === 0 ? '' : cases.map(c => {
@@ -1239,6 +1263,7 @@ function renderArchiveWeek(weekId) {
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
+        <td class="col-actions"><button class="btn-tiny bin-btn" data-action="bin-case" data-case-id="${c.id}" title="Move to recycle bin" onclick="event.stopPropagation()">🗑</button></td>
       </tr>
     `;
   }).join('');
@@ -1283,6 +1308,7 @@ function renderArchiveWeek(weekId) {
             <th>Status</th>
             <th>Process Time</th>
             <th>${week.isCurrent ? 'Created' : 'Closed'}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -1291,11 +1317,144 @@ function renderArchiveWeek(weekId) {
   `;
 }
 
+function renderRecycleBin() {
+  const binned = STATE.cases
+    .filter(c => c.deletedAt)
+    .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+  const rows = binned.map(c => {
+    const remaining = binMsRemaining(c);
+    const soon = remaining < DAY;   // expiring within 24h
+    return `
+      <tr>
+        <td class="col-id">${c.id}</td>
+        <td><div class="subject">${escapeHtml(c.subject)}</div></td>
+        <td>${escapeHtml(c.requester)}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span></td>
+        <td class="muted tiny">${fmtRelative(c.deletedAt)}</td>
+        <td class="tiny" ${soon ? 'style="color:var(--danger);font-weight:600"' : 'style="color:var(--text-muted)"'}>${remaining > 0 ? fmtDuration(remaining) + ' left' : 'expiring'}</td>
+        <td class="col-actions">
+          <button class="btn-tiny" data-action="restore-case" data-case-id="${c.id}">Restore</button>
+          <button class="btn-tiny btn-danger" data-action="purge-case" data-case-id="${c.id}" title="Permanently delete — cannot be undone">Delete forever</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="row-flex"><a class="btn-link mono" href="#/archive">← archive</a></div>
+        <h1 style="margin-top:8px">Recycle bin</h1>
+        <div class="subtitle">Deleted cases are kept here for 7 days, then permanently removed. ${binned.length} case${binned.length === 1 ? '' : 's'} in the bin.</div>
+      </div>
+    </div>
+    ${binned.length === 0 ? '<div class="queue-empty">The recycle bin is empty.</div>' : `
+      <table class="case-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Subject</th>
+            <th>Requester</th>
+            <th>Status</th>
+            <th>Deleted</th>
+            <th>Expires</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `}
+  `;
+}
+
+/* ---------- Recycle bin actions ---------- */
+
+// Soft-delete: move a case to the recycle bin (one confirm). It's hidden from the board and
+// archive and restorable for 7 days. `deletedAt` uses real wall-clock time.
+function handleBinCase(id) {
+  const c = caseById(id);
+  if (!c) return;
+  showModal(`
+    <h3>Move case ${escapeHtml(c.id)} to the recycle bin?</h3>
+    <div class="modal-sub">${escapeHtml(c.subject)}</div>
+    <div class="muted tiny" style="margin-top:8px">It will be hidden from the board and archive and kept in the recycle bin for 7 days — you can restore it any time before then.</div>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-danger" data-modal-submit>Move to bin</button>
+    </div>
+  `, () => {
+    c.deletedAt = realNow().toISOString();
+    logHistory(c, getOperator(STATE.operatorId), 'binned', 'Moved to recycle bin');
+    showToast(`${c.id} moved to the recycle bin (restorable for 7 days).`, 'warn');
+    render();
+    return true;
+  });
+}
+
+// Restore a binned case back to the board/archive.
+function handleRestoreCase(id) {
+  const c = caseById(id);
+  if (!c || !c.deletedAt) return;
+  c.deletedAt = null;   // null (not delete) so live-mode persistence clears it server-side too
+  logHistory(c, getOperator(STATE.operatorId), 'restored', 'Restored from recycle bin');
+  showToast(`${c.id} restored.`, 'success');
+  render();
+}
+
+// Permanent delete (the second confirm) — destroys the case for good.
+function handlePurgeCase(id) {
+  const c = caseById(id);
+  if (!c) return;
+  showModal(`
+    <h3>Permanently delete ${escapeHtml(c.id)}?</h3>
+    <div class="modal-sub">${escapeHtml(c.subject)}</div>
+    <div class="muted tiny" style="margin-top:8px"><strong>This cannot be undone.</strong> The case and its history are removed for good.</div>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Keep in bin</button>
+      <button class="btn btn-danger" data-modal-submit>Delete forever</button>
+    </div>
+  `, () => {
+    purgeCases([id]);
+    showToast(`${id} permanently deleted.`, 'warn');
+    render();
+    return true;
+  });
+}
+
+// Hard-remove cases from state (and, in live mode, from data.js on the server).
+function purgeCases(ids) {
+  const set = new Set(ids);
+  STATE.cases = STATE.cases.filter(c => !set.has(c.id));
+  if (STATE._savedSnapshot) for (const id of ids) delete STATE._savedSnapshot[id];
+  purgeCasesOnServer(ids);
+}
+
+// Tell the local server to drop these case ids from data.js (live mode only).
+function purgeCasesOnServer(ids) {
+  if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !ids.length) return;
+  setSaveStatus('saving', 'Deleting…');
+  try {
+    fetch('api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purgeIds: ids }),
+    }).then(r => setSaveStatus(r.ok ? 'saved' : 'error')).catch(() => setSaveStatus('error'));
+  } catch (e) { setSaveStatus('error'); }
+}
+
+// Auto-purge bin entries older than 7 days. Returns true if anything was purged.
+function purgeExpiredBin() {
+  const expired = STATE.cases.filter(binExpired).map(c => c.id);
+  if (!expired.length) return false;
+  purgeCases(expired);
+  return true;
+}
+
 /* ---------- Shifts ---------- */
 
 function shiftStats(shiftName) {
   const opIds = window.SHIFTS.find(s => s.name === shiftName)?.operatorIds || [];
-  const open = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const open = STATE.cases.filter(c => !c.deletedAt && !['closed', 'cancelled'].includes(c.status));
   const handedTo = open.filter(c => c.handover?.to === shiftName);
   const handedFrom = open.filter(c => c.handover?.from === shiftName);
   const writtenByShift = open.filter(c => c.handover && opIds.includes(c.handover.author));
@@ -1812,7 +1971,7 @@ function renderShiftDetail(shiftName) {
   };
 
   // Recent handover activity from history across all open cases.
-  const allOpen = STATE.cases.filter(c => !['closed', 'cancelled'].includes(c.status));
+  const allOpen = STATE.cases.filter(c => !c.deletedAt && !['closed', 'cancelled'].includes(c.status));
   const activity = [];
   for (const c of allOpen) {
     for (const h of (c.history || [])) {
@@ -2853,6 +3012,15 @@ function bindHandlers() {
     document.getElementById('lookback-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLoad(); });
   }
   document.getElementById('refresh-existing')?.addEventListener('click', refreshAllStored);
+  document.querySelectorAll('[data-action="bin-case"]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); handleBinCase(el.dataset.caseId); });
+  });
+  document.querySelectorAll('[data-action="restore-case"]').forEach(el => {
+    el.addEventListener('click', () => handleRestoreCase(el.dataset.caseId));
+  });
+  document.querySelectorAll('[data-action="purge-case"]').forEach(el => {
+    el.addEventListener('click', () => handlePurgeCase(el.dataset.caseId));
+  });
   document.querySelectorAll('[data-action="refresh-case"]').forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();
@@ -2878,8 +3046,9 @@ function bindHandlers() {
 
 function checkReminders() {
   const now = realNow().getTime();
-  let firedAny = false;
+  let firedAny = purgeExpiredBin();   // also sweep the recycle bin for entries past 7 days
   for (const c of STATE.cases) {
+    if (c.deletedAt) continue;
     if (!c.reminder || c.reminder.fired) continue;
     if (['closed', 'cancelled'].includes(c.status)) continue;
     if (new Date(c.reminder.fireAt).getTime() <= now) {

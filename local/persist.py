@@ -93,7 +93,7 @@ def _read_data_js_cases(path):
         return None
 
 
-def persist_cases(cases, data_js_path, source="live"):
+def persist_cases(cases, data_js_path, source="live", purge_ids=()):
     """Merge `cases` (list of board-shaped dicts) into data.js, KEEPING cases already there.
     Append new, update existing (by id), and never drop old cases that weren't in this query.
     Returns (added, updated, total). Writes nothing if nothing changed.
@@ -103,6 +103,8 @@ def persist_cases(cases, data_js_path, source="live"):
                         (status, routing, history, notes, clocks, agent layer) is preserved.
     source="operator" — cases are operator edits (/api/save): they are authoritative and
                         fully overwrite the stored case.
+    purge_ids         — case ids to permanently remove from data.js (recycle bin "delete
+                        forever" / 7-day auto-purge).
     Brand-new cases (not seen before) are taken in full either way."""
     # Baseline = whatever is already in data.js (the file we maintain) unioned with the
     # sidecar store, so old cases are preserved even if the store was cleared.
@@ -134,6 +136,11 @@ def persist_cases(cases, data_js_path, source="live"):
         else:
             by_id[cid] = c                     # brand-new case → take the full record
             added += 1
+
+    # Recycle bin: permanently drop any cases the operator purged.
+    for cid in (purge_ids or ()):
+        if by_id.pop(cid, None) is not None:
+            updated += 1
 
     merged_list = list(by_id.values())
 

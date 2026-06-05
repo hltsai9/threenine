@@ -207,8 +207,12 @@ Tracked todo list — each item has a concrete plan below.
   refreshing existing ones. *(Done: button relabelled "Load New", tooltip + `reloadLiveCases` toast
   reworded, paired with the new "Refresh Existing" button.)*
 - [ ] **4.3** Split the weekly archive out of `data.js` so the file doesn't grow unbounded.
-- [ ] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
-  1-week recycle bin for deleted cases.
+- [x] **4.4** Garbage-bin icon in the archive view, foolproof double-confirm before deleting, and a
+  1-week recycle bin for deleted cases. *(Done: 🗑 per archive-week row soft-deletes via `deletedAt`
+  (one confirm); a `#/archive/bin` Recycle bin lists binned cases with time-remaining, Restore, and
+  a second-confirm "Delete forever"; binned cases are hidden from board/archive/stats/reminders;
+  auto-purge after 7 days on the reminder tick. Persists in demo (localStorage) and live mode
+  (`persist.py` honors `deletedAt` + `purge_ids`).)*
 - [x] **4.5** Add a **First-line handling** clock to the case-detail clock grid (alongside SLA,
   Local FIT, and HQ Product Team). *(Done: `renderCaseDetailBody` shows a 4th tile valued
   `holderTotals.triage` — triage only; Sanity Check is requester time per 4.8 — with a `tl-triage`
@@ -227,6 +231,8 @@ Tracked todo list — each item has a concrete plan below.
 - [x] **4.9** Let the **first-line agent return a New case to the requester**. *(Done: "Return to
   requester" added to the `new` status transitions; Status Flow diagram + table updated; handler
   already handled the null-owner path. Test added.)*
+- [ ] **4.10** Load cases by a **created-between time window** (e.g. created between 72h and 60h
+  ago), not just "created within N hours".
 
 **Dependency note:** 4.2 is trivial and pairs with 4.1. 4.1 needs a small backend addition.
 4.3 (archive splitting) and 4.4 (recycle-bin persistence) both change the case-storage shape and
@@ -511,6 +517,35 @@ only be **Assign to Local FIT** or **Cancel** (`app.js:1122–1124`).
 - **Tests:** add a `handlePrompt` outcome test — from `status:'new', currentOwner:null`, submit
   `approaching_sla` with a reason → `status:'returned_to_requester'`, `slaPaused:true`, last history
   kind `returned`, and no error from the null-owner path.
+
+### 4.10 — Load cases by a created-between time window
+
+**Why.** Today "Load New" pulls cases **created within the last N hours** (a single look-back box →
+`?hours=N`). The operator wants to query a **band** — e.g. cases created **between 72h and 60h
+ago** — to backfill a specific window without re-pulling everything since then.
+
+**What exists**
+- Front end: the look-back control (`#lookback-input` + `#lookback-load`, `renderCaseList`) →
+  `reloadLiveCases()` → `tryLoadLiveCases()` builds `api/cases?hours=${STATE.lookbackHours}`
+  (`app.js`). `STATE.lookbackHours` persists in `localStorage` (`case-tracker-lookback`).
+- Back end: `serve.py` `_serve_cases` reads `?hours=`; `casecenter.fetch_cases(lookback_hours=...)`
+  sets `LOOKBACK_HOURS` for the operator's `fetch_raw()` query (`local/casecenter.py:213–240`).
+
+**Plan**
+- **UI:** add a second number input so the control reads "Created between `[to]` and `[from]` hours
+  ago" (two fields: `fromHours` = older bound, `toHours` = newer bound; e.g. 72 and 60). Keep the
+  single-box "within N hours" behavior when the newer bound is blank/0 (back-compat). Persist both
+  in `localStorage`.
+- **Query:** extend the request to `api/cases?fromHours=72&toHours=60` (keep `?hours=` working).
+- **Back end:** `serve.py` parse `fromHours`/`toHours`; pass a `(from_hours, to_hours)` window to
+  `casecenter.fetch_cases`, which exposes it to `fetch_raw()` (the user fills in the actual
+  Case Center date-range filter — document the two module globals like `LOOKBACK_HOURS`).
+- **Validate:** require `fromHours > toHours >= 0`; warn otherwise (mirror the existing positive-N
+  guard in the `doLoad` handler).
+- **Merge:** unchanged — results flow through the validated `mergeLiveCase`/overlay path, so a band
+  query never wipes operator work.
+- **Tests:** assert the request URL is built correctly for both the single-bound and two-bound
+  cases, and that the validation rejects an inverted/negative window.
 
 ## Notes
 
