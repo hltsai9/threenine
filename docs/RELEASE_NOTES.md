@@ -8,6 +8,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-06
+
+### Internal
+
+- **Project rules for every Claude Code session.** Added a root `CLAUDE.md` (auto-loaded rulebook)
+  and a scoped `backend/CLAUDE.md` (credentials live only on the ingestion side; `merge.py` field
+  ownership; `DATABASE_URL` is the only DB switch). Extended the **Stop** release-note hook to cover
+  `backend/` and `deploy/`, added a **Stop** `tests-before-finish` hook and a **PostToolUse**
+  `rebundle-standalone` hook, and a `/ship` skill for the end-of-change ritual.
+
+### Docs
+
+- **Single source of truth for setup.** New `docs/SETUP.md` consolidates run instructions, Case
+  Center credentials, and the full environment-variable table; the root/`local`/`backend` READMEs
+  now link to it instead of duplicating. Consolidated all TODOs into `docs/improvement-plan.md`
+  (new §5, absorbing the former `local/TODO-casecenter-mapping.md`).
+
 ## 2026-06-05
 
 ### Added

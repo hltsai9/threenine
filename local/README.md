@@ -26,23 +26,11 @@ browser ──POST /api/save-file▶ serve.py ─writes─▶ shifts.js / owners
   placement, handover notes, reminders) is kept in `localStorage` and merged back on every
   pull so refreshing never wipes your work.
 
-## One-time setup
+## Setup & run
 
-1. Credentials (pick ONE):
-   ```bash
-   cp local/secrets.local.json.example local/secrets.local.json   # edit: apiKey + cookie
-   # or:  export CASE_CENTER_API_KEY=...   CASE_CENTER_COOKIE=...   (Windows: set / $env:)
-   ```
-2. Wire up your fetch in **`local/casecenter.py`**:
-   - `fetch_raw()` — your request to Case Center; `return x_json["data"]` (a list works; the
-     whole response object is auto-unwrapped too). In your JQL use:
-     - `CASE_ID`        → when set, fetch just that one case (used by **+ New case**), e.g. `f'caseId = "{CASE_ID}"'`
-     - else `LOOKBACK_HOURS` → the look-back window, e.g. `f"created >= -{int(LOOKBACK_HOURS)}h"`
-   - `STATUS_MAP` / `STATUS_MAP_BY_STATUS` — Case Center status → board column.
-   - `LEVEL_MAP` — caseLevel → priority. `map_record()` — field names → board case.
-   - `BASE_URL` (top of file, or `CASE_CENTER_BASE_URL` env) — builds each case's link.
-
-## Run
+Credentials, the `local/casecenter.py` `fetch_raw()` wiring, and env vars are documented once in
+**[`../docs/SETUP.md`](../docs/SETUP.md)** (Case Center credentials + Environment variables). Once
+that's in place:
 
 ```bash
 python3 local/serve.py            # stdlib only; binds 127.0.0.1 (not exposed on the network)

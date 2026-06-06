@@ -57,13 +57,8 @@ no mixed content — so `prototype/config.js` keeps `API_BASE = ''`.
 
 ## Environment variables
 
-| Var | Used by | Default | Purpose |
-|-----|---------|---------|---------|
-| `DATABASE_URL` | all | SQLite file in repo root | DB connection (the demo↔prod swap) |
-| `CASE_CENTER_API_KEY` / `CASE_CENTER_COOKIE` | ingest | — | Case Center creds (ingest only) |
-| `ALLOWED_ORIGINS` | api | _(empty)_ | CORS origins, only for a separate-host SPA |
-| `SERVE_STATIC` | api | `1` | also serve `prototype/` at `/` |
-| `AUTO_CREATE` | api/ingest | `1` | create tables on start (set `0` to use Alembic) |
+`DATABASE_URL`, `CASE_CENTER_*`, `ALLOWED_ORIGINS`, `SERVE_STATIC`, `AUTO_CREATE`, and the rest are
+documented once in **[`../docs/SETUP.md`](../docs/SETUP.md)** (Environment variables).
 
 ## Files
 

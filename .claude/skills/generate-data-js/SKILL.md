@@ -65,7 +65,7 @@ Fields the live feed does **not** supply today are local/demo-only — keep them
 `agentStatus`, `handover`, `reminder`, FIT/HQ routing (`fitId`/`hqId`/`currentOwner`), and
 `history` (which powers the **ownership timeline** and the **FIT-vs-HQ time** split on the
 case detail). Open work to populate these from Case Center is tracked in
-`local/TODO-casecenter-mapping.md`.
+`docs/improvement-plan.md` (§5 — Live Case Center mapping).
 
 ## Conventions (do not break)
 

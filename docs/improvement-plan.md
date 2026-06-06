@@ -551,6 +551,54 @@ ago** — to backfill a specific window without re-pulling everything since then
 - **Tests:** assert the request URL is built correctly for both the single-bound and two-bound
   cases, and that the validation rejects an inverted/negative window.
 
+## 5 — Live Case Center mapping (open items)
+
+Moved here from the former `local/TODO-casecenter-mapping.md` so all backlog lives in one file.
+Resumable checklist for wiring live Case Center data. **Edit point for everything below:**
+`local/casecenter.py`. Verify with the snippet at the bottom. Full context: `local/README.md`.
+
+**Resolved (in `local/casecenter.py`):** items 1–6 — `caseStatus`/`caseSubstatus` → column +
+label (`STATUS_MAP` / `STATUS_MAP_BY_STATUS`), `caseLevel` → priority (`LEVEL_MAP`), people &
+departments in `map_record()`, case link (`BASE_URL` / `build_case_link()`), and the GMT ISO-8601
+`createDateTime` pass-through. See the casecenter.py docstrings for the agreed mapping tables.
+
+**Still open:**
+
+- **7. Ownership history → timeline + FIT/HQ time.** Live cases return `history: []`, so the
+  ownership timeline and FIT/HQ clocks read 0m. If Case Center exposes a status/assignment audit
+  log, map it in `map_record()` into a `history` array of `{ at, who, kind, detail }` that
+  `ownershipSegments()` (`app.js`) understands (`created` → first line · `assigned` → Local FIT ·
+  `escalated` (detail `FIT → HQ …`) → HQ · `status` (detail contains `Sanity Check`) → sanity ·
+  `returned` → with requester · `resumed` · `closed`/`cancelled`). Also populates the History list.
+- **8. Owner / routing (FIT vs HQ attribution).** Live cases set no `fitId`/`hqId`/`currentOwner`.
+  Decide how `assignee.accountId`/team maps to the board owner model (see §4.7's alias-table plan)
+  and set `currentOwner` to `'fit'`/`'hq'` so the active-owner clock/column are correct.
+- **9. SLA accuracy for live cases.** `caseSlaMs()` runs from `createDateTime` with no pauses
+  (no transitions). If Case Center reports real on-us/pause windows, map them
+  (`slaAccumulatedMs`/`slaPaused`, or derive from the #7 audit log).
+- **10. Weekly Archive bucketing.** `normalizeLiveCase()` defaults every live case's `weekId` to
+  the current week. Derive `weekId` from `createDateTime` against `window.WEEKS` for past-week
+  bucketing.
+- **11. Refresh cadence & cookie expiry (nice-to-have).** Data pulls on load/refresh only. Optional:
+  auto-refresh interval or manual button; surface a clear banner when `/api/cases` fails (cookie
+  expired → 500) instead of silently falling back to seed.
+- **`fetch_raw()`** in `local/casecenter.py` — paste the real Case Center request and
+  `return x_json["data"]` (credentials come from env vars or `secrets.local.json`).
+
+**Verify after filling the tables:**
+
+```bash
+python3 -c "
+import sys; sys.path.insert(0,'local'); import casecenter as cc, json
+rec = {'caseId':1,'subject':'t','createDateTime':'2026-06-05T05:12:00Z',
+       'caseLevel':'<a real level>','caseStatus':'<a real status>',
+       'caseSubstatus':'<a real substatus>','assignee':{'accountId':'a1'}}
+print(json.dumps(cc.map_record(rec), indent=2))   # expect correct status + priority
+"
+```
+Then run `python3 local/serve.py` and open http://127.0.0.1:8787/ — cases should land in the
+right columns. (Public Pages site stays on seed data; live mode is local only.)
+
 ## Notes
 
 - The earlier `docs/promo-slides-plan.md` references branch

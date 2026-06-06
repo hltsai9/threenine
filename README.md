@@ -9,52 +9,12 @@ This repo holds the **User Requirements Document** and a **click-through web pro
 
 - **Back end** (new): [`backend/`](backend/README.md) — a decoupled pipeline that loads cases into a database so the front end needs **no API key / cookie**. An ingestion script (the only holder of Case Center credentials) writes cases to a DB; a FastAPI service + the static SPA read from it. **SQLite for demos, PostgreSQL/MySQL for production on Kubernetes** (`deploy/`), selected by `DATABASE_URL`. This supersedes the per-user `local/serve.py` live-proxy (which is still fine for a single-user local run).
 
-## Run the prototype
+## Run it
 
-**Online (deployed):** GitHub Pages publishes the contents of `prototype/` via the workflow at `.github/workflows/pages.yml`. After enabling **Settings → Pages → Source = GitHub Actions**, the site is reachable at the Pages URL shown in the deploy job (typically `https://<user>.github.io/threenine/`).
-
-**Locally — easiest (just open a file):** double-click `prototype/standalone.html`, or open it in any browser via `file://`. It's a self-contained build of the prototype with the CSS and JS inlined, so no HTTP server or relative file fetches are needed. This is the recommended path for sharing the prototype as a single file.
-
-**Locally — modular sources (for editing):** open `prototype/index.html` after running a local HTTP server. The modular files (`data.js`, `shifts.js`, `owners.js`, `app.js`, `tour.js`, `styles.css`) load via `<script src>` and `<link rel>`, which works fine over `http://`:
-
-```bash
-cd prototype && python3 -m http.server 8000
-# then open http://localhost:8000
-```
-
-**Re-bundling after edits:** the modular source files are the source of truth. When you edit any of them, regenerate `standalone.html`:
-
-```bash
-node prototype/bundle.mjs
-```
-
-The Pages workflow runs this step automatically on every deploy.
-
-## ⚠️ Local setup checklist — after you pull
-
-A few files need attention **every time you pull this repo to your local machine** (they're either
-gitignored, stubs, or get clobbered by the local virus scanner). Don't skip these or live mode
-won't work:
-
-| File | What to do |
-| ---- | ---------- |
-| `local/casecenter.py` → `fetch_raw()` | Paste your real Case Center request logic here — the committed version is a **stub**. It should return the list of raw records (`x_json["data"]`). Do **not** hardcode credentials here. |
-| `local/secrets.local.json` | **Gitignored — won't exist after a clone.** Create it and fill in your `apiKey` + `cookie`: `cp local/secrets.local.json.example local/secrets.local.json` (or set `CASE_CENTER_API_KEY` / `CASE_CENTER_COOKIE` env vars instead). |
-| `prototype/index.html` | The local **virus scan may delete parts** of this file. Re-check it after pulling and restore if needed: `git restore prototype/index.html`. |
-| `prototype/standalone.html` | Same virus-scan issue. Easiest fix is to **regenerate** it from the modular sources: `node prototype/bundle.mjs` (or `git restore prototype/standalone.html`). |
-
-Quick restore for the two HTML files in one go:
-
-```bash
-git restore prototype/index.html
-node prototype/bundle.mjs   # rebuilds standalone.html from source
-```
-
-Then run the live backend (see `local/README.md`):
-
-```bash
-python3 local/serve.py   # then open the localhost URL it prints
-```
+Quickest look: open `prototype/standalone.html` via `file://` (self-contained, no server).
+For editing modular sources, the deployed Pages site, the local-setup checklist after a pull,
+Case Center credentials, and the full environment-variable table, see **[`docs/SETUP.md`](docs/SETUP.md)**
+— the single source of truth for running and configuring the app.
 
 ## Take the interactive tour
 

@@ -20,6 +20,23 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/release-note-reminder.sh\"",
             "statusMessage": "Checking release notes…"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/tests-before-finish.sh\"",
+            "statusMessage": "Running tests…"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/rebundle-standalone.sh\"",
+            "statusMessage": "Rebundling standalone.html…"
           }
         ]
       }
