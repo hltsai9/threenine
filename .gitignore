@@ -18,5 +18,9 @@ prototype/owners.js.*.bak
 __pycache__/
 *.pyc
 
+# Local SQLite database (demo) — never commit data.
+*.db
+casetracker.db
+
 # OS / editor cruft
 .DS_Store

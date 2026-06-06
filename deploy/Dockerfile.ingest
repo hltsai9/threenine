@@ -1,0 +1,20 @@
+# Ingestion image: pulls cases from Case Center into the DB. Runs as a CronJob.
+# Includes Node.js only because the optional --seed-from-data-js demo mode uses it;
+# the real Case Center path (local/casecenter.py) is pure Python.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+COPY backend/ backend/
+COPY local/ local/
+COPY prototype/data.js prototype/data.js
+
+# CC creds (CASE_CENTER_API_KEY / CASE_CENTER_COOKIE) come from a K8s Secret at runtime.
+ENV AUTO_CREATE=0
+CMD ["python", "-m", "backend.ingest", "--hours", "6"]

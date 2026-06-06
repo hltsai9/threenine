@@ -7,6 +7,8 @@ This repo holds the **User Requirements Document** and a **click-through web pro
 
 > The prototype is for design review, not production. There's no auth, no backend, and reloading the page resets all state.
 
+- **Back end** (new): [`backend/`](backend/README.md) — a decoupled pipeline that loads cases into a database so the front end needs **no API key / cookie**. An ingestion script (the only holder of Case Center credentials) writes cases to a DB; a FastAPI service + the static SPA read from it. **SQLite for demos, PostgreSQL/MySQL for production on Kubernetes** (`deploy/`), selected by `DATABASE_URL`. This supersedes the per-user `local/serve.py` live-proxy (which is still fine for a single-user local run).
+
 ## Run the prototype
 
 **Online (deployed):** GitHub Pages publishes the contents of `prototype/` via the workflow at `.github/workflows/pages.yml`. After enabling **Settings → Pages → Source = GitHub Actions**, the site is reachable at the Pages URL shown in the deploy job (typically `https://<user>.github.io/threenine/`).

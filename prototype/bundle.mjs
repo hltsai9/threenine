@@ -19,6 +19,7 @@ function read(name) {
 }
 
 const css = read('styles.css');
+const config = read('config.js');
 const data = read('data.js');
 const shifts = read('shifts.js');
 const owners = read('owners.js');
@@ -49,6 +50,8 @@ ${css}
 <body>
 ${bodyContent}
 <script>
+${config}
+
 ${data}
 
 ${shifts}

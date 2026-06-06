@@ -1,0 +1,23 @@
+# Same-origin entrypoint: both the SPA (/) and the API (/api/*) are served by the
+# API Deployment, so the browser sees one origin — no CORS, no HTTPS mixed-content.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: case-tracker
+  annotations:
+    # Adjust for your ingress controller / cert-manager setup.
+    cert-manager.io/cluster-issuer: "internal-ca"
+spec:
+  tls:
+    - hosts: ["case-tracker.internal"]
+      secretName: case-tracker-tls
+  rules:
+    - host: case-tracker.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: case-tracker-api
+                port: { number: 80 }

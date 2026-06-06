@@ -1,0 +1,10 @@
+# Core API + DB stack (works as-is on SQLite for demos).
+fastapi>=0.110
+uvicorn[standard]>=0.29
+SQLAlchemy>=2.0
+alembic>=1.13
+
+# Production database drivers — install the ONE matching your DATABASE_URL.
+# (Left commented so the SQLite demo needs no native build / network.)
+# psycopg[binary]>=3.1   # PostgreSQL  (postgresql+psycopg://...)
+# PyMySQL>=1.1           # MySQL/MariaDB (mysql+pymysql://...)

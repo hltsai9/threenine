@@ -41,13 +41,20 @@ try {
   if (lt >= 0) STATE.lookbackToHours = lt;
 } catch (e) { /* ignore */ }
 
+// Resolve an API path against window.API_BASE (set in config.js). Empty base = same origin
+// (relative path, exactly as before). A non-empty base points the SPA at a separate backend.
+function apiUrl(path) {
+  const base = (window.API_BASE || '').replace(/\/$/, '');
+  return base ? base + '/' + path.replace(/^\//, '') : path;
+}
+
 // Build the /api/cases query for a created-between window. With a newer bound > 0 it asks for a
 // band (created between fromHours and toHours ago); otherwise the legacy "within N hours" form.
 function liveCasesUrl(from, to) {
   from = from || 0; to = to || 0;
-  if (!from) return 'api/cases';
-  if (to > 0) return `api/cases?fromHours=${encodeURIComponent(from)}&toHours=${encodeURIComponent(to)}`;
-  return `api/cases?hours=${encodeURIComponent(from)}`;
+  if (!from) return apiUrl('api/cases');
+  if (to > 0) return apiUrl(`api/cases?fromHours=${encodeURIComponent(from)}&toHours=${encodeURIComponent(to)}`);
+  return apiUrl(`api/cases?hours=${encodeURIComponent(from)}`);
 }
 
 // Validate a created-between window. Returns an error string, or null if OK. The older bound must
@@ -1470,7 +1477,7 @@ function purgeCasesOnServer(ids) {
   if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !ids.length) return;
   setSaveStatus('saving', 'Deleting…');
   try {
-    fetch('api/save', {
+    fetch(apiUrl('api/save'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purgeIds: ids }),
@@ -2839,7 +2846,7 @@ function mergeLiveCase(raw) {
 // Fetch one case from Case Center by id (GET /api/cases?id=…). Returns the parsed cases array,
 // or throws on transport error / rejects with a status. Shared by add + refresh.
 async function fetchCaseById(id) {
-  const res = await fetch('api/cases?id=' + encodeURIComponent(id), { headers: { Accept: 'application/json' } });
+  const res = await fetch(apiUrl('api/cases?id=' + encodeURIComponent(id)), { headers: { Accept: 'application/json' } });
   if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
   const data = await res.json();
   return (Array.isArray(data) ? data : (data && data.cases)) || [];
@@ -3187,7 +3194,7 @@ function saveCasesToServer(cases) {
   if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !cases.length) return;
   setSaveStatus('saving');
   try {
-    fetch('api/save', {
+    fetch(apiUrl('api/save'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cases }),
@@ -3200,7 +3207,7 @@ function saveCasesToServer(cases) {
 function saveJsFile(file, snippet, label) {
   if (!/^https?:$/.test(location.protocol)) { showToast('Run the board via serve.py to save files.', 'warn'); return; }
   setSaveStatus('saving', 'Saving ' + label + '…');
-  fetch('api/save-file', {
+  fetch(apiUrl('api/save-file'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file, js: snippet }),

@@ -1,0 +1,48 @@
+# API service: stateless, horizontally scalable. Serves /api/* and the static SPA.
+# An initContainer runs Alembic migrations before the app starts.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-tracker-api
+  labels: { app: case-tracker-api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: case-tracker-api }
+  template:
+    metadata:
+      labels: { app: case-tracker-api }
+    spec:
+      initContainers:
+        - name: migrate
+          image: case-tracker-api:latest   # same image; just runs alembic
+          workingDir: /app/backend
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef: { name: case-tracker-db }
+      containers:
+        - name: api
+          image: case-tracker-api:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef: { name: case-tracker-db }
+          env:
+            - name: AUTO_CREATE
+              value: "0"
+            - name: SERVE_STATIC
+              value: "1"
+          readinessProbe:
+            httpGet: { path: /api/cases, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-tracker-api
+spec:
+  selector: { app: case-tracker-api }
+  ports:
+    - port: 80
+      targetPort: 8000

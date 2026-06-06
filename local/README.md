@@ -1,5 +1,11 @@
 # Running the board locally with LIVE Case Center data
 
+> **Note:** this `serve.py` flow is the **single-user, one-backend-per-machine** setup — each
+> user must configure the API key + cookie locally. To let a team load cases **without** any
+> per-user credential setup, use the decoupled database pipeline in [`backend/`](../backend/README.md)
+> instead (ingestion → DB → API). This `local/` flow remains handy for a quick solo run, and
+> `local/casecenter.py` is reused unchanged by the new ingestion script.
+
 The public site at `https://hltsai9.github.io/threenine/` is a **static demo** on seed data —
 it can't reach your on-prem Case Center (and must never hold credentials). To see **live**
 cases, run the board locally with a tiny stdlib Python server that talks to Case Center.

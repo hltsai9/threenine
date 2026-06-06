@@ -1,0 +1,20 @@
+# API service image: FastAPI (uvicorn) serving /api/* and the static SPA same-origin.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install deps first for layer caching. Uncomment a driver in requirements.txt
+# (psycopg / PyMySQL) to match your production DATABASE_URL.
+COPY backend/requirements.txt backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+# App code + the static front end (served same-origin → no CORS, no mixed content).
+COPY backend/ backend/
+COPY prototype/ prototype/
+
+ENV SERVE_STATIC=1 \
+    AUTO_CREATE=0
+EXPOSE 8000
+
+# Production runs migrations out-of-band (initContainer/Job) and disables AUTO_CREATE.
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]
