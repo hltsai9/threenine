@@ -8,6 +8,22 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-08
+
+### Changed
+
+- **Rolled the demo calendar forward one week.** Seed data now centers on **W24 · June 8 – 14,
+  2026** (`window.NOW` = `2026-06-12T13:00:00Z`): every case timestamp shifted +7 days, every
+  `weekId` bumped +1, and the rolling 4-week window advanced (W24 current; W23/W22/W21 prior;
+  the oldest week drops off). Coverage (statuses, flags, idle/SLA thresholds, stale handover,
+  carry-over) is preserved.
+
+### Internal
+
+- **Fixed stale week labels in `data.js`.** The historical section comments (`W16/W17/W18`) and
+  the carry-over note/history detail (`W18 → W19`) were several shifts out of date; they now
+  match the actual `weekId`s (`W21/W22/W23`, carry-over `W23 → W24`).
+
 ## 2026-06-06
 
 ### Internal
