@@ -165,6 +165,32 @@ test('holderTotals: live case (no created event) — first line = assign − cre
   eq(t.fit, 1 * HOUR);      // assign (1h ago) → now = 1h with FIT
 });
 
+/* ---------- process timeline (Case Center per-stage processing log) ----------
+ * processSegments orders the raw processTimeline by start time and gives each entry a duration
+ * (its processMinutes, falling back to end − start). Drives the case-detail "Process timeline". */
+const processSegments = app.processSegments;
+test('processSegments: empty / missing → []', () => {
+  eq(processSegments({}), []);
+  eq(processSegments({ processTimeline: [] }), []);
+});
+test('processSegments: orders by start time and uses minutes for duration', () => {
+  const segs = processSegments({ processTimeline: [
+    { processType: 'B', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR), minutes: 60 },
+    { processType: 'A', startedAt: iso(4 * HOUR), endedAt: iso(2 * HOUR), minutes: 120 },
+  ] });
+  eq(segs.map(s => s.processType), ['A', 'B']);   // re-sorted oldest-first
+  eq(segs.map(s => s.ms), [120 * 60000, 60 * 60000]);
+});
+test('processSegments: falls back to end − start when minutes absent', () => {
+  const segs = processSegments({ processTimeline: [
+    { startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },
+  ] });
+  eq(segs[0].ms, 2 * HOUR);
+});
+test('processSegments: non-objects are dropped', () => {
+  eq(processSegments({ processTimeline: [null, 0, { startedAt: iso(HOUR), minutes: 0 }] }).length, 1);
+});
+
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
 test('seed: every case has a non-empty string id', () =>

@@ -1675,6 +1675,12 @@ window.CASES = [
       { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
       { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
     ],
+    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    processTimeline: [
+      { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
+      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
+      { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
+    ],
   },
   {
     id: 'C-1045',
@@ -1705,6 +1711,13 @@ window.CASES = [
       { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — AMER desk' },
       { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
       { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
+    ],
+    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    processTimeline: [
+      { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
+      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
+      { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
+      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
     ],
   },
   {
@@ -2296,7 +2309,7 @@ function windowError(from, to) {
   return null;
 }
 
-const STORAGE_KEY = 'case-tracker-state-v4';
+const STORAGE_KEY = 'case-tracker-state-v5';
 // In live mode (served by local/serve.py, cases come from Case Center each refresh) we
 // persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
 // so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
@@ -2333,7 +2346,7 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 4,
+      v: 5,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
@@ -2346,7 +2359,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 4 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 5 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
@@ -2410,6 +2423,10 @@ function shiftCaseTimes(c, off) {
   if (c.handover) c.handover.at = shiftIso(c.handover.at, off);
   if (c.reminder) c.reminder.fireAt = shiftIso(c.reminder.fireAt, off);
   (c.history || []).forEach(h => { h.at = shiftIso(h.at, off); });
+  (c.processTimeline || []).forEach(p => {
+    p.startedAt = shiftIso(p.startedAt, off);
+    p.endedAt = shiftIso(p.endedAt, off);
+  });
 }
 function applyShiftToCurrentShift(off) {
   window.CURRENT_SHIFT = structuredClone(SEED_CURRENT_SHIFT);
@@ -3256,6 +3273,88 @@ function renderOwnershipTimeline(c) {
   `;
 }
 
+/* ---------- Process timeline (Case Center's per-stage processing time) ---------- */
+
+// Normalize c.processTimeline (Case Center's own per-stage log; see map_process_timeline in
+// local/casecenter.py) into ordered, duration-bearing segments. Each entry's length is its
+// reported processMinutes (the authoritative "process time"), falling back to end − start.
+// This is a LIVE Case Center field; demo cases that carry a seeded processTimeline show it too.
+function processSegments(c) {
+  const items = (c.processTimeline || []).filter(s => s && typeof s === 'object').slice();
+  items.sort((a, b) => new Date(a.startedAt || a.endedAt || 0) - new Date(b.startedAt || b.endedAt || 0));
+  return items.map(it => {
+    const start = it.startedAt ? new Date(it.startedAt).getTime() : null;
+    const end = it.endedAt ? new Date(it.endedAt).getTime() : null;
+    const ms = (typeof it.minutes === 'number' && isFinite(it.minutes))
+      ? Math.max(0, it.minutes) * 60000
+      : (start != null && end != null ? Math.max(0, end - start) : 0);
+    return { ...it, start, end, ms };
+  });
+}
+
+function renderProcessTimeline(c) {
+  const segs = processSegments(c);
+  if (segs.length === 0) {
+    return '<div class="muted tiny">No Case Center process timeline for this case.</div>';
+  }
+  const totalMs = segs.reduce((s, x) => s + x.ms, 0) || 1;
+
+  // One segment per processing stage; width ∝ its process time, colored by the board status
+  // its Case Center status maps to (so stages read like the board columns).
+  const bar = segs.map(s => {
+    const pct = (s.ms / totalMs) * 100;
+    const labelText = s.processType || s.ccStatus || '';
+    const tip = [
+      s.ccStatus || labelText,
+      fmtDuration(s.ms),
+      s.processor ? 'by ' + s.processor : '',
+      s.processorDept || '',
+      s.start != null ? 'from ' + fmtAbsolute(new Date(s.start).toISOString()) : '',
+    ].filter(Boolean).join(' · ');
+    return `<div class="tl-seg pill-${s.status || 'new'}" style="width:${pct}%" title="${escapeHtml(tip)}">${pct > 12 ? escapeHtml(labelText) : ''}</div>`;
+  }).join('');
+
+  // Legend: total process time grouped by the Case Center status label.
+  const groups = new Map();
+  segs.forEach(s => {
+    const key = s.ccStatus || statusLabel(s.status || 'new');
+    const g = groups.get(key) || { status: s.status || 'new', ms: 0 };
+    g.ms += s.ms;
+    groups.set(key, g);
+  });
+  const legend = [...groups.entries()].map(([label, g]) =>
+    `<span class="tl-key"><span class="tl-dot pill-${g.status}"></span>${escapeHtml(label)} <span class="muted">${fmtDuration(g.ms)}</span></span>`
+  ).join('');
+
+  // Markers: the clock time each stage began (and the last stage's end), placed at the
+  // cumulative process-time boundaries. (Widths are process-minutes, not wall-clock, so gaps
+  // between stages aren't drawn — the markers show when each stage started.)
+  let acc = 0;
+  const bounds = [];
+  segs.forEach(s => {
+    bounds.push({ pct: (acc / totalMs) * 100, iso: s.start != null ? new Date(s.start).toISOString() : null });
+    acc += s.ms;
+  });
+  const lastEnd = segs[segs.length - 1].end;
+  bounds.push({ pct: 100, iso: lastEnd != null ? new Date(lastEnd).toISOString() : null });
+  let prevPct = -99;
+  const marks = bounds.filter(b => b.iso).map(b => {
+    const row = (b.pct - prevPct < 7) ? 1 : 0;
+    prevPct = b.pct;
+    const horiz = b.pct <= 1 ? 'left:0;text-align:left'
+      : b.pct >= 99 ? 'left:100%;transform:translateX(-100%);text-align:right'
+        : `left:${b.pct}%;transform:translateX(-50%)`;
+    return `<span class="tl-mark" style="${horiz};top:${row * 13}px" title="${escapeHtml(fmtAbsolute(b.iso))}">${escapeHtml(fmtClockShort(b.iso))}</span>`;
+  }).join('');
+
+  return `
+    <div class="timeline" role="img" aria-label="Process timeline">${bar}</div>
+    <div class="tl-marks">${marks}</div>
+    <div class="tl-legend">${legend}</div>
+    <div class="muted tiny" style="margin-top:6px">Total process time: ${fmtDuration(totalMs)} · ${segs.length} stage${segs.length === 1 ? '' : 's'}</div>
+  `;
+}
+
 function renderCaseDetailBody(c) {
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
@@ -3322,6 +3421,11 @@ function renderCaseDetailBody(c) {
             <h3>Ownership timeline</h3>
             ${renderOwnershipTimeline(c)}
           </div>
+          ${(c.processTimeline && c.processTimeline.length) ? `
+          <div class="detail-section">
+            <h3>Process timeline <span class="muted tiny" style="font-weight:400">· from Case Center</span></h3>
+            ${renderProcessTimeline(c)}
+          </div>` : ''}
           <div class="detail-section">
             <h3>Handover (latest)</h3>
             ${handoverHtml}
@@ -5388,6 +5492,7 @@ function normalizeLiveCase(c) {
 const CC_OWNED_FIELDS = [
   'subject', 'ccStatusLabel', 'priority', 'caseLink',
   'requester', 'requesterDept', 'reporterId', 'reporterDept', 'assigneeId', 'assigneeDept',
+  'processTimeline',   // Case Center's per-stage processing log (drives the Process timeline)
 ];
 function overlayLiveCase(existing, raw) {
   for (const k of CC_OWNED_FIELDS) {

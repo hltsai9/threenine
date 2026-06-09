@@ -10,6 +10,18 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-08
 
+### Added
+
+- **Process timeline on the case detail (from Case Center).** A new timeline shows Case Center's
+  own per-stage processing log — each stage sized by its `processMinutes`, colored by the board
+  status its Case Center status maps to, with a per-status legend, a total, and per-stage tooltips
+  (processor, dept, status, start time). `local/casecenter.py` gains `map_process_timeline()` (it
+  normalizes `r.processTimeline` items — `processorDeptName/processStartTime/caseStatus/
+  processMinutes/caseSubstatus/processEndTime/processType/processor` — into the board shape and is
+  exposed through `map_record`); `processTimeline` is treated as a Case Center–owned field, so a
+  live refresh keeps it current. Seeded on two demo cases (C-1044, C-1045). The detail section is
+  hidden for cases that have no process timeline.
+
 ### Changed
 
 - **Rolled the demo calendar forward one week.** Seed data now centers on **W24 · June 8 – 14,
@@ -23,6 +35,9 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Fixed stale week labels in `data.js`.** The historical section comments (`W16/W17/W18`) and
   the carry-over note/history detail (`W18 → W19`) were several shifts out of date; they now
   match the actual `weekId`s (`W21/W22/W23`, carry-over `W23 → W24`).
+- **Storage key bumped `v4 → v5`** for the new top-level `processTimeline` field on cases, so
+  returning users don't load a stale localStorage shape. Added 4 `processSegments` characterization
+  tests (ordering, minutes-vs-span duration, junk filtering) — suite now at 71.
 
 ## 2026-06-06
 

@@ -135,7 +135,32 @@ def map_priority(case_level):
     return LEVEL_MAP.get(str(case_level), "medium")
 
 
-# ---- 2c. Map one Case Center record to a board case ----------------------------------
+# ---- 2c. Map Case Center's per-stage processing log -> board process timeline --------
+# r["processTimeline"] is Case Center's own breakdown of how long the case spent in each
+# processing stage. Each raw item carries: processorDeptName, processStartTime, caseStatus,
+# processMinutes, caseSubstatus, processEndTime, processType, processor. We normalize each into
+# the board shape the case detail's "Process timeline" component renders, carrying both the raw
+# Case Center status label (ccStatus) and the board status it maps to (so each stage can be
+# colored like the board columns).
+def map_process_timeline(r):
+    out = []
+    for it in (r.get("processTimeline") or []):
+        if not isinstance(it, dict):
+            continue
+        out.append({
+            "processType": it.get("processType"),
+            "processor": it.get("processor"),
+            "processorDept": it.get("processorDeptName"),
+            "ccStatus": status_label(it.get("caseStatus"), it.get("caseSubstatus")),
+            "status": map_status(it.get("caseStatus"), it.get("caseSubstatus")),
+            "startedAt": it.get("processStartTime"),
+            "endedAt": it.get("processEndTime"),
+            "minutes": it.get("processMinutes"),
+        })
+    return out
+
+
+# ---- 2d. Map one Case Center record to a board case ----------------------------------
 def map_record(r):
     """Translate a single Case Center record (one element of x_json['data']) into a
     board case dict. Field names below match what you provided."""
@@ -164,6 +189,8 @@ def map_record(r):
         "reporterDept": reporter.get("deptName"),
         "assigneeId": assignee.get("accountId"),
         "assigneeDept": assignee.get("deptName"),
+        # Case Center's per-stage processing log -> the board "Process timeline" component.
+        "processTimeline": map_process_timeline(r),
         # Not provided by Case Center in your field list — left at board defaults:
         # caseType, notes.
     }

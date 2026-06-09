@@ -155,6 +155,12 @@ window.CASES = [
       { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
       { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
     ],
+    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    processTimeline: [
+      { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
+      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
+      { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
+    ],
   },
   {
     id: 'C-1045',
@@ -185,6 +191,13 @@ window.CASES = [
       { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — AMER desk' },
       { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
       { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
+    ],
+    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    processTimeline: [
+      { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
+      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
+      { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
+      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
     ],
   },
   {
