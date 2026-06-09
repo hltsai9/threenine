@@ -47,6 +47,8 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Storage key bumped `v4 → v5 → v6`** for the new top-level `processTimeline` and `waitUser`
   fields on cases, so returning users don't load a stale localStorage shape. Added 4
   `processSegments` and 3 `waitUserDueMs` characterization tests — suite now at 74.
+- **Pages deploy now triggers on `claude/charming-cray-ti71j0`** (added to the push branch list in
+  `.github/workflows/pages.yml`).
 
 ## 2026-06-06
 
