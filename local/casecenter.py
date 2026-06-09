@@ -160,7 +160,30 @@ def map_process_timeline(r):
     return out
 
 
-# ---- 2d. Map one Case Center record to a board case ----------------------------------
+# ---- 2d. "Wait User" substatus detail -> board waitUser block ------------------------
+# When caseSubstatus == "Wait User" the case is parked on the end user. Case Center carries a
+# r["subStatus"] block describing why it's waiting and on what:
+#   reason, dueAction, dueDateTime, transition, transitionDateTime, and a lastProcessor object
+#   (assignee, handlerGrp, handlerType — who last handled it before it was parked).
+# We surface it as `waitUser` on the board case, attached only when the case is in Wait User.
+def map_wait_user(r):
+    sub = r.get("subStatus") or {}
+    lp = sub.get("lastProcessor") or {}
+    return {
+        "reason": sub.get("reason"),
+        "dueAction": sub.get("dueAction"),
+        "dueDateTime": sub.get("dueDateTime"),
+        "transition": sub.get("transition"),
+        "transitionDateTime": sub.get("transitionDateTime"),
+        "lastProcessor": {
+            "assignee": lp.get("assignee"),
+            "handlerGrp": lp.get("handlerGrp"),
+            "handlerType": lp.get("handlerType"),
+        },
+    }
+
+
+# ---- 2e. Map one Case Center record to a board case ----------------------------------
 def map_record(r):
     """Translate a single Case Center record (one element of x_json['data']) into a
     board case dict. Field names below match what you provided."""
@@ -168,7 +191,7 @@ def map_record(r):
     assignee = r.get("assignee") or {}
     custom = r.get("customField") or {}
     case_id = str(r.get("caseId") or "")
-    return {
+    case = {
         "id": case_id,
         "caseLink": build_case_link(case_id),
         "subject": r.get("subject") or "(no subject)",
@@ -194,6 +217,11 @@ def map_record(r):
         # Not provided by Case Center in your field list — left at board defaults:
         # caseType, notes.
     }
+    # When the case is parked on the end user ("Wait User" substatus), attach the subStatus
+    # detail (reason / due action + date / last processor / transition).
+    if r.get("caseSubstatus") == "Wait User":
+        case["waitUser"] = map_wait_user(r)
+    return case
 
 
 # ---- 1. Your existing request to Case Center -----------------------------------------

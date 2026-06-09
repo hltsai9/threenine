@@ -12,6 +12,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Added
 
+- **"Waiting on user" panel on the case detail (from Case Center).** When a case is parked on the
+  end user (Case Center substatus `Wait User`), the detail now shows the `subStatus` block — the
+  wait **reason**, the **due action** and **due date** (with a *due in …* / *overdue by …* chip),
+  the **last processor** (assignee · handler group · handler type), and the **transition** that
+  parked it. `local/casecenter.py` gains `map_wait_user()` (reads `r.subStatus` →
+  `reason / dueAction / dueDateTime / transition / transitionDateTime / lastProcessor.{assignee,
+  handlerGrp, handlerType}`); `map_record` attaches it as `waitUser` only when
+  `caseSubstatus == "Wait User"`. Treated as a Case Center–owned field (kept current on refresh)
+  and seeded (overdue) on C-1046. The section is hidden for cases that aren't waiting on the user.
 - **Process timeline on the case detail (from Case Center).** A new timeline shows Case Center's
   own per-stage processing log — each stage sized by its `processMinutes`, colored by the board
   status its Case Center status maps to, with a per-status legend, a total, and per-stage tooltips
@@ -35,9 +44,9 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Fixed stale week labels in `data.js`.** The historical section comments (`W16/W17/W18`) and
   the carry-over note/history detail (`W18 → W19`) were several shifts out of date; they now
   match the actual `weekId`s (`W21/W22/W23`, carry-over `W23 → W24`).
-- **Storage key bumped `v4 → v5`** for the new top-level `processTimeline` field on cases, so
-  returning users don't load a stale localStorage shape. Added 4 `processSegments` characterization
-  tests (ordering, minutes-vs-span duration, junk filtering) — suite now at 71.
+- **Storage key bumped `v4 → v5 → v6`** for the new top-level `processTimeline` and `waitUser`
+  fields on cases, so returning users don't load a stale localStorage shape. Added 4
+  `processSegments` and 3 `waitUserDueMs` characterization tests — suite now at 74.
 
 ## 2026-06-06
 

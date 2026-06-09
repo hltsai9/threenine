@@ -836,6 +836,9 @@ table.case-table {
 .tl-sanity    { background: #6ee7b7; color: #065f46; }
 .tl-requester { background: #67e8f9; color: #155e75; }
 .tl-done      { background: #d1d5db; color: #374151; }
+/* "Wait User" due chip */
+.wu-due { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #e0e7ff; color: #3730a3; white-space: nowrap; }
+.wu-overdue { background: #fee2e2; color: #991b1b; }
 .clock {
   background: #f9fafb;
   border: 1px solid var(--border);

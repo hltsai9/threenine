@@ -229,6 +229,17 @@ window.CASES = [
       { at: '2026-06-09T09:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
       { at: '2026-06-11T14:00:00Z', who: 'op-da', kind: 'returned', detail: 'Returned to requester (need repro)' },
     ],
+    // Case Center "Wait User" substatus detail (mirrors map_wait_user in casecenter.py) —
+    // present because this case is parked on the end user. dueDateTime here is past NOW, so the
+    // detail shows an "overdue" chip.
+    waitUser: {
+      reason: 'Awaiting reproduction steps from requester',
+      dueAction: 'Requester to attach error logs + repro steps',
+      dueDateTime: '2026-06-12T10:00:00Z',
+      transition: 'Returned to user',
+      transitionDateTime: '2026-06-11T14:00:00Z',
+      lastProcessor: { assignee: 'op-da', handlerGrp: 'Local FIT — EMEA', handlerType: 'FIT' },
+    },
   },
   {
     id: 'C-1047',

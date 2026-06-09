@@ -66,7 +66,7 @@ function windowError(from, to) {
   return null;
 }
 
-const STORAGE_KEY = 'case-tracker-state-v5';
+const STORAGE_KEY = 'case-tracker-state-v6';
 // In live mode (served by local/serve.py, cases come from Case Center each refresh) we
 // persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
 // so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
@@ -103,7 +103,7 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 5,
+      v: 6,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
@@ -116,7 +116,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 5 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 6 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
@@ -184,6 +184,10 @@ function shiftCaseTimes(c, off) {
     p.startedAt = shiftIso(p.startedAt, off);
     p.endedAt = shiftIso(p.endedAt, off);
   });
+  if (c.waitUser) {
+    c.waitUser.dueDateTime = shiftIso(c.waitUser.dueDateTime, off);
+    c.waitUser.transitionDateTime = shiftIso(c.waitUser.transitionDateTime, off);
+  }
 }
 function applyShiftToCurrentShift(off) {
   window.CURRENT_SHIFT = structuredClone(SEED_CURRENT_SHIFT);
@@ -1112,6 +1116,38 @@ function renderProcessTimeline(c) {
   `;
 }
 
+/* ---------- "Wait User" substatus detail (Case Center subStatus block) ---------- */
+
+// Signed ms from now until the Wait User due time: positive = still due in the future,
+// negative = overdue, null = no due date. NOW-based, like the other case clocks.
+function waitUserDueMs(c) {
+  const due = c && c.waitUser && c.waitUser.dueDateTime;
+  if (!due) return null;
+  const t = new Date(due).getTime();
+  return isNaN(t) ? null : t - NOW.getTime();
+}
+
+function renderWaitUser(c) {
+  const w = c.waitUser;
+  if (!w) return '';
+  const lp = w.lastProcessor || {};
+  const lpBits = [lp.assignee, lp.handlerGrp, lp.handlerType].filter(Boolean).map(escapeHtml).join(' · ');
+  const dueMs = waitUserDueMs(c);
+  let dueChip = '';
+  if (dueMs != null) {
+    const overdue = dueMs < 0;
+    dueChip = ` <span class="wu-due ${overdue ? 'wu-overdue' : ''}">${escapeHtml(overdue ? `overdue by ${fmtDuration(-dueMs)}` : `due in ${fmtDuration(dueMs)}`)}</span>`;
+  }
+  const row = (k, v) => v ? `<div class="detail-row"><span class="k">${k}</span><span class="v">${v}</span></div>` : '';
+  return `
+    ${row('Reason', w.reason ? escapeHtml(w.reason) : '')}
+    ${row('Due action', w.dueAction ? escapeHtml(w.dueAction) : '')}
+    ${row('Due', w.dueDateTime ? `${fmtAbsolute(w.dueDateTime)}${dueChip}` : '')}
+    ${row('Last processor', lpBits || '<span class="muted">—</span>')}
+    ${row('Transition', w.transition ? `${escapeHtml(w.transition)}${w.transitionDateTime ? ` <span class="muted">· ${fmtAbsolute(w.transitionDateTime)}</span>` : ''}` : '')}
+  `;
+}
+
 function renderCaseDetailBody(c) {
   const fit = getOwner('fit', c.fitId);
   const hq = getOwner('hq', c.hqId);
@@ -1182,6 +1218,11 @@ function renderCaseDetailBody(c) {
           <div class="detail-section">
             <h3>Process timeline <span class="muted tiny" style="font-weight:400">· from Case Center</span></h3>
             ${renderProcessTimeline(c)}
+          </div>` : ''}
+          ${c.waitUser ? `
+          <div class="detail-section">
+            <h3>Waiting on user <span class="muted tiny" style="font-weight:400">· from Case Center</span></h3>
+            ${renderWaitUser(c)}
           </div>` : ''}
           <div class="detail-section">
             <h3>Handover (latest)</h3>
@@ -3250,6 +3291,7 @@ const CC_OWNED_FIELDS = [
   'subject', 'ccStatusLabel', 'priority', 'caseLink',
   'requester', 'requesterDept', 'reporterId', 'reporterDept', 'assigneeId', 'assigneeDept',
   'processTimeline',   // Case Center's per-stage processing log (drives the Process timeline)
+  'waitUser',          // "Wait User" substatus detail (reason / due / last processor)
 ];
 function overlayLiveCase(existing, raw) {
   for (const k of CC_OWNED_FIELDS) {

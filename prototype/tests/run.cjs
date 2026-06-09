@@ -191,6 +191,19 @@ test('processSegments: non-objects are dropped', () => {
   eq(processSegments({ processTimeline: [null, 0, { startedAt: iso(HOUR), minutes: 0 }] }).length, 1);
 });
 
+/* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
+ * waitUserDueMs returns signed ms to the Wait User due time (NOW-based): positive = due in the
+ * future, negative = overdue, null = no waitUser/due date. */
+const waitUserDueMs = app.waitUserDueMs;
+test('waitUserDueMs: null without waitUser or due date', () => {
+  eq(waitUserDueMs({}), null);
+  eq(waitUserDueMs({ waitUser: {} }), null);
+});
+test('waitUserDueMs: positive when due in the future', () =>
+  eq(waitUserDueMs({ waitUser: { dueDateTime: iso(-2 * HOUR) } }), 2 * HOUR));
+test('waitUserDueMs: negative when overdue', () =>
+  eq(waitUserDueMs({ waitUser: { dueDateTime: iso(3 * HOUR) } }), -3 * HOUR));
+
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
 test('seed: every case has a non-empty string id', () =>
