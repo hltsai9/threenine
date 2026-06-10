@@ -31,8 +31,25 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   live refresh keeps it current. Seeded on two demo cases (C-1044, C-1045). The detail section is
   hidden for cases that have no process timeline.
 
+### Fixed
+
+- **Operator work now survives a page refresh in live mode.** Reloading the board no longer
+  re-pulls Case Center and rebuilds the board (which could drop or reset a case you'd just
+  assigned/moved). Live mode now adopts the persisted `data.js` store on load, so a refresh shows
+  exactly what's saved. (See the matching *Changed* entry — Case Center is queried only via "Load
+  New" / "Refresh Existing".)
+- **Timeline timezones now line up.** Case Center timestamps that arrive without a timezone
+  (process-timeline and Wait User times) were parsed in the viewer's local zone, so the Process
+  timeline disagreed with the Ownership timeline (anchored on `createDateTime`, which carries
+  `+00:00`). `local/casecenter.py` now normalizes every datetime it emits to explicit UTC
+  (`iso_utc()` — Case Center stores GMT), so all timelines share one frame.
+
 ### Changed
 
+- **A page refresh no longer pulls from Case Center — load on demand only.** In live mode the
+  board now queries Case Center only when you press **Load New** or **Refresh Existing**; opening
+  or reloading the page shows the cases already saved in `data.js`. (`boot()` enters live mode
+  from the persisted store instead of auto-fetching.)
 - **Rolled the demo calendar forward one week.** Seed data now centers on **W24 · June 8 – 14,
   2026** (`window.NOW` = `2026-06-12T13:00:00Z`): every case timestamp shifted +7 days, every
   `weekId` bumped +1, and the rolling 4-week window advanced (W24 current; W23/W22/W21 prior;

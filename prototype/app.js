@@ -67,9 +67,10 @@ function windowError(from, to) {
 }
 
 const STORAGE_KEY = 'case-tracker-state-v6';
-// In live mode (served by local/serve.py, cases come from Case Center each refresh) we
-// persist ONLY the local agent layer — agentStatus, handover, reminder — keyed by case id,
-// so a data pull never clobbers the operator's own work. Seed/demo mode keeps full state.
+// In live mode (served by local/serve.py; cases come from Case Center on demand via
+// "Load New" / "Refresh Existing", not on page refresh) we persist ONLY the local agent layer —
+// agentStatus, handover, reminder — keyed by case id, so a data pull never clobbers the
+// operator's own work. Seed/demo mode keeps full state.
 const AGENT_KEY = 'case-tracker-agent-v1';
 
 // The agent-owned fields that survive a live data refresh.
@@ -90,6 +91,27 @@ function applyAgentLayer(map) {
     if (a.reminder !== undefined) c.reminder = a.reminder;
   }
 }
+
+// Re-apply the operator's saved local layer (operator selection + agent layer keyed by case id).
+function applyStoredAgentLayer() {
+  try {
+    const raw = localStorage.getItem(AGENT_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
+      STATE.operatorId = parsed.operatorId;
+    }
+    applyAgentLayer(parsed.agent || {});
+  } catch (e) { /* ignore corrupt local layer */ }
+}
+
+// Baseline for change-detection in live mode: snapshot the current cases so only LATER operator
+// edits POST back to the server (the store already has what's on the board right now).
+function snapshotSavedCases() {
+  STATE._savedSnapshot = {};
+  for (const c of STATE.cases) if (c.id) STATE._savedSnapshot[c.id] = JSON.stringify(c);
+}
+
 
 function saveState() {
   try {
@@ -3425,20 +3447,10 @@ async function tryLoadLiveCases() {
     STATE.cases = valid.map(normalizeLiveCase);
   }
 
-  // Re-apply the operator's local layer (queue placement, handover notes, reminders).
-  try {
-    const raw = localStorage.getItem(AGENT_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
-        STATE.operatorId = parsed.operatorId;
-      }
-      applyAgentLayer(parsed.agent || {});
-    }
-  } catch (e) { /* ignore corrupt local layer */ }
-  // Baseline for change-detection: the server already has this data, so only later edits POST.
-  STATE._savedSnapshot = {};
-  for (const c of STATE.cases) if (c.id) STATE._savedSnapshot[c.id] = JSON.stringify(c);
+  // Re-apply the operator's local layer (queue placement, handover notes, reminders) and snapshot
+  // the result so only later edits POST back to the server.
+  applyStoredAgentLayer();
+  snapshotSavedCases();
   return true;
 }
 
@@ -3474,20 +3486,25 @@ async function reloadLiveCases() {
   );
 }
 
-async function boot() {
+// Enter live mode WITHOUT pulling from Case Center. Live mode = served by serve.py over http(s)
+// with a persisted Case Center store (data.js carries CASES_LIVE_CAPTURE = true, written by
+// serve.py on every fetch/save). seedBoot() has already adopted that store as STATE.cases, so we
+// just flag live, re-apply the operator's local layer and snapshot for change-detection. A page
+// refresh therefore shows exactly what's saved — Case Center is queried only when the operator
+// presses "Load New" / "Refresh Existing".
+function enterLiveMode() {
+  window.__LIVE__ = true;
+  NOW = new Date(); // real time for SLA math against live timestamps
+  applyStoredAgentLayer();
+  snapshotSavedCases();
+}
+
+function boot() {
   if (!location.hash) location.hash = '#/cases';
-  render(); // immediate paint from seed / saved state
-  // Show a loading indicator only if the live fetch is actually slow (avoids a flash when
-  // there's no backend, e.g. the public Pages site).
-  let loaderTimer = null;
-  if (/^https?:$/.test(location.protocol)) loaderTimer = setTimeout(showLiveLoading, 250);
-  const live = await tryLoadLiveCases();
-  if (loaderTimer) clearTimeout(loaderTimer);
-  hideLiveLoading();
-  if (live) {
-    render(); // repaint with live Case Center data + merged agent layer
-    showToast(`Live: loaded ${STATE.cases.length} case${STATE.cases.length === 1 ? '' : 's'} from Case Center.`, 'success');
+  if (window.CASES_LIVE_CAPTURE && /^https?:$/.test(location.protocol)) {
+    enterLiveMode();
   }
+  render();
 }
 
 boot();

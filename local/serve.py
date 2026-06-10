@@ -6,8 +6,9 @@ What it does
 ------------
 - Serves the existing static site (../prototype) at http://127.0.0.1:<PORT>/
 - Exposes GET /api/cases, which runs your Case Center fetch (see casecenter.py)
-  and returns the cases as JSON. The page calls this on every refresh, so the
-  board always shows the latest data.
+  and returns the cases as JSON. The board queries it when you press "Load New" /
+  "Refresh Existing" — NOT on every page refresh — so a reload keeps the cases
+  already saved in data.js and Case Center is pulled only on demand.
 
 Because the page and the API are served from the SAME origin, there are no CORS
 problems, and your API key + cookie never leave this Python process (they are

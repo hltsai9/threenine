@@ -31,8 +31,30 @@ browser and must NOT come from Case Center — it is merged back automatically.
 import inspect
 import json
 import os
+import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Case Center stores datetimes in GMT. Some fields come back with an explicit offset
+# (createDateTime → "...+00:00"), but others (process timeline / Wait User times) can arrive
+# WITHOUT a timezone designator. The browser parses a zone-less ISO string in the VIEWER's local
+# timezone, which makes those timelines disagree with createDateTime (parsed as UTC). Normalize
+# every datetime we emit to carry an explicit UTC marker so all timelines line up.
+_HAS_TZ = re.compile(r"(?:Z|[+-]\d{2}:?\d{2})$")
+_ISO_NAIVE = re.compile(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$")
+
+
+def iso_utc(value):
+    """Return `value` with an explicit UTC offset. Zone-less ISO datetimes (Case Center is GMT)
+    get a trailing 'Z'; values that already carry a zone — or that we don't recognize — pass
+    through unchanged. Non-strings (e.g. None) pass through too."""
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text or _HAS_TZ.search(text):
+        return value
+    m = _ISO_NAIVE.match(text)
+    return f"{m.group(1)}T{m.group(2)}Z" if m else value
 
 # Case Center query window (hours back) — how far back to look for cases. The board's
 # "Created within … h / Load" control sets this per request; this is just the default.
@@ -153,8 +175,8 @@ def map_process_timeline(r):
             "processorDept": it.get("processorDeptName"),
             "ccStatus": status_label(it.get("caseStatus"), it.get("caseSubstatus")),
             "status": map_status(it.get("caseStatus"), it.get("caseSubstatus")),
-            "startedAt": it.get("processStartTime"),
-            "endedAt": it.get("processEndTime"),
+            "startedAt": iso_utc(it.get("processStartTime")),
+            "endedAt": iso_utc(it.get("processEndTime")),
             "minutes": it.get("processMinutes"),
         })
     return out
@@ -172,9 +194,9 @@ def map_wait_user(r):
     return {
         "reason": sub.get("reason"),
         "dueAction": sub.get("dueAction"),
-        "dueDateTime": sub.get("dueDateTime"),
+        "dueDateTime": iso_utc(sub.get("dueDateTime")),
         "transition": sub.get("transition"),
-        "transitionDateTime": sub.get("transitionDateTime"),
+        "transitionDateTime": iso_utc(sub.get("transitionDateTime")),
         "lastProcessor": {
             "assignee": lp.get("assignee"),
             "handlerGrp": lp.get("handlerGrp"),
@@ -203,8 +225,8 @@ def map_record(r):
         "priority": map_priority(r.get("caseLevel")),
         # createDateTime is GMT ISO-8601 with millis/offset (e.g. 2026-06-04T20:57:18.742+00:00);
         # the browser parses it directly and renders it in the viewer's local time.
-        "createdAt": r.get("createDateTime"),
-        "slaStartedAt": r.get("createDateTime"),
+        "createdAt": iso_utc(r.get("createDateTime")),
+        "slaStartedAt": iso_utc(r.get("createDateTime")),
         # People. The board "requester" is the end user the case is about.
         "requester": custom.get("userAccount") or "",
         "requesterDept": custom.get("userDept"),
