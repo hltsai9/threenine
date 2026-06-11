@@ -12,13 +12,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Changed
 
-- **CommuGround visual theme applied to the prototype.** Reskinned `prototype/styles.css` and
-  loaded Plus Jakarta Sans + JetBrains Mono via Google Fonts in `prototype/index.html` to match
-  the `design_handoff_commuground` reference (light page bg `#f7f5fc`, white sticky sidebar with
-  the gradient brand tile, lavender accent system `#6857c0`/`#ab9ef1`/`#efeafc`, softer 14–20px
-  radii, the brand gradient on primary buttons and the tour CTA, kanban columns gain solid
-  accent-colored headers with deep text and per-column card accent bars). No markup, class
-  hooks, behavior, or sidebar items were changed — only the appearance.
+- **Switched the prototype skin from the Pastel CommuGround theme to the Forest variant.**
+  Updated `prototype/styles.css` tokens to the Forest palette (page bg `#e8ece8`, deep-forest
+  accent `#2e5942`/`#4e8063`/`#e3efe7`, light→dark green lifecycle column ramp, desaturated
+  brick/amber/tan semantic pills) and swapped Plus Jakarta Sans + JetBrains Mono for
+  Source Serif 4 + Libre Franklin + IBM Plex Mono via Google Fonts. Titles, page header,
+  stat figures, column names, and modal/shift names are now set in Source Serif 4 700 per
+  the formal-mode spec. Radii tightened ~3px across cards/pills/chips; brand and primary
+  buttons use the green gradient `#2f6b46→#4e8063` with a green-tinted shadow. Prompt icon
+  swatches re-mapped to Forest greens/brick. No markup, class hooks, behavior, or sidebar
+  items were changed — only the theme.
+- **CommuGround visual theme applied to the prototype (earlier today).** Reskinned
+  `prototype/styles.css` and loaded Plus Jakarta Sans + JetBrains Mono via Google Fonts in
+  `prototype/index.html` to match the Pastel `design_handoff_commuground` reference. Now
+  superseded by the Forest skin above.
 
 ---
 
