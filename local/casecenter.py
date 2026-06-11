@@ -22,8 +22,8 @@ Status enum (this is the *Case Center status*, it drives the kanban columns):
     | resolved | closed | cancelled
 Optional (sensible defaults applied in the browser if omitted):
     caseLink (built from BASE_URL + caseId), ccStatusLabel (the displayed CC status),
-    requester + requesterDept (the end user), reporterId + reporterDept,
-    assigneeId + assigneeDept, priority (low|medium|high), caseType,
+    user + userDept (the end user), reporter + reporterDept,
+    assignee + assigneeDept, priority (low|medium|high), caseType,
     createdAt / slaStartedAt (ISO-8601 GMT, e.g. "2026-06-04T20:57:18.742+00:00"), notes
 The agent layer (queue placement, handover notes, reminders) is LOCAL to the
 browser and must NOT come from Case Center — it is merged back automatically.
@@ -107,7 +107,8 @@ def _load_secrets():
 
 # ---- 2a. Map Case Center status -> the board's status enum ---------------------------
 # The board column for a case is its Case Center status. We map on the
-# (caseStatus, caseSubstatus) pair first, then fall back to caseStatus alone.
+# (caseStatus, sub-transition) pair first, then fall back to caseStatus alone.
+# The sub-transition comes from r["subStatus"]["transition"] in the new format.
 # Board enum values:
 #   new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
 #
@@ -119,7 +120,7 @@ def _load_secrets():
 #     terminal outcome). Change to "resolved" if you want to distinguish them.
 #   - "In-Progress" / "Open" -> new (the operator then moves it to with_fit / with_hq).
 STATUS_MAP = {
-    # (caseStatus, caseSubstatus): board_status
+    # (caseStatus, sub-transition): board_status
     ("In-Progress", "Return"):    "new",                    # requester returned the case to IT
     ("In-Progress", "Wait User"): "returned_to_requester",  # waiting on the user
 }
@@ -142,8 +143,20 @@ def map_status(case_status, case_substatus):
 
 
 def status_label(case_status, case_substatus):
-    """Human label shown on the board = caseStatus + caseSubstatus (the real CC status)."""
+    """Human label shown on the board = caseStatus + sub-transition (the real CC status)."""
     return (str(case_status or "") + (" " + str(case_substatus) if case_substatus else "")).strip() or "—"
+
+
+def sub_transition(r):
+    """Read the sub-status transition (the new format's replacement for caseSubstatus).
+
+    Case Center now carries the substatus inside an object: r["subStatus"]["transition"].
+    Tolerate the object being missing, null, or not a dict — return None in any of those
+    cases so callers stay safe."""
+    sub = r.get("subStatus") if isinstance(r, dict) else None
+    if not isinstance(sub, dict):
+        return None
+    return sub.get("transition")
 
 
 # ---- 2b. Map caseLevel -> board priority (low | medium | high) ------------------------
@@ -183,14 +196,16 @@ def map_process_timeline(r):
 
 
 # ---- 2d. "Wait User" substatus detail -> board waitUser block ------------------------
-# When caseSubstatus == "Wait User" the case is parked on the end user. Case Center carries a
-# r["subStatus"] block describing why it's waiting and on what:
+# When the sub-transition is "Wait User" the case is parked on the end user. Case Center carries
+# the detail in r["subStatus"]:
 #   reason, dueAction, dueDateTime, transition, transitionDateTime, and a lastProcessor object
 #   (assignee, handlerGrp, handlerType — who last handled it before it was parked).
 # We surface it as `waitUser` on the board case, attached only when the case is in Wait User.
 def map_wait_user(r):
-    sub = r.get("subStatus") or {}
-    lp = sub.get("lastProcessor") or {}
+    sub = r.get("subStatus")
+    if not isinstance(sub, dict):
+        return None
+    lp = sub.get("lastProcessor") if isinstance(sub.get("lastProcessor"), dict) else {}
     return {
         "reason": sub.get("reason"),
         "dueAction": sub.get("dueAction"),
@@ -205,44 +220,80 @@ def map_wait_user(r):
     }
 
 
-# ---- 2e. Map one Case Center record to a board case ----------------------------------
+# ---- 2e. Resolve a processor id (reporter / assignee) -> dept name --------------------
+# The new Case Center payload no longer carries a department on the reporter / assignee
+# objects directly. The processTimeline is the authoritative source: each item has
+# `processor` (the account id) and `processorDeptName`. We pick the most recent timeline
+# entry whose processor matches the id we're resolving.
+def dept_from_timeline(r, account_id):
+    if not account_id:
+        return None
+    items = r.get("processTimeline") if isinstance(r, dict) else None
+    if not isinstance(items, list):
+        return None
+    match = None
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        if it.get("processor") != account_id:
+            continue
+        dept = it.get("processorDeptName")
+        if not dept:
+            continue
+        # Prefer the latest matching entry by processEndTime / processStartTime if available.
+        when = it.get("processEndTime") or it.get("processStartTime") or ""
+        if match is None or when > (match[0] or ""):
+            match = (when, dept)
+    return match[1] if match else None
+
+
+# ---- 2f. Map one Case Center record to a board case ----------------------------------
 def map_record(r):
     """Translate a single Case Center record (one element of x_json['data']) into a
-    board case dict. Field names below match what you provided."""
-    reporter = r.get("reporter") or {}
-    assignee = r.get("assignee") or {}
-    custom = r.get("customField") or {}
+    board case dict. Field names below match the current Case Center JSON shape."""
     case_id = str(r.get("caseId") or "")
+    transition = sub_transition(r)
+    # The end user the case is about. Case Center now carries this at the top level as
+    # userAccount + userName (e.g. "alice.park" + "Alice Park"); we show both when present.
+    user_account = r.get("userAccount") or ""
+    user_name = r.get("userName") or ""
+    user_display = " ".join(p for p in (str(user_account), str(user_name)) if p).strip()
+    # Reporter / assignee are now plain account ids at the top level (no nested object,
+    # no department); the dept is derived from processTimeline below.
+    reporter_id = r.get("reporter") or ""
+    assignee_id = r.get("assignee") or ""
     case = {
         "id": case_id,
         "caseLink": build_case_link(case_id),
         "subject": r.get("subject") or "(no subject)",
-        "status": map_status(r.get("caseStatus"), r.get("caseSubstatus")),
-        # Real Case Center status shown on the board (caseStatus + caseSubstatus), e.g.
+        "status": map_status(r.get("caseStatus"), transition),
+        # Real Case Center status shown on the board (caseStatus + sub-transition), e.g.
         # "In-Progress Wait User". The board uses this for the visible label; `status`
         # above only drives which column the card sits in.
-        "ccStatusLabel": status_label(r.get("caseStatus"), r.get("caseSubstatus")),
+        "ccStatusLabel": status_label(r.get("caseStatus"), transition),
         "priority": map_priority(r.get("caseLevel")),
         # createDateTime is GMT ISO-8601 with millis/offset (e.g. 2026-06-04T20:57:18.742+00:00);
         # the browser parses it directly and renders it in the viewer's local time.
         "createdAt": iso_utc(r.get("createDateTime")),
         "slaStartedAt": iso_utc(r.get("createDateTime")),
-        # People. The board "requester" is the end user the case is about.
-        "requester": custom.get("userAccount") or "",
-        "requesterDept": custom.get("userDept"),
-        "reporterId": reporter.get("accountId"),
-        "reporterDept": reporter.get("deptName"),
-        "assigneeId": assignee.get("accountId"),
-        "assigneeDept": assignee.get("deptName"),
+        # People. The board "user" is the end user the case is about.
+        "user": user_display,
+        "userDept": r.get("userDept"),
+        "reporter": reporter_id,
+        "reporterDept": dept_from_timeline(r, reporter_id),
+        "assignee": assignee_id,
+        "assigneeDept": dept_from_timeline(r, assignee_id),
         # Case Center's per-stage processing log -> the board "Process timeline" component.
         "processTimeline": map_process_timeline(r),
         # Not provided by Case Center in your field list — left at board defaults:
         # caseType, notes.
     }
-    # When the case is parked on the end user ("Wait User" substatus), attach the subStatus
-    # detail (reason / due action + date / last processor / transition).
-    if r.get("caseSubstatus") == "Wait User":
-        case["waitUser"] = map_wait_user(r)
+    # When the case is parked on the end user ("Wait User" sub-transition), attach the
+    # subStatus detail (reason / due action + date / last processor / transition).
+    if transition == "Wait User":
+        wu = map_wait_user(r)
+        if wu is not None:
+            case["waitUser"] = wu
     return case
 
 

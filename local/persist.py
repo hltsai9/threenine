@@ -31,7 +31,7 @@ STORE = os.path.join(HERE, "cases.store.json")
 # Must stay in sync with CC_OWNED_FIELDS in prototype/app.js.
 CC_OWNED_FIELDS = (
     "subject", "ccStatusLabel", "priority", "caseLink",
-    "requester", "requesterDept", "reporterId", "reporterDept", "assigneeId", "assigneeDept",
+    "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
 )
 
 SENTINEL = "// === LIVE CASES (auto-written by local/serve.py — do NOT commit) ==="

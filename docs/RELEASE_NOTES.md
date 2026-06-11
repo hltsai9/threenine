@@ -12,6 +12,22 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Changed
 
+- **Adapted `local/casecenter.py` `map_record()` to Case Center's new JSON shape.** The
+  substatus moved into a `subStatus` object — `caseSubstatus` is gone; we now read
+  `subStatus.transition` via a new `sub_transition(r)` helper that tolerates the object
+  being missing, null, or the wrong type. The end-user fields moved to the top level: the
+  board case's `requester` field is renamed **`user`** (now combines `userAccount` +
+  `userName`), and `requesterDept` becomes **`userDept`** (from top-level `userDept` —
+  the old `customField` block is gone). `reporterId` → **`reporter`** and `assigneeId` →
+  **`assignee`** (both plain account ids at the top level now); their departments are
+  derived from `processTimeline` by matching `processor` to the id and picking the
+  latest item's `processorDeptName` (no direct `deptName` on the new payload). `Wait User`
+  attaches `waitUser` only when its block is present and well-formed. The same field
+  renames flowed through `local/persist.py` and `backend/merge.py` `CC_OWNED_FIELDS`,
+  `prototype/app.js` (detail rows, table column header → "User", queue/board reads,
+  `CC_OWNED_FIELDS` mirror), `prototype/data.js` seed cases (`requester:` → `user:`),
+  and the test fixture in `prototype/tests/run.cjs`. 77/77 tests pass.
+
 - **Switched the prototype skin from the Pastel CommuGround theme to the Forest variant.**
   Updated `prototype/styles.css` tokens to the Forest palette (page bg `#e8ece8`, deep-forest
   accent `#2e5942`/`#4e8063`/`#e3efe7`, light→dark green lifecycle column ramp, desaturated

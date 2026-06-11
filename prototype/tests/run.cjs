@@ -246,7 +246,7 @@ function scratch(props) {
     fitCannotResolve: false, slaPaused: false, slaAccumulatedMs: 0, slaStartedAt: iso(0),
     holdMs: { fit: 0, hq: 0 }, holdStartedAt: null, lastOwnerContact: null,
     handover: null, reminder: null, closedAt: undefined, resolutionCode: undefined,
-    history: [], requester: 'Test Requester',
+    history: [], user: 'Test User',
   }, props);
   return c;
 }

@@ -21,7 +21,7 @@ from .db import Case
 # an existing case, so an ingestion run never resets operator routing/status.
 CC_OWNED_FIELDS = (
     "subject", "ccStatusLabel", "priority", "caseLink",
-    "requester", "requesterDept", "reporterId", "reporterDept", "assigneeId", "assigneeDept",
+    "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
 )
 
 

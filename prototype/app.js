@@ -443,7 +443,7 @@ function statusLabel(s) {
 }
 
 // Visible status label. Live Case Center cases carry ccStatusLabel (the raw
-// caseStatus + caseSubstatus, e.g. "In-Progress Wait User"); seed cases fall back to the
+// caseStatus + sub-transition, e.g. "In-Progress Wait User"); seed cases fall back to the
 // board enum label. The pill COLOR still uses the mapped enum (c.status).
 function displayStatus(c) {
   return (c && c.ccStatusLabel) || statusLabel(c.status);
@@ -905,7 +905,7 @@ function renderKanbanCard(c) {
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
       <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
       <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assigneeId ? escapeHtml(c.assigneeId) : '<span class="muted">unassigned</span>')}</span>
+        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
@@ -1276,9 +1276,9 @@ function renderCaseDetailBody(c) {
         <div class="card"><div class="card-body">
           <div class="detail-section">
             <h3>Routing</h3>
-            <div class="detail-row"><span class="k">Requester</span><span class="v">${c.requester ? escapeHtml(c.requester) : '<span class="muted">—</span>'}${c.requesterDept ? ` <span class="muted">· ${escapeHtml(c.requesterDept)}</span>` : ''}</span></div>
-            ${c.reporterId ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporterId)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
-            ${c.assigneeId ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assigneeId)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
+            <div class="detail-row"><span class="k">User</span><span class="v">${c.user ? escapeHtml(c.user) : '<span class="muted">—</span>'}${c.userDept ? ` <span class="muted">· ${escapeHtml(c.userDept)}</span>` : ''}</span></div>
+            ${c.reporter ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporter)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
+            ${c.assignee ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assignee)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
             <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
@@ -1465,7 +1465,7 @@ function renderArchiveWeek(weekId) {
           <div class="subject">${escapeHtml(c.subject)}</div>
           <div><a class="link-inline" href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
         </td>
-        <td>${escapeHtml(c.requester)}</td>
+        <td>${escapeHtml(c.user)}</td>
         <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
@@ -1510,7 +1510,7 @@ function renderArchiveWeek(weekId) {
           <tr>
             <th>ID</th>
             <th>Subject / Case Link</th>
-            <th>Requester</th>
+            <th>User</th>
             <th>Local FIT</th>
             <th>HQ Product Team</th>
             <th>Status</th>
@@ -1536,7 +1536,7 @@ function renderRecycleBin() {
       <tr>
         <td class="col-id">${c.id}</td>
         <td><div class="subject">${escapeHtml(c.subject)}</div></td>
-        <td>${escapeHtml(c.requester)}</td>
+        <td>${escapeHtml(c.user)}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span></td>
         <td class="muted tiny">${fmtRelative(c.deletedAt)}</td>
         <td class="tiny" ${soon ? 'style="color:var(--danger);font-weight:600"' : 'style="color:var(--text-muted)"'}>${remaining > 0 ? fmtDuration(remaining) + ' left' : 'expiring'}</td>
@@ -2693,7 +2693,7 @@ function handlePrompt(caseId, kind) {
       c.holdStartedAt = null;
       c.status = 'returned_to_requester';
       logHistory(c, op, 'returned', `Returned to requester · ${reason}`);
-      showToast(`${c.id} returned to ${c.requester}. SLA clock paused. Resume from the case detail when they reply.`, 'success');
+      showToast(`${c.id} returned to ${c.user}. SLA clock paused. Resume from the case detail when they reply.`, 'success');
       render();
       return true;
     });
@@ -3322,7 +3322,7 @@ function normalizeLiveCase(c) {
 // Sanity Check, a refresh won't snap it back to the column its raw Case Center status maps to.
 const CC_OWNED_FIELDS = [
   'subject', 'ccStatusLabel', 'priority', 'caseLink',
-  'requester', 'requesterDept', 'reporterId', 'reporterDept', 'assigneeId', 'assigneeDept',
+  'user', 'userDept', 'reporter', 'reporterDept', 'assignee', 'assigneeDept',
   'processTimeline',   // Case Center's per-stage processing log (drives the Process timeline)
   'waitUser',          // "Wait User" substatus detail (reason / due / last processor)
 ];
