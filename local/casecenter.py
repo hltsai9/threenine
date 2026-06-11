@@ -132,14 +132,51 @@ STATUS_MAP_BY_STATUS = {
     "Close":           "closed",
     "Drop":            "cancelled",
 }
+# Refinement layer for ambiguous caseStatus values (e.g. "In-Progress" can mean either
+# triage or with the local FIT). The board status here is taken from the LAST item in the
+# case's processTimeline: its `processType` tells us which stage the case is currently in.
+# Consulted after the (status, substatus) pair and before the caseStatus-alone fallback.
+STATUS_MAP_BY_PROCESS_TYPE = {
+    "1st  Line":    "new",
+    "Service Team": "with_fit",
+}
 
 
-def map_status(case_status, case_substatus):
+def last_process_type(r):
+    """Return the `processType` of the most recent item in r["processTimeline"], or None.
+
+    Recency is decided by the latest `processEndTime` (falling back to `processStartTime`);
+    if none of the items carry a timestamp we use the last item in the list. The structure
+    is tolerated being missing, null, or the wrong type."""
+    items = r.get("processTimeline") if isinstance(r, dict) else None
+    if not isinstance(items, list):
+        return None
+    best = None  # (when_key, process_type)
+    for idx, it in enumerate(items):
+        if not isinstance(it, dict):
+            continue
+        pt = it.get("processType")
+        when = it.get("processEndTime") or it.get("processStartTime") or ""
+        # Pair the timestamp with the index so that items without timestamps are still
+        # ordered by their position in the list (a later position wins).
+        key = (when or "", idx)
+        if best is None or key > best[0]:
+            best = (key, pt)
+    return best[1] if best else None
+
+
+def map_status(case_status, case_substatus, last_pt=None):
+    """Map a Case Center status into a board status column.
+
+    Lookup order: (caseStatus, sub-transition) pair → last-processType refinement →
+    caseStatus alone → fall back to "new" so an unmapped case still shows up."""
     if (case_status, case_substatus) in STATUS_MAP:
         return STATUS_MAP[(case_status, case_substatus)]
+    if last_pt and last_pt in STATUS_MAP_BY_PROCESS_TYPE:
+        return STATUS_MAP_BY_PROCESS_TYPE[last_pt]
     if case_status in STATUS_MAP_BY_STATUS:
         return STATUS_MAP_BY_STATUS[case_status]
-    return "new"  # safe default so an unmapped case still shows up (in the New column)
+    return "new"
 
 
 def status_label(case_status, case_substatus):
@@ -173,21 +210,22 @@ def map_priority(case_level):
 # ---- 2c. Map Case Center's per-stage processing log -> board process timeline --------
 # r["processTimeline"] is Case Center's own breakdown of how long the case spent in each
 # processing stage. Each raw item carries: processorDeptName, processStartTime, caseStatus,
-# processMinutes, caseSubstatus, processEndTime, processType, processor. We normalize each into
-# the board shape the case detail's "Process timeline" component renders, carrying both the raw
-# Case Center status label (ccStatus) and the board status it maps to (so each stage can be
-# colored like the board columns).
+# processMinutes, subStatus.transition (the new format's substatus), processEndTime,
+# processType, processor. We normalize each into the board shape the case detail's "Process
+# timeline" component renders, carrying both the raw Case Center status label (ccStatus) and
+# the board status it maps to (so each stage can be colored like the board columns).
 def map_process_timeline(r):
     out = []
     for it in (r.get("processTimeline") or []):
         if not isinstance(it, dict):
             continue
+        it_transition = sub_transition(it)
         out.append({
             "processType": it.get("processType"),
             "processor": it.get("processor"),
             "processorDept": it.get("processorDeptName"),
-            "ccStatus": status_label(it.get("caseStatus"), it.get("caseSubstatus")),
-            "status": map_status(it.get("caseStatus"), it.get("caseSubstatus")),
+            "ccStatus": status_label(it.get("caseStatus"), it_transition),
+            "status": map_status(it.get("caseStatus"), it_transition),
             "startedAt": iso_utc(it.get("processStartTime")),
             "endedAt": iso_utc(it.get("processEndTime")),
             "minutes": it.get("processMinutes"),
@@ -199,7 +237,7 @@ def map_process_timeline(r):
 # When the sub-transition is "Wait User" the case is parked on the end user. Case Center carries
 # the detail in r["subStatus"]:
 #   reason, dueAction, dueDateTime, transition, transitionDateTime, and a lastProcessor object
-#   (assignee, handlerGrp, handlerType — who last handled it before it was parked).
+#   (assignee, handlerType — who last handled it before it was parked).
 # We surface it as `waitUser` on the board case, attached only when the case is in Wait User.
 def map_wait_user(r):
     sub = r.get("subStatus")
@@ -214,7 +252,6 @@ def map_wait_user(r):
         "transitionDateTime": iso_utc(sub.get("transitionDateTime")),
         "lastProcessor": {
             "assignee": lp.get("assignee"),
-            "handlerGrp": lp.get("handlerGrp"),
             "handlerType": lp.get("handlerType"),
         },
     }
@@ -253,6 +290,10 @@ def map_record(r):
     board case dict. Field names below match the current Case Center JSON shape."""
     case_id = str(r.get("caseId") or "")
     transition = sub_transition(r)
+    # The last processTimeline item's processType refines an ambiguous caseStatus —
+    # e.g. "In-Progress" alone can mean either triage or with the local FIT, but the
+    # last stage's processType ("1st  Line" vs "Service Team") disambiguates.
+    last_pt = last_process_type(r)
     # The end user the case is about. Case Center now carries this at the top level as
     # userAccount + userName (e.g. "alice.park" + "Alice Park"); we show both when present.
     user_account = r.get("userAccount") or ""
@@ -266,7 +307,7 @@ def map_record(r):
         "id": case_id,
         "caseLink": build_case_link(case_id),
         "subject": r.get("subject") or "(no subject)",
-        "status": map_status(r.get("caseStatus"), transition),
+        "status": map_status(r.get("caseStatus"), transition, last_pt),
         # Real Case Center status shown on the board (caseStatus + sub-transition), e.g.
         # "In-Progress Wait User". The board uses this for the visible label; `status`
         # above only drives which column the card sits in.

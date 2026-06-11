@@ -12,6 +12,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Changed
 
+- **Follow-ups to the Case Center JSON adapter.** `map_process_timeline()` now reads each
+  item's sub-transition via the shared `sub_transition(it)` helper instead of the removed
+  `caseSubstatus` field, keeping the per-stage logic consistent with the top-level
+  `subStatus.transition` change. `map_wait_user()` drops `handlerGrp` from
+  `lastProcessor` (Case Center no longer carries it). Added a `STATUS_MAP_BY_PROCESS_TYPE`
+  table next to `STATUS_MAP_BY_STATUS` to disambiguate "In-Progress" using the last
+  `processTimeline` item's `processType`: `"1st  Line"` → **new**, `"Service Team"` →
+  **with_fit**. `map_status()` now takes an optional `last_pt` argument and consults the
+  new table between the (status, substatus) pair lookup and the caseStatus-alone fallback;
+  `map_record()` passes the result of a new `last_process_type(r)` helper (which picks the
+  most recent item by `processEndTime`/`processStartTime`, falling back to list order).
 - **Adapted `local/casecenter.py` `map_record()` to Case Center's new JSON shape.** The
   substatus moved into a `subStatus` object — `caseSubstatus` is gone; we now read
   `subStatus.transition` via a new `sub_transition(r)` helper that tolerates the object
