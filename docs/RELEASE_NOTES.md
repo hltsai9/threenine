@@ -8,6 +8,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-11
+
+### Changed
+
+- **CommuGround visual theme applied to the prototype.** Reskinned `prototype/styles.css` and
+  loaded Plus Jakarta Sans + JetBrains Mono via Google Fonts in `prototype/index.html` to match
+  the `design_handoff_commuground` reference (light page bg `#f7f5fc`, white sticky sidebar with
+  the gradient brand tile, lavender accent system `#6857c0`/`#ab9ef1`/`#efeafc`, softer 14–20px
+  radii, the brand gradient on primary buttons and the tour CTA, kanban columns gain solid
+  accent-colored headers with deep text and per-column card accent bars). No markup, class
+  hooks, behavior, or sidebar items were changed — only the appearance.
+
+---
+
 ## 2026-06-08
 
 ### Added
