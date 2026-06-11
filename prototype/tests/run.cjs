@@ -204,6 +204,20 @@ test('waitUserDueMs: positive when due in the future', () =>
 test('waitUserDueMs: negative when overdue', () =>
   eq(waitUserDueMs({ waitUser: { dueDateTime: iso(3 * HOUR) } }), -3 * HOUR));
 
+/* ---------- caseHref (Case Center link, with client-side fallback) ----------
+ * Prefer the server-built caseLink; fall back to base URL + id when it's empty (e.g. a case
+ * stored before CASE_CENTER_BASE_URL was set, now that refresh no longer re-fetches). */
+const caseHref = app.caseHref;
+test('caseHref: uses the stored caseLink when present', () =>
+  eq(caseHref({ id: 'C-1', caseLink: 'https://cc.example/CC-1' }), 'https://cc.example/CC-1'));
+test('caseHref: builds from base URL + id when caseLink is empty', () => {
+  app.CASE_CENTER_BASE_URL = 'https://cc.example/cases/';   // trailing slash trimmed
+  eq(caseHref({ id: 'C-9', caseLink: '' }), 'https://cc.example/cases/C-9');
+  delete app.CASE_CENTER_BASE_URL;
+});
+test('caseHref: empty string when there is no link and no base URL', () =>
+  eq(caseHref({ id: 'C-9' }), ''));
+
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
 test('seed: every case has a non-empty string id', () =>

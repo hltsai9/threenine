@@ -163,6 +163,17 @@ def persist_cases(cases, data_js_path, source="live", purge_ids=()):
     return (added, updated, len(merged_list))
 
 
+def _case_center_base_url():
+    """The resolved Case Center base URL, to expose to the browser. Prefer casecenter.BASE_URL
+    (which already folds in the CASE_CENTER_BASE_URL env var and any in-file override); fall back
+    to the env var directly if casecenter can't be imported in this context."""
+    try:
+        import casecenter
+        return getattr(casecenter, "BASE_URL", "") or ""
+    except Exception:
+        return os.environ.get("CASE_CENTER_BASE_URL", "") or ""
+
+
 def _write_data_js(path, cases):
     text = ""
     if os.path.exists(path):
@@ -182,10 +193,14 @@ def _write_data_js(path, cases):
     else:
         head = (text.rstrip() + "\n\n") if text else ""
 
+    # Expose the Case Center base URL (not a secret) so the board can rebuild a case's link from
+    # its id when caseLink is empty — the page no longer re-fetches on refresh to do it server-side.
+    base_url = _case_center_base_url()
     block = (
         SENTINEL + "\n"
         "// Real Case Center data — do NOT commit/push. Original: data.js.orig · previous: data.js.bak\n"
         "window.CASES_LIVE_CAPTURE = true;\n"
+        f"window.CASE_CENTER_BASE_URL = {json.dumps(base_url)};\n"
         "window.CASES = " + json.dumps(cases, indent=2, ensure_ascii=False) + ";\n"
     )
     with open(path, "w", encoding="utf-8") as fh:

@@ -2509,6 +2509,17 @@ function getOwner(type, id) {
 }
 function caseById(id) { return STATE.cases.find(c => c.id === id); }
 
+// Case Center link for a case. Prefer the server-built caseLink; if it's empty (e.g. a case
+// stored before CASE_CENTER_BASE_URL was set — and a page refresh no longer re-fetches to rebuild
+// it), fall back to building it from the case id + the base URL serve.py exposes as
+// window.CASE_CENTER_BASE_URL. Mirrors build_case_link() in casecenter.py.
+function caseHref(c) {
+  if (c && c.caseLink) return c.caseLink;
+  const base = window.CASE_CENTER_BASE_URL;
+  if (base && c && c.id) return String(base).replace(/\/+$/, '') + '/' + c.id;
+  return '';
+}
+
 // Recycle bin: a binned case carries a `deletedAt` ISO timestamp. Binned cases are hidden from
 // the board, archive and all stats, and live only in the recycle bin until 7 days pass (then
 // they're purged). Bin timing uses real wall-clock time (like reminders), not the demo clock.
@@ -3181,7 +3192,7 @@ function renderReadingPanel(c) {
           ${flags}
         </div>
         <h2 style="margin-top:6px;">${escapeHtml(c.subject)}</h2>
-        <div class="muted tiny"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+        <div class="muted tiny"><a href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer">${escapeHtml(caseHref(c))}</a></div>
       </div>
       <div class="reading-actions">${actions}</div>
     </div>
@@ -3562,7 +3573,7 @@ function renderCaseDetail(id) {
           ${flags}
         </div>
         <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
-        <div class="subtitle"><a href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer">${escapeHtml(c.caseLink)}</a></div>
+        <div class="subtitle"><a href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer">${escapeHtml(caseHref(c))}</a></div>
       </div>
       <div class="toolbar">${actions}</div>
     </div>
@@ -3709,7 +3720,7 @@ function renderArchiveWeek(weekId) {
         <td class="col-id">${c.id}</td>
         <td>
           <div class="subject">${escapeHtml(c.subject)}</div>
-          <div><a class="link-inline" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
+          <div><a class="link-inline" href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
         </td>
         <td>${escapeHtml(c.requester)}</td>
         <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>

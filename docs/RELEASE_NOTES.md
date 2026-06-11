@@ -33,6 +33,12 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Fixed
 
+- **Case Center link no longer disappears in live mode.** Since a page refresh no longer
+  re-fetches, a case stored before `CASE_CENTER_BASE_URL` was configured kept its empty
+  `caseLink` and rendered a blank link. The board now falls back to building the link from the
+  case id + the base URL (`caseHref()`), and `serve.py`/`persist.py` expose that base as
+  `window.CASE_CENTER_BASE_URL` in `data.js`. (One-time repair for already-stored cases: press
+  **Refresh Existing**, which re-pulls with the base set and rewrites the links.)
 - **Operator work now survives a page refresh in live mode.** Reloading the board no longer
   re-pulls Case Center and rebuilds the board (which could drop or reset a case you'd just
   assigned/moved). Live mode now adopts the persisted `data.js` store on load, so a refresh shows
