@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  ::-webkit-scrollbar{height:10px;width:10px;}
+  ::-webkit-scrollbar-thumb{background:rgba(171,158,241,0.3);border-radius:20px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  input:focus,select:focus,button:focus{outline:none;}
+  @keyframes cgpulse{0%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.65);}100%{opacity:1;transform:scale(1);}}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;display:flex;font-family:'Plus Jakarta Sans',system-ui,sans-serif;{{ wrapBgStyle }}">
+
+  <!-- SIDEBAR -->
+  <div style="{{ sidebarStyle }}">
+    <div style="display:flex;align-items:center;gap:11px;padding:6px 8px 4px;">
+      <div style="width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#a99cf0 0%,#f093bd 60%,#7fd0c6 125%);box-shadow:0 4px 12px rgba(169,156,240,.4);flex:0 0 auto;"></div>
+      <div>
+        <div style="font-weight:800;font-size:17px;letter-spacing:-.02em;color:#2e2a47;">CommuGround</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:600;color:#a29ebb;letter-spacing:.06em;margin-top:1px;">SUPPORT × SRE</div>
+      </div>
+    </div>
+
+    <div style="height:1px;background:#f0eef7;margin:16px 4px;"></div>
+
+    <div style="display:flex;flex-direction:column;gap:4px;">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+        <div onClick="{{ n.onClick }}" style="{{ n.style }}" style-hover="{{ n.hoverStyle }}">
+          <span style="{{ n.iconStyle }}">{{ n.icon }}</span>
+          <span>{{ n.label }}</span>
+          <span style="flex:1;"></span>
+          <sc-if value="{{ n.showBadge }}" hint-placeholder-val="{{ false }}"><span style="{{ n.badgeStyle }}">{{ n.badge }}</span></sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#7d7a99;padding:11px 12px;background:#f7f5fc;border-radius:13px;margin-bottom:10px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#80cba7;animation:cgpulse 1.8s ease-in-out infinite;flex:0 0 auto;"></span>
+      {{ onlineCount }} teammates online
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #f0eef7;border-radius:13px;">
+      <span style="width:32px;height:32px;border-radius:50%;background:#ec84ad;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:0 0 auto;">AL</span>
+      <div style="min-width:0;">
+        <div style="font-size:12.5px;font-weight:700;color:#2e2a47;">Alex</div>
+        <div style="font-size:11px;color:#a29ebb;">Support · on shift</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+    <div style="max-width:1260px;width:100%;margin:0 auto;padding:16px 22px 44px;">
+
+      <!-- TOP BAR -->
+      <div style="display:flex;align-items:center;gap:16px;padding:13px 18px;background:#fff;border-radius:18px;box-shadow:0 1px 3px rgba(24,20,52,.06);margin-bottom:14px;position:sticky;top:8px;z-index:30;">
+        <div style="min-width:0;">
+          <div style="font-weight:800;font-size:18px;letter-spacing:-.02em;color:#2e2a47;">{{ pageTitle }}</div>
+          <div style="font-size:12px;color:#a29ebb;font-weight:600;margin-top:1px;">{{ pageSub }}</div>
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:flex;align-items:center;gap:8px;background:#f6f4fb;border-radius:11px;padding:8px 13px;width:200px;color:#a29ebb;font-size:13px;font-weight:500;">🔍&nbsp;Search cases…</div>
+        <div style="display:flex;gap:3px;background:#f6f4fb;padding:3px;border-radius:12px;">
+          <sc-for list="{{ themeButtons }}" as="tb" hint-placeholder-count="3">
+            <button onClick="{{ tb.onClick }}" style="{{ tb.style }}">{{ tb.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;padding-left:2px;">
+          <sc-for list="{{ onlineAvatars }}" as="av" hint-placeholder-count="5">
+            <div title="{{ av.name }}" style="{{ av.style }}">{{ av.initials }}</div>
+          </sc-for>
+        </div>
+        <button onClick="{{ onNewCase }}" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#9b8aed,#ec84ad);color:#fff;border:none;font-family:inherit;font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:11px;cursor:pointer;box-shadow:0 5px 14px rgba(155,138,237,.34);">+ New case</button>
+      </div>
+
+      <!-- ===================== BOARD VIEW ===================== -->
+      <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <!-- STATS STRIP -->
+          <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <sc-for list="{{ stats }}" as="st" hint-placeholder-count="5">
+              <div onClick="{{ st.onClick }}" style="{{ st.wrapStyle }}">
+                <div style="{{ st.iconStyle }}">{{ st.icon }}</div>
+                <div>
+                  <div style="{{ st.valueStyle }}">{{ st.value }}</div>
+                  <div style="font-size:11.5px;color:#a29ebb;font-weight:600;margin-top:1px;">{{ st.label }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- FILTERS -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+              <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}<span style="{{ f.countStyle }}">{{ f.count }}</span></button>
+            </sc-for>
+          </div>
+
+          <!-- BOARD -->
+          <div style="display:flex;gap:15px;align-items:flex-start;overflow-x:auto;padding:2px 2px 16px;">
+            <sc-for list="{{ columns }}" as="col" hint-placeholder-count="5">
+              <div style="min-width:286px;max-width:300px;flex:0 0 auto;display:flex;flex-direction:column;gap:9px;" onDragOver="{{ col.onDragOver }}" onDrop="{{ col.onDrop }}">
+                <div style="{{ col.headerStyle }}">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="{{ col.dotStyle }}"></span>
+                    <span style="{{ col.nameStyle }}">{{ col.name }}</span>
+                    <span style="{{ col.countStyle }}">{{ col.count }}</span>
+                  </div>
+                  <div style="{{ col.subStyle }}">{{ col.sub }}</div>
+                </div>
+                <div style="{{ col.bodyStyle }}">
+                  <sc-for list="{{ col.cards }}" as="card" hint-placeholder-count="2">
+                    <div draggable="true" onDragStart="{{ card.onDragStart }}" onClick="{{ card.onOpen }}" style="{{ card.cardStyle }}" style-hover="{{ card.hoverStyle }}">
+                      <div style="{{ card.accentBarStyle }}"></div>
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+                        <span style="{{ card.codeStyle }}">{{ card.code }}</span>
+                        <sc-if value="{{ card.showPriority }}" hint-placeholder-val="{{ false }}"><span style="{{ card.priorityStyle }}">{{ card.priorityLabel }}</span></sc-if>
+                        <span style="flex:1;"></span>
+                        <sc-if value="{{ card.showStuck }}" hint-placeholder-val="{{ false }}"><span style="{{ card.stuckStyle }}">⏱ {{ card.stuckLabel }}</span></sc-if>
+                      </div>
+                      <div style="{{ card.titleStyle }}">{{ card.title }}</div>
+                      <div style="display:flex;gap:4px;align-items:center;margin:11px 0 11px;">
+                        <sc-for list="{{ card.dots }}" as="d" hint-placeholder-count="4"><span style="{{ d.style }}"></span></sc-for>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <sc-if value="{{ card.showOwner }}" hint-placeholder-val="{{ false }}"><span style="{{ card.ownerStyle }}">{{ card.ownerInitials }}</span></sc-if>
+                        <sc-if value="{{ card.unassigned }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;color:#a29ebb;background:#f4f2fa;padding:3px 9px;border-radius:8px;">Unassigned</span></sc-if>
+                        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#aaa6c0;font-weight:500;">{{ card.updatedLabel }}</span>
+                        <span style="flex:1;"></span>
+                        <sc-if value="{{ card.showComments }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#9591ad;font-weight:600;">💬 {{ card.commentCount }}</span></sc-if>
+                        <sc-if value="{{ card.showViewers }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#8b78d8;font-weight:700;">👀 {{ card.viewerCount }}</span></sc-if>
+                      </div>
+                      <div style="display:flex;gap:6px;margin-top:11px;border-top:1px solid #f3f1fa;padding-top:10px;">
+                        <button onClick="{{ card.onNudge }}" style="{{ card.nudgeStyle }}">👋 Nudge</button>
+                        <sc-if value="{{ card.showHandoff }}" hint-placeholder-val="{{ false }}"><button onClick="{{ card.onHandoff }}" style="{{ card.handoffStyle }}">{{ card.handoffLabel }} →</button></sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                    <div style="{{ col.emptyStyle }}">Nothing here — drag a card in</div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===================== SHIFTS VIEW ===================== -->
+      <sc-if value="{{ isShifts }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+            <sc-for list="{{ shiftPanels }}" as="sp" hint-placeholder-count="2">
+              <div style="{{ sp.wrapStyle }}">
+                <div style="font-size:11.5px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:15px;">{{ sp.teamLabel }}</div>
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+                  <span style="{{ sp.onAvatarStyle }}">{{ sp.onInitials }}</span>
+                  <div>
+                    <div style="{{ sp.onLabelStyle }}">ON SHIFT NOW</div>
+                    <div style="font-size:18px;font-weight:700;color:#2e2a47;line-height:1.2;margin-top:2px;">{{ sp.onName }}</div>
+                    <div style="font-size:12px;color:#a29ebb;font-weight:500;margin-top:2px;">until {{ sp.until }}</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;border-top:1px solid #f3f1fa;padding-top:14px;">
+                  <span style="{{ sp.nextAvatarStyle }}">{{ sp.nextInitials }}</span>
+                  <div style="font-size:12.5px;color:#6c6890;font-weight:500;">Up next: <b style="color:#2e2a47;">{{ sp.nextName }}</b></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border-radius:18px;padding:22px;box-shadow:0 1px 3px rgba(24,20,52,.06);">
+            <div style="font-size:11.5px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:18px;">THIS WEEK'S ROTA</div>
+            <div style="display:grid;grid-template-columns:92px repeat(7,1fr);gap:12px 10px;align-items:center;">
+              <div></div>
+              <sc-for list="{{ rotaDays }}" as="d" hint-placeholder-count="7"><div style="text-align:center;font-size:11.5px;font-weight:700;color:#a29ebb;">{{ d.label }}</div></sc-for>
+              <div style="font-size:12.5px;font-weight:700;color:#b65389;">Support</div>
+              <sc-for list="{{ rotaSupport }}" as="r" hint-placeholder-count="7"><div style="display:flex;justify-content:center;"><span style="{{ r.style }}">{{ r.initials }}</span></div></sc-for>
+              <div style="font-size:12.5px;font-weight:700;color:#2f877f;">SRE</div>
+              <sc-for list="{{ rotaSRE }}" as="r" hint-placeholder-count="7"><div style="display:flex;justify-content:center;"><span style="{{ r.style }}">{{ r.initials }}</span></div></sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===================== OWNERS VIEW ===================== -->
+      <sc-if value="{{ isOwners }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;">
+          <sc-for list="{{ owners }}" as="o" hint-placeholder-count="5">
+            <div onClick="{{ o.onClick }}" style="background:#fff;border-radius:18px;padding:18px;box-shadow:0 1px 3px rgba(24,20,52,.06);border:1px solid #f3f1fa;cursor:pointer;" style-hover="{{ o.hoverStyle }}">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:15px;">
+                <span style="{{ o.avatarStyle }}">{{ o.initials }}</span>
+                <div style="min-width:0;">
+                  <div style="font-weight:700;font-size:15px;color:#2e2a47;">{{ o.name }}</div>
+                  <span style="{{ o.teamChipStyle }}">{{ o.team }}</span>
+                </div>
+                <span style="flex:1;"></span>
+                <div style="text-align:right;">
+                  <div style="{{ o.countStyle }}">{{ o.openCount }}</div>
+                  <div style="font-size:10.5px;color:#a29ebb;font-weight:600;">open</div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <sc-for list="{{ o.cases }}" as="oc" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:9px;">
+                    <span style="{{ oc.dotStyle }}"></span>
+                    <span style="font-size:12.5px;color:#4a4665;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ oc.title }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ o.empty }}" hint-placeholder-val="{{ false }}"><div style="font-size:12.5px;color:#a8a4c0;font-weight:600;">All clear — no open cases 🎉</div></sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ===================== WEEKLY ARCHIVE VIEW ===================== -->
+      <sc-if value="{{ isArchive }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <sc-for list="{{ archiveStats }}" as="as" hint-placeholder-count="3">
+              <div style="flex:1;min-width:180px;background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 1px 3px rgba(24,20,52,.06);">
+                <div style="{{ as.valueStyle }}">{{ as.value }}</div>
+                <div style="font-size:12px;color:#a29ebb;font-weight:600;margin-top:3px;">{{ as.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 3px rgba(24,20,52,.06);margin-bottom:14px;">
+            <div style="font-size:11.5px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:15px;">RESOLVED THIS WEEK</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <sc-for list="{{ archiveCases }}" as="ac" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid #f3f1fa;border-radius:13px;">
+                  <span style="{{ ac.ownerStyle }}">{{ ac.ownerInitials }}</span>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:13.5px;font-weight:600;color:#28244a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ ac.title }}</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#aaa6c0;margin-top:2px;">{{ ac.code }} · closed by {{ ac.ownerName }}</div>
+                  </div>
+                  <span style="font-size:11.5px;font-weight:700;color:#429a72;background:#e7f5ed;padding:4px 11px;border-radius:9px;flex:0 0 auto;">✓ Resolved</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="background:#fff;border-radius:18px;padding:20px;box-shadow:0 1px 3px rgba(24,20,52,.06);">
+            <div style="font-size:11.5px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:18px;">PREVIOUS WEEKS</div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <sc-for list="{{ archiveWeeks }}" as="w" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:14px;">
+                  <div style="width:128px;font-size:13px;font-weight:600;color:#4a4665;flex:0 0 auto;">{{ w.week }}</div>
+                  <div style="flex:1;height:11px;background:#f3f1fa;border-radius:6px;overflow:hidden;"><div style="{{ w.barStyle }}"></div></div>
+                  <div style="width:74px;text-align:right;font-size:13px;font-weight:700;color:#28244a;flex:0 0 auto;">{{ w.count }} cases</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <!-- DRAWER -->
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ draw.onClose }}" style="position:fixed;inset:0;background:rgba(46,42,71,.32);backdrop-filter:blur(2px);z-index:50;display:flex;justify-content:flex-end;">
+      <div onClick="{{ draw.stop }}" style="width:436px;max-width:94vw;height:100vh;background:#fbfaff;box-shadow:-22px 0 60px rgba(46,42,71,.24);display:flex;flex-direction:column;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+        <div style="display:flex;align-items:center;gap:10px;padding:17px 20px;background:#fff;border-bottom:1px solid #f3f1fa;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#9591ad;">{{ draw.code }}</span>
+          <sc-if value="{{ draw.showPriority }}" hint-placeholder-val="{{ false }}"><span style="{{ draw.priorityStyle }}">{{ draw.priorityLabel }}</span></sc-if>
+          <span style="flex:1;"></span>
+          <button onClick="{{ draw.onClose }}" style="width:30px;height:30px;border-radius:9px;border:none;background:#f6f4fb;color:#6c6890;font-size:16px;cursor:pointer;">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:20px;">
+          <div style="font-size:18px;font-weight:700;line-height:1.32;color:#2e2a47;margin-bottom:13px;text-wrap:pretty;">{{ draw.title }}</div>
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;flex-wrap:wrap;">
+            <span style="{{ draw.colChipStyle }}">{{ draw.colName }}</span>
+            <sc-if value="{{ draw.showOwner }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#6c6890;font-weight:600;"><span style="{{ draw.ownerStyle }}">{{ draw.ownerInitials }}</span>{{ draw.ownerName }}</span>
+            </sc-if>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#aaa6c0;">updated {{ draw.updatedLabel }}</span>
+          </div>
+          <sc-if value="{{ draw.showViewers }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:7px;background:#efeafc;border-radius:10px;padding:8px 12px;margin-bottom:18px;font-size:12.5px;font-weight:600;color:#6857c0;">
+              <span style="width:7px;height:7px;border-radius:50%;background:#ab9ef1;animation:cgpulse 1.8s ease-in-out infinite;"></span>{{ draw.viewersText }}
+            </div>
+          </sc-if>
+
+          <div style="background:#fff;border:1px solid #f3f1fa;border-radius:14px;padding:16px 14px;margin-bottom:16px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:14px;">LIFECYCLE</div>
+            <div style="display:flex;align-items:flex-start;">
+              <sc-for list="{{ draw.stages }}" as="stg" hint-placeholder-count="4">
+                <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:6px;">
+                  <span style="{{ stg.dotStyle }}">{{ stg.mark }}</span>
+                  <span style="{{ stg.labelStyle }}">{{ stg.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:20px;">
+            <button onClick="{{ draw.onNudge }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1px solid #ece9f5;color:#6c6890;font-family:inherit;font-weight:700;font-size:13px;padding:11px;border-radius:11px;cursor:pointer;" style-hover="{{ draw.nudgeHover }}">👋 Nudge for update</button>
+            <sc-if value="{{ draw.showHandoff }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ draw.onHandoff }}" style="{{ draw.handoffStyle }}">{{ draw.handoffLabel }} →</button>
+            </sc-if>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:#a29ebb;margin-bottom:14px;">CONVERSATION</div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <sc-for list="{{ draw.comments }}" as="cm" hint-placeholder-count="3">
+              <sc-if value="{{ cm.system }}" hint-placeholder-val="{{ false }}">
+                <div style="text-align:center;"><span style="display:inline-block;font-size:11.5px;color:#9591ad;font-weight:600;background:#f4f2fa;padding:5px 12px;border-radius:9px;">{{ cm.text }} · {{ cm.time }}</span></div>
+              </sc-if>
+              <sc-if value="{{ cm.normal }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                  <span style="{{ cm.avatarStyle }}">{{ cm.initials }}</span>
+                  <div style="flex:1;">
+                    <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:3px;">
+                      <span style="font-size:13px;font-weight:700;color:#33304f;">{{ cm.name }}</span>
+                      <span style="{{ cm.teamStyle }}">{{ cm.team }}</span>
+                      <span style="font-size:11px;color:#aaa6c0;">{{ cm.time }}</span>
+                    </div>
+                    <div style="font-size:13.5px;line-height:1.5;color:#4a4665;background:#fff;border:1px solid #f3f1fa;border-radius:11px;padding:9px 12px;text-wrap:pretty;">{{ cm.text }}</div>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;padding:14px 16px;background:#fff;border-top:1px solid #f3f1fa;">
+          <input ref="{{ draftRef }}" onKeyDown="{{ draw.onKey }}" placeholder="Message the team…  @ to mention" style="flex:1;border:1px solid #e9e6f4;border-radius:11px;padding:11px 13px;font-family:inherit;font-size:13.5px;color:#33304f;background:#fbfaff;" />
+          <button onClick="{{ draw.onPost }}" style="background:linear-gradient(135deg,#9b8aed,#ec84ad);color:#fff;border:none;font-family:inherit;font-weight:700;font-size:13.5px;padding:0 18px;border-radius:11px;cursor:pointer;">Send</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- COMPOSE MODAL -->
+  <sc-if value="{{ composeOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ onComposeClose }}" style="position:fixed;inset:0;background:rgba(46,42,71,.4);backdrop-filter:blur(2px);z-index:60;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+      <div onClick="{{ draw.stop }}" style="width:440px;max-width:92vw;background:#fff;border-radius:20px;padding:24px;box-shadow:0 30px 70px rgba(46,42,71,.3);">
+        <div style="font-size:18px;font-weight:800;margin-bottom:4px;color:#2e2a47;">New case</div>
+        <div style="font-size:13px;color:#a29ebb;margin-bottom:18px;">It lands in <b style="color:#8a89ab;">New</b> for triage.</div>
+        <label style="font-size:12px;font-weight:700;color:#6c6890;">Title</label>
+        <input ref="{{ titleRef }}" placeholder="e.g. Payment webhook failing for EU customers" style="width:100%;margin:6px 0 16px;border:1px solid #e9e6f4;border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:#33304f;" />
+        <label style="font-size:12px;font-weight:700;color:#6c6890;">Priority</label>
+        <select ref="{{ priorityRef }}" style="width:100%;margin:6px 0 22px;border:1px solid #e9e6f4;border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14px;color:#33304f;background:#fff;">
+          <option value="urgent">🔥 Urgent</option>
+          <option value="high">High</option>
+          <option value="normal" selected="selected">Normal</option>
+        </select>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button onClick="{{ onComposeClose }}" style="background:#f6f4fb;color:#6c6890;border:none;font-family:inherit;font-weight:700;font-size:13.5px;padding:11px 18px;border-radius:11px;cursor:pointer;">Cancel</button>
+          <button onClick="{{ onComposeCreate }}" style="background:linear-gradient(135deg,#9b8aed,#ec84ad);color:#fff;border:none;font-family:inherit;font-weight:700;font-size:13.5px;padding:11px 20px;border-radius:11px;cursor:pointer;">Create case</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#2e2a47;color:#fff;font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-weight:600;font-size:13.5px;padding:12px 20px;border-radius:13px;box-shadow:0 12px 32px rgba(46,42,71,.36);z-index:70;display:flex;align-items:center;gap:9px;">
+      <span style="width:7px;height:7px;border-radius:50%;background:#88dcc0;"></span>{{ toast }}
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.draftRef = React.createRef();
+    this.titleRef = React.createRef();
+    this.priorityRef = React.createRef();
+    this.ORDER = ['new', 'local', 'hq', 'sanity', 'resolved'];
+    this.colDefs = [
+      { id: 'new', name: 'New', sub: 'Unassigned · awaiting triage', accent: '#9aa6cf', deep: '#5a608c', tint: '#eef0f8' },
+      { id: 'local', name: 'Local Team', sub: 'Owned by Support', accent: '#f093bd', deep: '#b65389', tint: '#fcebf3' },
+      { id: 'hq', name: 'HQ Team', sub: 'Owned by SRE', accent: '#5fc8be', deep: '#2f877f', tint: '#e2f5f2' },
+      { id: 'sanity', name: 'Sanity Check', sub: 'Back with the user', accent: '#ab9ef1', deep: '#6857c0', tint: '#efeafc' },
+      { id: 'resolved', name: 'Resolved', sub: 'Closed out', accent: '#80cba7', deep: '#429a72', tint: '#e7f5ed' }
+    ];
+    this.people = {
+      you:   { initials: 'AL', name: 'Alex (you)', short: 'Alex', team: 'Support', color: '#ec84ad' },
+      maya:  { initials: 'MR', name: 'Maya R.', short: 'Maya', team: 'Support', color: '#f0a7c6' },
+      priya: { initials: 'PK', name: 'Priya K.', short: 'Priya', team: 'Support', color: '#e98fb4' },
+      devon: { initials: 'DL', name: 'Devon L.', short: 'Devon', team: 'SRE', color: '#5cc3b9' },
+      sam:   { initials: 'ST', name: 'Sam T.', short: 'Sam', team: 'SRE', color: '#74c3d0' },
+      user:  { initials: 'CU', name: 'Customer', short: 'the customer', team: 'User', color: '#ab9ef1' }
+    };
+    this.baseViewers = { 'CG-4798': ['devon', 'maya'], 'CG-4762': ['user'] };
+    this.rota = [
+      { day: 'Mon', sup: 'maya', sre: 'devon' },
+      { day: 'Tue', sup: 'priya', sre: 'sam' },
+      { day: 'Wed', sup: 'you', sre: 'devon' },
+      { day: 'Thu', sup: 'maya', sre: 'sam' },
+      { day: 'Fri', sup: 'priya', sre: 'devon' },
+      { day: 'Sat', sup: 'you', sre: 'sam' },
+      { day: 'Sun', sup: 'maya', sre: 'devon' }
+    ];
+    this.shiftNow = {
+      sup: { on: 'maya', next: 'priya', until: '4:00 PM' },
+      sre: { on: 'devon', next: 'sam', until: '6:00 PM' }
+    };
+    this.archiveWeeks = [
+      { week: 'Jun 2 – 8', count: 14 },
+      { week: 'May 26 – Jun 1', count: 11 },
+      { week: 'May 19 – 25', count: 9 },
+      { week: 'May 12 – 18', count: 12 }
+    ];
+    this.state = {
+      theme: 'pop', view: 'board', filter: 'all', selectedId: null,
+      draggingId: null, dragOverCol: null, toast: null, composeOpen: false,
+      nextNum: 4822, handoffsToday: 12, roam: null,
+      cards: [
+        { id: 'CG-4821', col: 'new', title: 'Checkout returns 500s — spiking across the EU region', priority: 'urgent', owner: null, updated: 6, comments: [] },
+        { id: 'CG-4820', col: 'new', title: "Customer can't reset password via SSO login", priority: 'high', owner: null, updated: 22, comments: [] },
+        { id: 'CG-4814', col: 'local', title: 'Refund not processed for order #88231', priority: 'normal', owner: 'maya', updated: 58, comments: [
+          { id: 1, who: 'maya', text: 'Confirmed the charge went through twice. Issuing a manual refund now.', min: 50 },
+          { id: 2, who: 'you', text: 'Thanks Maya — drop the txn id here in case SRE needs it.', min: 12 } ] },
+        { id: 'CG-4809', col: 'local', title: 'Mobile app crashes on photo upload (Android 14)', priority: 'high', owner: 'priya', updated: 205, comments: [
+          { id: 1, who: 'priya', text: 'Reproduced on a Pixel 8. Looks like the image resizer OOMs on large files.', min: 160 } ] },
+        { id: 'CG-4805', col: 'local', title: 'Billing discrepancy in the monthly invoice export', priority: 'normal', owner: 'you', updated: 40, comments: [] },
+        { id: 'CG-4798', col: 'hq', title: 'DB replica lag causing API timeouts', priority: 'urgent', owner: 'devon', updated: 300, comments: [
+          { id: 1, who: 'devon', text: 'Replica lag jumped to ~8s right after the 14:00 deploy. Digging in.', min: 290 },
+          { id: 2, who: 'maya', text: '3 enterprise accounts are reporting timeouts — bumping this to urgent.', min: 240 },
+          { id: 3, system: true, text: 'Maya handed this to HQ Team', min: 235 },
+          { id: 4, who: 'devon', text: 'Rolling back the connection-pool change now.', min: 120 },
+          { id: 5, who: 'devon', text: 'Lag is back under 500ms. Watching for 30 min before I resolve.', min: 42 } ] },
+        { id: 'CG-4790', col: 'hq', title: 'Elevated 5xx on the API gateway', priority: 'high', owner: 'sam', updated: 72, comments: [
+          { id: 1, who: 'sam', text: 'Scaling the gateway pool up by 2 and watching the error rate.', min: 60 } ] },
+        { id: 'CG-4777', col: 'hq', title: 'Memory leak in the background worker pool', priority: 'normal', owner: 'devon', updated: 360, comments: [] },
+        { id: 'CG-4762', col: 'sanity', title: 'Password-reset email delay — fixed?', priority: 'normal', owner: 'user', updated: 30, comments: [
+          { id: 1, who: 'sam', text: 'Deployed the queue fix. @customer can you confirm the email now arrives within a minute?', min: 28 } ] },
+        { id: 'CG-4750', col: 'sanity', title: 'Search latency improvements — please verify', priority: 'normal', owner: 'user', updated: 75, comments: [] },
+        { id: 'CG-4733', col: 'resolved', title: 'OAuth login loop on Safari', priority: 'normal', owner: 'devon', updated: 120, comments: [] },
+        { id: 'CG-4721', col: 'resolved', title: 'Webhook retries duplicating events', priority: 'normal', owner: 'sam', updated: 1440, comments: [] }
+      ]
+    };
+  }
+
+  componentDidMount() {
+    this._iv = setInterval(() => {
+      const ids = this.state.cards.filter(c => c.col !== 'resolved').map(c => c.id);
+      if (!ids.length) return;
+      const pool = ['sam', 'priya', 'maya', 'devon'];
+      this.setState({ roam: { cardId: ids[Math.floor(Math.random() * ids.length)], person: pool[Math.floor(Math.random() * pool.length)] } });
+    }, 5000);
+  }
+  componentWillUnmount() { clearInterval(this._iv); clearTimeout(this._t); }
+
+  // ---- helpers ----
+  hexA(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  colDef(id) { return this.colDefs.find(c => c.id === id); }
+  colName(id) { return this.colDef(id).name; }
+  fmt(m) {
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    if (m < 1440) return Math.floor(m / 60) + 'h ago';
+    return Math.floor(m / 1440) + 'd ago';
+  }
+  isStuck(c) { return c.updated >= 180 && (c.col === 'local' || c.col === 'hq'); }
+  viewersFor(id) {
+    const base = this.baseViewers[id] ? this.baseViewers[id].slice() : [];
+    const r = this.state.roam;
+    if (r && r.cardId === id && base.indexOf(r.person) === -1) base.push(r.person);
+    return base.map(k => this.people[k]);
+  }
+  handoffLabel(col) {
+    const i = this.ORDER.indexOf(col), next = this.ORDER[i + 1];
+    return { local: 'Assign to Support', hq: 'Hand to SRE', sanity: 'Send to user', resolved: 'Resolve' }[next] || '';
+  }
+
+  // ---- actions ----
+  flash(msg) { this.setState({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: null }), 2600); }
+  moveCard(id, toCol) {
+    this.setState(s => ({
+      cards: s.cards.map(c => c.id === id ? { ...c, col: toCol, updated: 0, comments: [...c.comments, { id: Date.now(), system: true, text: 'You moved this to ' + this.colName(toCol), min: 0 }] } : c),
+      handoffsToday: s.handoffsToday + 1
+    }));
+    this.flash('Moved ' + id + ' → ' + this.colName(toCol));
+  }
+  handoff(id) {
+    const c = this.state.cards.find(x => x.id === id); if (!c) return;
+    const i = this.ORDER.indexOf(c.col);
+    if (i < this.ORDER.length - 1) this.moveCard(id, this.ORDER[i + 1]);
+  }
+  nudge(id) {
+    const c = this.state.cards.find(x => x.id === id);
+    const owner = c && c.owner ? this.people[c.owner].short : 'the team';
+    this.setState(s => ({ cards: s.cards.map(x => x.id === id ? { ...x, comments: [...x.comments, { id: Date.now(), system: true, text: '👋 You nudged ' + owner + ' for an update', min: 0 }] } : x) }));
+    this.flash('Nudge sent to ' + owner + ' — they got a ping');
+  }
+  onDrop(colId) {
+    const id = this.state.draggingId;
+    this.setState({ draggingId: null, dragOverCol: null });
+    if (!id) return;
+    const c = this.state.cards.find(x => x.id === id);
+    if (c && c.col !== colId) this.moveCard(id, colId);
+  }
+  post() {
+    const el = this.draftRef.current; const v = el ? el.value.trim() : '';
+    if (!v) return; const id = this.state.selectedId;
+    this.setState(s => ({ cards: s.cards.map(c => c.id === id ? { ...c, comments: [...c.comments, { id: Date.now(), who: 'you', text: v, min: 0 }] } : c) }));
+    if (el) el.value = '';
+  }
+  createCase() {
+    const t = this.titleRef.current ? this.titleRef.current.value.trim() : '';
+    if (!t) { this.flash('Add a short title first'); return; }
+    const pr = this.priorityRef.current ? this.priorityRef.current.value : 'normal';
+    const id = 'CG-' + this.state.nextNum;
+    this.setState(s => ({ cards: [{ id, col: 'new', title: t, priority: pr, owner: null, updated: 0, comments: [] }, ...s.cards], nextNum: s.nextNum + 1, composeOpen: false }));
+    this.flash(id + ' created in New');
+  }
+  stop(e) { if (e && e.stopPropagation) e.stopPropagation(); }
+
+  matchFilter(c) {
+    const f = this.state.filter;
+    if (f && f.indexOf('own:') === 0) return c.owner === f.slice(4);
+    switch (f) {
+      case 'urgent': return c.priority === 'urgent';
+      case 'stuck': return this.isStuck(c);
+      case 'mine': return c.owner === 'you';
+      case 'await': return c.col === 'sanity';
+      default: return true;
+    }
+  }
+
+  // ---- view builders ----
+  buildCard(c, def) {
+    const theme = this.state.theme;
+    const owner = c.owner ? this.people[c.owner] : null;
+    const stuck = this.isStuck(c);
+    const idx = this.ORDER.indexOf(c.col);
+    const i = idx, next = this.ORDER[i + 1], nAccent = next ? this.colDef(next).accent : def.accent, nDeep = next ? this.colDef(next).deep : def.deep;
+    const dots = [0, 1, 2, 3].map(k => {
+      let bg = '#ddd9ea';
+      if (c.col === 'resolved' || k < idx) bg = '#80cba7';
+      else if (k === idx) bg = def.accent;
+      return { style: { width: k === idx ? '17px' : '7px', height: '7px', borderRadius: '4px', background: bg, transition: 'all .25s' } };
+    });
+    const viewers = this.viewersFor(c.id);
+    const prMap = {
+      urgent: { background: '#fbe0e5', color: '#cf6a7c' },
+      high: { background: '#fbecd0', color: '#b9842f' }
+    };
+    return {
+      key: c.id, code: c.id, title: c.title,
+      codeStyle: { fontFamily: "'JetBrains Mono',monospace", fontSize: '11px', fontWeight: 600, color: theme === 'bold' ? '#9b97bd' : '#9591ad', letterSpacing: '.02em' },
+      titleStyle: { fontSize: '13.5px', fontWeight: 600, lineHeight: 1.36, color: '#28244a', textWrap: 'pretty' },
+      showPriority: c.priority !== 'normal',
+      priorityLabel: c.priority === 'urgent' ? 'Urgent' : 'High',
+      priorityStyle: { ...(prMap[c.priority] || {}), fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '7px', letterSpacing: '.02em' },
+      showStuck: stuck, stuckLabel: Math.floor(c.updated / 60) + 'h idle',
+      stuckStyle: { fontSize: '10.5px', fontWeight: 700, color: '#d98a5c', background: '#fbe9da', padding: '2px 7px', borderRadius: '7px', display: 'inline-flex', alignItems: 'center', gap: '3px' },
+      cardStyle: {
+        position: 'relative', background: '#fff', borderRadius: '14px', padding: '13px 14px 12px 17px', cursor: 'grab',
+        boxShadow: theme === 'bold' ? '0 6px 22px rgba(0,0,0,.34)' : '0 1px 2px rgba(24,20,52,.04),0 5px 16px rgba(24,20,52,.05)',
+        border: theme === 'bold' ? '1px solid rgba(255,255,255,.06)' : '1px solid #f1eff7',
+        opacity: this.state.draggingId === c.id ? 0.4 : 1, transition: 'box-shadow .15s, transform .15s'
+      },
+      hoverStyle: { transform: 'translateY(-2px)', boxShadow: theme === 'bold' ? '0 10px 30px rgba(0,0,0,.45)' : '0 4px 8px rgba(24,20,52,.06),0 12px 28px rgba(24,20,52,.1)' },
+      accentBarStyle: { position: 'absolute', left: 0, top: '13px', bottom: '13px', width: '4px', borderRadius: '0 4px 4px 0', background: def.accent, boxShadow: theme === 'bold' ? '0 0 10px ' + def.accent : 'none' },
+      showOwner: !!owner, ownerInitials: owner ? owner.initials : '',
+      ownerStyle: owner ? { width: '24px', height: '24px', borderRadius: '50%', background: owner.color, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700 } : {},
+      unassigned: !owner && c.col === 'new',
+      updatedLabel: this.fmt(c.updated),
+      showComments: c.comments.length > 0, commentCount: c.comments.length,
+      showViewers: viewers.length > 0, viewerCount: viewers.length,
+      dots,
+      onOpen: () => this.setState({ selectedId: c.id }),
+      onNudge: (e) => { this.stop(e); this.nudge(c.id); },
+      onHandoff: (e) => { this.stop(e); this.handoff(c.id); },
+      handoffLabel: this.handoffLabel(c.col), showHandoff: c.col !== 'resolved',
+      handoffStyle: { flex: '1.7', fontFamily: 'inherit', fontSize: '11.5px', fontWeight: 700, padding: '6px 8px', borderRadius: '8px', border: 'none', background: this.hexA(nAccent, 0.18), color: nDeep, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      nudgeStyle: { flex: '1', fontFamily: 'inherit', fontSize: '11.5px', fontWeight: 600, padding: '6px 8px', borderRadius: '8px', border: '1px solid #ece9f5', background: '#fff', color: '#6c6890', cursor: 'pointer' },
+      onDragStart: (e) => { try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); } catch (_) {} this.setState({ draggingId: c.id }); }
+    };
+  }
+
+  buildColumn(def) {
+    const theme = this.state.theme, s = this.state;
+    const all = s.cards.filter(c => c.col === def.id);
+    const shown = all.filter(c => this.matchFilter(c)).map(c => this.buildCard(c, def));
+    const over = s.dragOverCol === def.id;
+    let headerStyle, dotStyle, nameStyle, countStyle, subStyle, bodyStyle;
+    const baseBody = { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', borderRadius: '16px', minHeight: '110px', transition: 'background .15s, box-shadow .15s' };
+    if (theme === 'pop') {
+      headerStyle = { background: def.accent, borderRadius: '13px', padding: '11px 14px', boxShadow: '0 5px 16px ' + this.hexA(def.accent, 0.34) };
+      dotStyle = { display: 'none' };
+      nameStyle = { fontWeight: 700, fontSize: '14px', color: def.deep };
+      countStyle = { marginLeft: 'auto', background: 'rgba(255,255,255,.55)', color: def.deep, fontWeight: 700, fontSize: '12px', padding: '1px 9px', borderRadius: '9px' };
+      subStyle = { fontSize: '11px', color: this.hexA(def.deep, 0.8), fontWeight: 600, marginTop: '2px' };
+      bodyStyle = { ...baseBody, background: '#fff', boxShadow: over ? 'inset 0 0 0 2px ' + def.accent : 'inset 0 0 0 1px #f1eff7' };
+    } else if (theme === 'bold') {
+      headerStyle = { padding: '2px 4px 0' };
+      dotStyle = { width: '9px', height: '9px', borderRadius: '3px', background: def.accent, boxShadow: '0 0 9px ' + def.accent };
+      nameStyle = { fontWeight: 700, fontSize: '14px', color: def.accent, textShadow: '0 0 16px ' + this.hexA(def.accent, 0.55) };
+      countStyle = { marginLeft: 'auto', background: this.hexA(def.accent, 0.18), color: def.accent, fontWeight: 700, fontSize: '12px', padding: '1px 8px', borderRadius: '8px' };
+      subStyle = { fontSize: '11px', color: '#8a85ad', fontWeight: 600, marginTop: '2px', marginLeft: '17px' };
+      bodyStyle = { ...baseBody, background: over ? this.hexA(def.accent, 0.12) : 'rgba(255,255,255,.045)', boxShadow: over ? 'inset 0 0 0 2px ' + def.accent : 'inset 0 0 0 1px rgba(255,255,255,.07)' };
+    } else {
+      headerStyle = { padding: '2px 4px 0' };
+      dotStyle = { width: '9px', height: '9px', borderRadius: '3px', background: def.accent };
+      nameStyle = { fontWeight: 700, fontSize: '14px', color: '#28244a' };
+      countStyle = { marginLeft: 'auto', background: this.hexA(def.accent, 0.2), color: def.deep, fontWeight: 700, fontSize: '12px', padding: '1px 8px', borderRadius: '8px' };
+      subStyle = { fontSize: '11px', color: '#9591ad', fontWeight: 600, marginTop: '2px', marginLeft: '17px' };
+      bodyStyle = { ...baseBody, background: over ? this.hexA(def.accent, 0.28) : def.tint, boxShadow: over ? 'inset 0 0 0 2px ' + def.accent : 'none' };
+    }
+    return {
+      id: def.id, name: def.name, sub: def.sub, count: all.length, cards: shown,
+      headerStyle, dotStyle, nameStyle, countStyle, subStyle, bodyStyle,
+      empty: shown.length === 0,
+      emptyStyle: { textAlign: 'center', fontSize: '12px', color: theme === 'bold' ? '#7a76a0' : '#a8a4c0', fontWeight: 600, padding: '18px 8px', border: '1.5px dashed ' + (theme === 'bold' ? 'rgba(255,255,255,.12)' : '#e3e0ee'), borderRadius: '11px' },
+      onDragOver: (e) => { e.preventDefault(); if (this.state.dragOverCol !== def.id) this.setState({ dragOverCol: def.id }); },
+      onDrop: (e) => { e.preventDefault(); this.onDrop(def.id); }
+    };
+  }
+
+  buildDrawer() {
+    const c = this.state.cards.find(x => x.id === this.state.selectedId);
+    if (!c) return null;
+    const def = this.colDef(c.col);
+    const owner = c.owner ? this.people[c.owner] : null;
+    const idx = this.ORDER.indexOf(c.col);
+    const stages = ['New', 'Local Team', 'HQ Team', 'Sanity Check'].map((label, k) => {
+      const done = c.col === 'resolved' || k < idx, active = k === idx;
+      return {
+        label, mark: done ? '✓' : '',
+        dotStyle: { width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: (done || active) ? '#fff' : '#aaa6bf', background: done ? '#80cba7' : (active ? def.accent : '#eceaf3'), boxShadow: active ? '0 0 0 4px ' + this.hexA(def.accent, 0.18) : 'none', transition: 'all .2s' },
+        labelStyle: { fontSize: '10.5px', fontWeight: active ? 700 : 600, color: active ? '#28244a' : '#9591ad', textAlign: 'center', lineHeight: 1.2 }
+      };
+    });
+    const comments = c.comments.map(cm => {
+      if (cm.system) return { key: cm.id, system: true, normal: false, text: cm.text, time: this.fmt(cm.min) };
+      const p = this.people[cm.who] || this.people.you;
+      return {
+        key: cm.id, system: false, normal: true, text: cm.text, time: this.fmt(cm.min),
+        name: p.short === 'Alex' ? 'Alex (you)' : p.name, initials: p.initials,
+        avatarStyle: { flex: '0 0 auto', width: '30px', height: '30px', borderRadius: '50%', background: p.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700 },
+        team: p.team, teamStyle: { fontSize: '10px', fontWeight: 700, color: p.color, background: this.hexA(p.color, 0.16), padding: '1px 6px', borderRadius: '6px' }
+      };
+    });
+    const viewers = this.viewersFor(c.id).filter(p => p.short !== 'Alex');
+    const vtext = viewers.length ? viewers.map(p => p.short === 'the customer' ? 'The customer' : p.short).join(' & ') + (viewers.length > 1 ? ' are viewing now' : ' is viewing now') : '';
+    const nIdx = idx + 1, nDef = this.ORDER[nIdx] ? this.colDef(this.ORDER[nIdx]) : def;
+    return {
+      code: c.id, title: c.title,
+      showPriority: c.priority !== 'normal', priorityLabel: c.priority === 'urgent' ? 'Urgent' : 'High',
+      priorityStyle: { ...(c.priority === 'urgent' ? { background: '#fbe0e5', color: '#cf6a7c' } : { background: '#fbecd0', color: '#b9842f' }), fontSize: '10.5px', fontWeight: 700, padding: '2px 9px', borderRadius: '7px' },
+      colName: def.name, colChipStyle: { fontSize: '12px', fontWeight: 700, color: def.deep, background: this.hexA(def.accent, 0.2), padding: '4px 11px', borderRadius: '9px' },
+      showOwner: !!owner, ownerName: owner ? (owner.short === 'Alex' ? 'Alex (you)' : owner.name) : '', ownerInitials: owner ? owner.initials : '',
+      ownerStyle: owner ? { width: '20px', height: '20px', borderRadius: '50%', background: owner.color, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700 } : {},
+      updatedLabel: this.fmt(c.updated),
+      showViewers: !!vtext, viewersText: vtext,
+      stages, comments,
+      showHandoff: c.col !== 'resolved', handoffLabel: this.handoffLabel(c.col),
+      handoffStyle: { flex: '1.4', fontFamily: 'inherit', fontWeight: 700, fontSize: '13px', padding: '11px', borderRadius: '11px', border: 'none', cursor: 'pointer', background: this.hexA(nDef.accent, 0.2), color: nDef.deep, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      nudgeHover: { background: '#f6f4fd' },
+      onClose: () => this.setState({ selectedId: null }),
+      stop: (e) => this.stop(e),
+      onNudge: () => this.nudge(c.id),
+      onHandoff: () => this.handoff(c.id),
+      onPost: () => this.post(),
+      onKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.post(); } }
+    };
+  }
+
+  avatar(k, size) {
+    const p = this.people[k];
+    return {
+      initials: p.initials,
+      name: k === 'you' ? 'Alex (you)' : p.name,
+      style: { width: size + 'px', height: size + 'px', borderRadius: '50%', background: p.color, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36) + 'px', fontWeight: 700, flex: '0 0 auto' }
+    };
+  }
+
+  buildOwners() {
+    const order = ['you', 'maya', 'priya', 'devon', 'sam'];
+    return order.map(k => {
+      const p = this.people[k];
+      const cases = this.state.cards.filter(c => c.owner === k && c.col !== 'resolved');
+      const teamAccent = p.team === 'SRE' ? '#2f877f' : '#b65389';
+      return {
+        key: k, name: k === 'you' ? 'Alex (you)' : p.name, initials: p.initials, team: p.team,
+        avatarStyle: { width: '46px', height: '46px', borderRadius: '50%', background: p.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, flex: '0 0 auto' },
+        teamChipStyle: { fontSize: '10.5px', fontWeight: 700, color: teamAccent, background: this.hexA(teamAccent, 0.13), padding: '2px 9px', borderRadius: '7px', marginTop: '4px', display: 'inline-block' },
+        countStyle: { fontSize: '26px', fontWeight: 800, color: cases.length ? teamAccent : '#cdc9dc', lineHeight: 1 },
+        openCount: cases.length, empty: cases.length === 0,
+        cases: cases.map(c => { const d = this.colDef(c.col); return { key: c.id, title: c.title, dotStyle: { width: '8px', height: '8px', borderRadius: '3px', background: d.accent, flex: '0 0 auto' } }; }),
+        hoverStyle: { transform: 'translateY(-2px)', boxShadow: '0 10px 26px rgba(24,20,52,.1)' },
+        onClick: () => this.setState({ view: 'board', filter: 'own:' + k })
+      };
+    });
+  }
+
+  buildShifts() {
+    const panel = (label, accent, deep, data) => {
+      const on = this.avatar(data.on, 54), nx = this.avatar(data.next, 32);
+      return {
+        teamLabel: label,
+        wrapStyle: { flex: '1', minWidth: '300px', background: '#fff', borderRadius: '18px', padding: '20px 22px', boxShadow: '0 1px 3px rgba(24,20,52,.06)', borderTop: '4px solid ' + accent },
+        onAvatarStyle: on.style, onInitials: on.initials, onName: on.name, until: data.until,
+        onLabelStyle: { fontSize: '10.5px', fontWeight: 700, letterSpacing: '.05em', color: deep },
+        nextAvatarStyle: nx.style, nextInitials: nx.initials, nextName: nx.name
+      };
+    };
+    const panels = [
+      panel('SUPPORT', '#f093bd', '#b65389', this.shiftNow.sup),
+      panel('SRE', '#5fc8be', '#2f877f', this.shiftNow.sre)
+    ];
+    const rotaSupport = this.rota.map(r => { const a = this.avatar(r.sup, 30); return { key: r.day + 's', initials: a.initials, style: a.style }; });
+    const rotaSRE = this.rota.map(r => { const a = this.avatar(r.sre, 30); return { key: r.day + 'r', initials: a.initials, style: a.style }; });
+    return { panels, rotaDays: this.rota.map(r => ({ key: r.day, label: r.day })), rotaSupport, rotaSRE };
+  }
+
+  buildArchive() {
+    const resolved = this.state.cards.filter(c => c.col === 'resolved');
+    const cases = resolved.map(c => {
+      const p = c.owner ? this.people[c.owner] : null;
+      return {
+        key: c.id, code: c.id, title: c.title,
+        ownerInitials: p ? p.initials : '—', ownerName: p ? (c.owner === 'you' ? 'Alex' : p.name) : 'unassigned',
+        ownerStyle: { width: '34px', height: '34px', borderRadius: '50%', background: p ? p.color : '#cdc9dc', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flex: '0 0 auto' }
+      };
+    });
+    const max = Math.max.apply(null, this.archiveWeeks.map(w => w.count));
+    const weeks = this.archiveWeeks.map(w => ({
+      key: w.week, week: w.week, count: w.count,
+      barStyle: { height: '100%', width: (w.count / max * 100) + '%', background: 'linear-gradient(90deg,#ab9ef1,#80cba7)', borderRadius: '6px' }
+    }));
+    const stats = [
+      { key: 'r', value: resolved.length, label: 'Resolved this week', valueStyle: { fontSize: '30px', fontWeight: 800, color: '#429a72', lineHeight: 1 } },
+      { key: 'a', value: '1.8d', label: 'Avg time to resolve', valueStyle: { fontSize: '30px', fontWeight: 800, color: '#6857c0', lineHeight: 1 } },
+      { key: 'h', value: 38, label: 'Handoffs this week', valueStyle: { fontSize: '30px', fontWeight: 800, color: '#2f877f', lineHeight: 1 } }
+    ];
+    return { stats, cases, weeks };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const themes = [{ id: 'refined', label: 'Refined' }, { id: 'pop', label: 'Pop' }, { id: 'bold', label: 'Bold' }];
+    const themeButtons = themes.map(t => ({
+      label: t.label, onClick: () => this.setState({ theme: t.id }),
+      style: { fontFamily: 'inherit', fontSize: '12.5px', fontWeight: s.theme === t.id ? 700 : 600, padding: '6px 12px', borderRadius: '9px', border: 'none', cursor: 'pointer', background: s.theme === t.id ? '#fff' : 'transparent', color: s.theme === t.id ? '#2e2a47' : '#a29ebb', boxShadow: s.theme === t.id ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }
+    }));
+
+    const appBg = s.theme === 'bold' ? '#141229' : (s.theme === 'pop' ? '#f7f5fc' : '#f3f1fa');
+    const wrapBgStyle = 'background:' + appBg + ';transition:background .3s;';
+    try { document.body.style.background = appBg; } catch (e) {}
+
+    const sidebarStyle = {
+      width: '236px', flex: '0 0 auto', alignSelf: 'flex-start', position: 'sticky', top: '0', height: '100vh',
+      background: s.theme === 'bold' ? '#1c1838' : '#fff', borderRight: '1px solid ' + (s.theme === 'bold' ? 'rgba(255,255,255,.06)' : '#f0eef7'),
+      padding: '18px 14px', display: 'flex', flexDirection: 'column', zIndex: 40, transition: 'background .3s'
+    };
+
+    const views = [
+      { id: 'board', label: 'Board', icon: '🗂️' },
+      { id: 'shifts', label: 'Shifts', icon: '🗓️' },
+      { id: 'owners', label: 'Owners', icon: '👥' },
+      { id: 'archive', label: 'Weekly Archive', icon: '🗄️' }
+    ];
+    const openCount = s.cards.filter(c => c.col !== 'resolved').length;
+    const nav = views.map(v => {
+      const active = s.view === v.id;
+      const onDark = s.theme === 'bold';
+      return {
+        key: v.id, label: v.label, icon: v.icon,
+        onClick: () => this.setState({ view: v.id }),
+        style: { display: 'flex', alignItems: 'center', gap: '11px', padding: '11px 13px', borderRadius: '12px', cursor: 'pointer', fontSize: '13.5px', fontWeight: active ? 700 : 600, color: active ? '#6857c0' : (onDark ? '#b6b1d6' : '#7d7a99'), background: active ? '#efeafc' : 'transparent', boxShadow: active ? 'inset 3px 0 0 #ab9ef1' : 'none', transition: 'background .15s' },
+        hoverStyle: active ? {} : { background: onDark ? 'rgba(255,255,255,.05)' : '#f7f5fc' },
+        iconStyle: { fontSize: '15px', width: '20px', textAlign: 'center', flex: '0 0 auto' },
+        showBadge: v.id === 'board', badge: openCount,
+        badgeStyle: { fontSize: '11px', fontWeight: 700, padding: '0 7px', borderRadius: '8px', background: active ? '#ab9ef1' : '#efeafc', color: active ? '#fff' : '#6857c0' }
+      };
+    });
+
+    const titles = {
+      board: ['Board', 'Support × SRE case flow'],
+      shifts: ['Shifts', "Who's on, who's next"],
+      owners: ['Owners', 'Case load by teammate'],
+      archive: ['Weekly Archive', 'Resolved cases, by week']
+    };
+    const pageTitle = titles[s.view][0], pageSub = titles[s.view][1];
+
+    const onlineKeys = ['maya', 'priya', 'devon', 'sam', 'you'];
+    const onlineAvatars = onlineKeys.map((k, i) => {
+      const p = this.people[k];
+      return { initials: p.initials, name: p.name, style: { width: '30px', height: '30px', borderRadius: '50%', background: p.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10.5px', fontWeight: 700, boxShadow: '0 0 0 2px #fff', marginLeft: i === 0 ? '0' : '-9px', position: 'relative', zIndex: String(10 - i) } };
+    });
+
+    const open = s.cards.filter(c => c.col !== 'resolved').length;
+    const stuckCount = s.cards.filter(c => this.isStuck(c)).length;
+    const awaiting = s.cards.filter(c => c.col === 'sanity').length;
+    const mkStat = (icon, value, label, accent, onClick, hot) => ({
+      icon, value, label,
+      wrapStyle: { flex: '1', minWidth: '156px', background: '#fff', borderRadius: '16px', padding: '13px 15px', boxShadow: '0 1px 3px rgba(24,20,52,.05)', display: 'flex', alignItems: 'center', gap: '12px', cursor: onClick ? 'pointer' : 'default' },
+      iconStyle: { width: '38px', height: '38px', borderRadius: '11px', flex: '0 0 auto', background: this.hexA(accent, 0.15), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' },
+      valueStyle: { fontSize: '21px', fontWeight: 800, color: hot && value > 0 ? accent : '#2e2a47', lineHeight: 1 },
+      onClick: onClick || null
+    });
+    const stats = [
+      mkStat('📋', open, 'Open cases', '#ab9ef1', null, false),
+      mkStat('⏱', stuckCount, 'Stuck — need a push', '#d98a5c', () => this.setState({ filter: 'stuck' }), true),
+      mkStat('👤', awaiting, 'Awaiting the user', '#ab9ef1', () => this.setState({ filter: 'await' }), false),
+      mkStat('🔁', s.handoffsToday, 'Handoffs today', '#5fc8be', null, false),
+      mkStat('🟢', 5, 'Teammates online', '#80cba7', null, false)
+    ];
+
+    const fdefs = [
+      { id: 'all', label: 'All cases', accent: '#6b6e94' },
+      { id: 'urgent', label: '🔥 Urgent', accent: '#cf6a7c' },
+      { id: 'stuck', label: '⏱ Stuck', accent: '#d98a5c' },
+      { id: 'mine', label: 'My cases', accent: '#ec84ad' },
+      { id: 'await', label: '👤 Awaiting user', accent: '#ab9ef1' }
+    ];
+    const cntFor = (id) => s.cards.filter(c => { const old = this.state.filter; this.state.filter = id; const r = this.matchFilter(c); this.state.filter = old; return r; }).length;
+    const filters = fdefs.map(f => {
+      const active = s.filter === f.id, cnt = f.id === 'all' ? s.cards.length : cntFor(f.id);
+      return {
+        label: f.label, count: cnt,
+        onClick: () => this.setState({ filter: f.id }),
+        style: { display: 'inline-flex', alignItems: 'center', gap: '7px', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700, padding: '8px 13px', borderRadius: '11px', border: 'none', cursor: 'pointer', background: active ? f.accent : '#fff', color: active ? '#fff' : '#6c6890', boxShadow: active ? 'none' : '0 1px 2px rgba(24,20,52,.05)' },
+        countStyle: { fontSize: '11px', fontWeight: 700, padding: '0px 6px', borderRadius: '7px', background: active ? 'rgba(255,255,255,.28)' : '#f4f2fa', color: active ? '#fff' : '#a29ebb' }
+      };
+    });
+
+    const columns = this.colDefs.map(d => this.buildColumn(d));
+    const draw = this.buildDrawer();
+    const shifts = this.buildShifts();
+    const archive = this.buildArchive();
+
+    return {
+      wrapBgStyle, sidebarStyle, nav, pageTitle, pageSub,
+      themeButtons, onlineAvatars, onlineCount: 5,
+      onNewCase: () => this.setState({ composeOpen: true }),
+      isBoard: s.view === 'board', isShifts: s.view === 'shifts', isOwners: s.view === 'owners', isArchive: s.view === 'archive',
+      stats, filters, columns,
+      shiftPanels: shifts.panels, rotaDays: shifts.rotaDays, rotaSupport: shifts.rotaSupport, rotaSRE: shifts.rotaSRE,
+      owners: this.buildOwners(),
+      archiveStats: archive.stats, archiveCases: archive.cases, archiveWeeks: archive.weeks,
+      drawerOpen: !!draw, draw: draw || { stop: (e) => this.stop(e) },
+      draftRef: this.draftRef, titleRef: this.titleRef, priorityRef: this.priorityRef,
+      composeOpen: s.composeOpen,
+      onComposeClose: () => this.setState({ composeOpen: false }),
+      onComposeCreate: () => this.createCase(),
+      toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>
