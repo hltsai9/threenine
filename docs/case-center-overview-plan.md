@@ -58,7 +58,8 @@ Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive tab
   - *HQ did not handle* — Night shift passes via handover; the next **Day shift** performs the reassignment at **17:30**, User → HQ.
   - *Escalate to Core Team* — Night shift passes via handover; the next **Day shift** performs the reassignment at **09:00**, User → Core Team.
   - Computed against the existing rota (`window.ROTA`) and `window.NOW`; reuse the shift-resolution helpers already in `app.js`.
-- Setting Track Status happens through the **existing action surface** — the status-transition dropdown and the per-status action buttons (assign to Core, escalate to HQ, verify fix, move to sanity check, etc.) all stay; they now write `trackStatus` instead of CC fields. The dropdown labels map 1:1 to the seven track statuses (rename where needed).
+- Setting Track Status happens through the **existing action surface** — the status-transition dropdown and the per-status action buttons (assign to Core, escalate to HQ, verify fix, move to sanity check, etc.) all stay; they now write `trackStatus` instead of CC fields. The dropdown lists **all 7** Track Statuses to every shift; options relevant to the current shift (e.g. *Escalate to Core Team* and *HQ did not handle* on Night; *Weekend Case* on Fri/Sat) are **visually highlighted** at the top, the rest are still selectable below — the operator is never blocked from picking any value.
+- **Track Status persists.** It never auto-clears — even after CC catches up to the desired routing. The operator must clear it manually via **Clear Track Status** on the detail panel. The clear action enforces two pre-conditions: the CC status is `closed` (or `cancelled`) *and* a fresh handover note exists for the incoming shift; if either is missing, a confirmation prompt explains why and lets the operator either back out or proceed anyway.
 - Watchlists: keep the existing **Approaching SLA (N)** and **Stale handover (N)** banners; replace today's "Escalated — keep an eye" banner with two new ones:
   - **Action due this shift (N)** — picked cases whose `scheduledHandoff.dueShift` matches the current operator's shift.
   - **Action overdue (N)** — `dueAt` is in the past and CC still shows the old assignee.
@@ -70,7 +71,7 @@ Critical files: `prototype/app.js` (the dropdown action handlers that now write 
 
 The action surface stays — those buttons and dropdowns are how the operator expresses intent. What changes is what they mutate:
 
-- **Status-transition dropdown** and **per-status action buttons** (assign to Core, escalate to HQ, chase owner, verify fix, return to requester, move to sanity check, close, cancel, reopen, etc.) now write `trackStatus` on the operator layer **only**, mapping 1:1 to the seven values in section 3. They no longer touch `status`, `coreId`, `hqId`, `currentOwner`, `holdMs`, `holdStartedAt`, `slaPaused`, `slaAccumulatedMs`, or push CC-shaped events into `history[]`. CC-owned fields are display-only.
+- **Status-transition dropdown** and **per-status action buttons** (assign to Core, escalate to HQ, chase owner, verify fix, return to requester, move to sanity check, close, cancel, reopen, etc.) now write `trackStatus` on the operator layer **only**. The dropdown surfaces all 7 Track Statuses to every shift, with the current-shift-relevant ones highlighted on top (see section 3); they no longer touch `status`, `coreId`, `hqId`, `currentOwner`, `holdMs`, `holdStartedAt`, `slaPaused`, `slaAccumulatedMs`, or push CC-shaped events into `history[]`. CC-owned fields are display-only.
 - **Routing is not rigid.** Drop any state-machine guard that restricts which statuses an operator can pick (e.g. "can only escalate from with_core to with_hq"). Every Track Status is selectable from anywhere. If `validTransitions` / similar helpers exist in `app.js`, replace their call sites with the full track-status enum.
 - **Drag-between-columns** on the kanban is removed — cards stay in their CC `status` column. The way to set Track Status is the dropdown / action button.
 - **History entries** for these actions are kept, but tagged as operator-intent events (e.g. `kind: 'track-status-set'`, with `from`, `to`, `who`, `at`). They live in the operator layer alongside handover/reminder and never get sent to Case Center.
@@ -110,10 +111,11 @@ On every picked case, render a small **Route Board** that shows where the case c
 - **Where it renders:**
   - **Kanban card footer** — single-line compact form: chip → chip · time.
   - **Case detail panel** — full-width version with the same chips but also a label above ("Next stop") and the *From / To / Time / Owning shift* spelled out.
-- **Computation:** pure function of `(trackStatus, currentAssignee, now, ROTA)`. No new persisted state — `scheduledHandoff` is derived on the fly each render. Reuse existing rota/shift helpers so the "next Day shift at 17:30" lookup honours the operator's actual schedule.
+- **Chip derivation.** The **From** chip is derived from the live CC `assigneeDept` field via a dept→role mapping kept in `prototype/owners.js` (each Core Team desk and HQ Product Team row carries an explicit `route_role` of `Core Team` or `HQ`; anything else → `User`). The mapping is editable in the existing Owners editor (`#/owners`) — see section 8. The **To** chip is the abstract destination implied by Track Status (*User*, *Core Team*, or *HQ*). If the From chip can't be resolved (dept not in mapping), fall back to the literal CC assignee name and surface a small "unmapped" hint so the team adds it to `owners.js`.
+- **Computation:** pure function of `(trackStatus, assigneeDept, now, ROTA, OWNERS)`. No new persisted state — `scheduledHandoff` is derived on the fly each render. Reuse existing rota/shift helpers so the "next Day shift at 17:30" lookup honours the operator's actual schedule.
 - Zero-dependency: chips + CSS arrow, no SVG library needed.
 
-Critical files: `prototype/app.js` (route-board renderer, scheduled-handoff computation), `prototype/styles.css` (chip + arrow styling).
+Critical files: `prototype/app.js` (route-board renderer, scheduled-handoff computation, dept→role lookup), `prototype/owners.js` (per-dept `route_role` field), `prototype/styles.css` (chip + arrow styling).
 
 ### 7. Analytics: split picked vs unpicked + time-on-us trend
 
@@ -129,7 +131,7 @@ Augment the existing `weekStats` function and its renderers in `prototype/app.js
 
 - **Handover notes** and **reminders** — keep as-is on the case detail panel; both are operator-layer state already.
 - **Shifts + rota editor** (`#/shifts`) — unchanged.
-- **Owners editor** (`#/owners`) — keep, but reframe as a **contact reference** (team TZ, office hours, Slack/JIRA queue). Remove any "assign this case to desk X" action that lives here; the editor itself stays.
+- **Owners editor** (`#/owners`) — keep, and reframe as a **contact reference + dept→role mapping**. Each Core Team desk and HQ Product Team row gains a `route_role` field (one of `Core Team` / `HQ` / `User`) used by the Route Board's From-chip derivation (section 6). Remove any "assign this case to desk X" action that lives here; the editor itself stays.
 
 ### 9. Wording / branding pass
 
@@ -153,7 +155,9 @@ Augment the existing `weekStats` function and its renderers in `prototype/app.js
 - `docs/RELEASE_NOTES.md` — one entry under today.
 - `prototype/standalone.html` — regenerated by `node prototype/bundle.mjs`.
 
-No changes to `data.js`, `shifts.js`, `owners.js`. The only backend tweak is the `?ids=` query support for scoped refresh.
+- `prototype/owners.js` — add a `route_role` field (`Core Team` / `HQ` / `User`) on each Core Team desk and HQ Product Team row; surface it as a small dropdown in the Owners editor.
+
+No changes to `data.js`, `shifts.js`. The only backend tweak is the `?ids=` query support for scoped refresh.
 
 ## Verification
 
@@ -168,7 +172,8 @@ No changes to `data.js`, `shifts.js`, `owners.js`. The only backend tweak is the
    - Advance `window.NOW` (or wait into the relevant shift) so a scheduled handoff falls within the current shift — the Route Board arrow turns amber, the card highlights, and the **Action due this shift (N)** watchlist increments. With `window.NOW` past `dueAt` while CC `assignee` still equals the From chip, the arrow turns red and the card lands in **Action overdue (N)**.
    - Confirm CC-owned fields on the detail panel render but are not editable. The `+ New case` button is still present; type an older Case Center ID and verify the manual-import flow brings that one case into the archive overview.
    - Add a handover note and a reminder — both persist.
-   - Turn on the **Auto-refresh** toggle at 5 minutes; verify the picked-case scoped refresh fires (or trigger it via **Refresh now**), CC current-status / assignee updates if they changed in Case Center, and `trackStatus` / picks / handovers / reminders survive the merge. After refresh, if the CC `assignee` now equals the Route Board's *To* chip, the action-due/overdue highlight clears automatically.
+   - Turn on the **Auto-refresh** toggle at 5 minutes; verify the picked-case scoped refresh fires (or trigger it via **Refresh now**), CC current-status / assignee updates if they changed in Case Center, and `trackStatus` / picks / handovers / reminders survive the merge. Track Status does **not** auto-clear when CC catches up — the Route Board updates the From chip (so the arrow now goes *To → To*, signalling "delivered"), but the Track Status pill stays until the operator clears it manually (see next step).
+   - Manually clear Track Status on a delivered case: open the case detail panel and choose **Clear Track Status**. The route board collapses back to a single chip. Per the team rule, only do this once the case is **closed in CC** *and* the relevant handover note for the next shift has been written; the Clear action shows a confirmation if either pre-condition isn't met (CC status is not closed, or no fresh handover for the incoming shift).
    - Refresh the page; picks, handover, reminder survive (operator layer in localStorage).
    - Switch operator via the sidebar; confirm picked state behaves as expected for the chosen operator model (today picks are global per the existing implementation — call out in the release note if we keep that vs make picks per-operator).
 3. Reopen `prototype/standalone.html` via `file://` after `node prototype/bundle.mjs`; the same walkthrough should work without a server.
