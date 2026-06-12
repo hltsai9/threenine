@@ -899,158 +899,230 @@ function renderTzHint(owner) {
  *  being "picked" from #/archive (Overview).
  */
 
-const ROUTE_STATIONS = ['User', 'Core Team', 'HQ'];
+/* ---------- Hand-off Route Board ----------
+ * Built to spec (band → card → absolute-positioned rows). Stations at left 12%,
+ * 50%, 88% of the white card. Four row types:
+ *
+ *   MOVING (66px)  — scheduled handoff. Solid origin dot at the From station,
+ *                    coloured route line to the destination, animated traveling
+ *                    dot along the line, hollow ring + arrowhead at the To
+ *                    station, deadline chip centered above the line.
+ *   WATCH  (60px)  — `escalated_to_hq`. Dot at HQ ringed by a dashed circle,
+ *                    amber eye icon and id to the right. No line.
+ *   STAY   (48px)  — `case_closed` / `need_to_contact_user` / untracked. Quiet
+ *                    dot at User with "<id> · stays". `need_to_contact_user`
+ *                    adds an outlined blue-grey eye icon to the dot's left.
+ *   SANITY (46px)  — collapsed header row for every `sanity_check` case with a
+ *                    +/- toggle; expanded reveals one 38px sub-row per case.
+ *
+ * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
+ */
 
-function caseRouteLane(c) {
-  const station = caseStation(c);
-  const ts = caseTrackStatus(c);
-  const def = ts ? TRACK_STATUS_BY_ID[ts] : null;
-  const handoff = scheduledHandoff(c);
-  const phase = trackStatusPhase(c);
+const ROUTE_STATION_POS = { 'User': 12, 'Core Team': 50, 'HQ': 88 };
+// Midpoint of the route line where the deadline chip sits.
+// Spec is explicit: 31% for Core, 70% for HQ (not the geometric midpoint of
+// 12→88 — biased toward the destination so it doesn't overlap the case id).
+const ROUTE_CHIP_POS = { 'Core Team': 31, 'HQ': 70 };
+const ROUTE_GREEN = '#2E5641';
+const ROUTE_RED = '#B05050';
 
-  // Arrow target. For scheduled statuses: the handoff's `to`. For the two watching
-  // statuses: the watched station, but only if the dot isn't already there.
-  let arrowTo = null;
-  if (handoff && handoff.to !== station) arrowTo = handoff.to;
-  if (def?.watch && def.watch !== station) arrowTo = def.watch;
-
-  return {
-    station,
-    arrowTo,
-    watch: def?.watch || null,
-    handoff,
-    phase,
-    delivered: !!handoff && station === handoff.to,
-    trackDef: def,
-    subjectTag: def?.useSubjectTag ? c.subject : null,
-    closedBadge: ts === 'case_closed',
-  };
+function _mstYmd(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const ms = d.getTime() - MST_OFFSET_HOURS * 3600 * 1000;
+  const m = new Date(ms);
+  return `${m.getUTCFullYear()}-${m.getUTCMonth()}-${m.getUTCDate()}`;
 }
 
-function renderRouteLane(c, opts = {}) {
-  const lane = caseRouteLane(c);
-  const isSelected = STATE.kanbanSelected === c.id;
-  const phaseClass = lane.phase === 'overdue' ? ' lane-overdue' :
-                     lane.phase === 'due-this-shift' ? ' lane-due' :
-                     lane.delivered ? ' lane-delivered' : '';
+// "today HH:MM" if the dueAt falls on the same MST date as NOW; otherwise
+// "<Day> HH:MM" (e.g. "Sun 17:30"). Overdue chips get "overdue HH:MM".
+function formatDeadlineChip(handoff, phase) {
+  const due = handoff.dueAt;
+  const time = _shiftTzHHMM(due);  // HH:MM in MST
+  if (phase === 'overdue') return `overdue ${time}`;
+  const sameMstDay = _mstYmd(due) === _mstYmd(NOW.toISOString());
+  if (sameMstDay) return `today ${time}`;
+  return `${handoff.dueDay} ${time}`;
+}
 
-  // Three station cells. Each may carry: the dot, the eyeball icon, the closed badge,
-  // and a segment of the arrow that originates at the From-station's center and ends at
-  // the To-station's center. The arrow segments are sized so they tile end-to-end across
-  // the row (start = right half of From cell, middle = full cell, end = left half of To
-  // cell with the arrowhead at the To center).
-  const showArrow = !!lane.arrowTo && !lane.delivered;
-  const fromIdx = ROUTE_STATIONS.indexOf(lane.station);
-  const toIdx   = ROUTE_STATIONS.indexOf(lane.arrowTo);
-  const forward = fromIdx < toIdx;
+function _classifyRouteRow(c) {
+  const ts = caseTrackStatus(c);
+  if (ts === 'sanity_check') return 'sanity';
+  if (scheduledHandoff(c)) return 'moving';
+  if (ts === 'escalated_to_hq') return 'watch';
+  return 'stay';  // case_closed, need_to_contact_user, untracked
+}
 
-  const cells = ROUTE_STATIONS.map((st, idx) => {
-    const hasDot = st === lane.station;
-    const hasEye = lane.watch === st;
-    const arrowLandsHere = lane.arrowTo === st;
-    let body = '';
-    if (hasDot) {
-      body += `<span class="route-dot" aria-label="at ${escapeHtml(st)}"></span>`;
-    }
-    if (hasEye) {
-      body += `<span class="route-eye" title="Watching at ${escapeHtml(st)}" aria-label="watching">👁</span>`;
-    }
-    if (lane.closedBadge && hasDot) {
-      body += `<span class="route-closed-badge" title="Case Closed">✓</span>`;
-    }
-    if (lane.delivered && arrowLandsHere) {
-      body += `<span class="route-delivered" title="Delivered">✓ delivered</span>`;
-    }
-    if (lane.subjectTag && hasDot) {
-      body += `<span class="route-tag" title="${escapeHtml(c.subject)}">${escapeHtml(c.subject)}</span>`;
-    } else if (lane.trackDef && hasDot && !lane.subjectTag && !lane.closedBadge && !lane.arrowTo) {
-      body += `<span class="route-tag">${escapeHtml(lane.trackDef.short)}</span>`;
-    }
-    // Arrow role for this cell.
-    let arrowSeg = '';
-    if (showArrow) {
-      let role = null;
-      if (idx === fromIdx) role = 'start';
-      else if (idx === toIdx) role = 'end';
-      else if ((forward && idx > fromIdx && idx < toIdx) || (!forward && idx < fromIdx && idx > toIdx)) role = 'middle';
-      if (role) {
-        const head = role === 'end' ? `<span class="route-arrowhead">▶</span>` : '';
-        const dir = forward ? 'fwd' : 'back';
-        arrowSeg = `<span class="route-arrow-line route-arrow-${role} route-arrow-${dir}"><span class="route-arrow-pulse"></span></span>${head}`;
-      }
-    }
-    return `<div class="route-cell" data-station="${escapeHtml(st)}">${arrowSeg}${body}</div>`;
-  }).join('');
-
-  const dueChip = lane.handoff ? (() => {
-    const due = lane.handoff.dueAt;
-    const dueLabel = `${lane.handoff.dueDay} ${String(lane.handoff.dueShift)} · ${fmtLocalTime(due)}`;
-    const phaseLabel = lane.phase === 'overdue' ? `Overdue · ${fmtLocalTime(due)}` :
-                       lane.phase === 'due-this-shift' ? `Due this shift · ${fmtLocalTime(due)}` :
-                       lane.delivered ? '✓ Delivered' : dueLabel;
-    return `<span class="route-due" title="${escapeHtml(fmtLocalTime(due))}">${escapeHtml(phaseLabel)}</span>`;
-  })() : '';
+function _renderMovingRow(c, top, animDelay) {
+  const handoff = scheduledHandoff(c);
+  const phase = trackStatusPhase(c);
+  const overdue = phase === 'overdue';
+  const color = overdue ? ROUTE_RED : ROUTE_GREEN;
+  const originPct = ROUTE_STATION_POS[handoff.from] ?? ROUTE_STATION_POS['User'];
+  const destPct = ROUTE_STATION_POS[handoff.to];
+  const chipPct = ROUTE_CHIP_POS[handoff.to] ?? ((originPct + destPct) / 2);
+  const widthPct = destPct - originPct;
+  const chipText = formatDeadlineChip(handoff, phase);
+  const chipCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
 
   return `
-    <div class="route-lane${isSelected ? ' lane-selected' : ''}${phaseClass}" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="route-lane-id"><span class="mono muted">${c.id}</span></div>
-      <div class="route-lane-cells">${cells}</div>
-      <div class="route-lane-meta">
-        <span class="route-subject">${escapeHtml(c.subject)}</span>
-        ${dueChip}
+    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-line"            style="left:${originPct}%; width:${widthPct}%; background:${color};"></div>
+      <div class="rb-line-arrowhead"  style="left:${destPct}%; border-left-color:${color};"></div>
+      <div class="rb-travel-track"    style="left:${originPct}%; width:${widthPct}%;">
+        <span class="rb-travel-dot" style="background:${color}; animation-delay:${animDelay}s;"></span>
       </div>
+      <div class="rb-origin-dot"      style="left:${originPct}%; background:#33596B; box-shadow:0 0 0 1.5px #33596B;"></div>
+      <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
+      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)}</div>
+      <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
+    </div>
+  `;
+}
+
+function _renderWatchRow(c, top) {
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  return `
+    <div class="rb-row rb-row-watch${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-watch-ring" style="left:88%;"></div>
+      <div class="rb-watch-dot"  style="left:88%;"></div>
+      <div class="rb-watch-eye"  style="left:calc(88% + 22px);" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div class="rb-watch-id" style="left:calc(88% + 42px);">${escapeHtml(c.id)}</div>
+    </div>
+  `;
+}
+
+function _renderStayRow(c, top) {
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const needsUser = caseTrackStatus(c) === 'need_to_contact_user';
+  const eyeIcon = needsUser ? `
+    <div class="rb-stay-eye" style="left:calc(12% - 22px);" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C8AA0" stroke-width="1.6"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>` : '';
+  return `
+    <div class="rb-row rb-row-stay${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      ${eyeIcon}
+      <div class="rb-stay-dot" style="left:12%;"></div>
+      <div class="rb-stay-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · stays</div>
+    </div>
+  `;
+}
+
+function _renderSanityHeader(count, expanded, top) {
+  const sym = expanded ? '−' : '+';
+  return `
+    <div class="rb-row rb-row-sanity-header" style="top:${top}px;" data-action="toggle-sanity">
+      <div class="rb-sanity-dot" style="left:12%;"></div>
+      <button class="rb-sanity-toggle" style="left:calc(12% + 14px);" type="button" aria-expanded="${expanded}">${sym}</button>
+      <div class="rb-sanity-label" style="left:calc(12% + 42px);">Sanity Check · ${count} case${count === 1 ? '' : 's'}</div>
+    </div>
+  `;
+}
+
+function _renderSanitySubRow(c, top) {
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  return `
+    <div class="rb-row rb-row-sanity-sub${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-sanity-sub-dot" style="left:12%;"></div>
+      <div class="rb-sanity-sub-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
     </div>
   `;
 }
 
 function renderRouteBoardStrip() {
   const all = pickedCases();
-  if (all.length === 0) {
-    return `<div class="route-board route-board-empty">No cases picked yet. Open <a href="#/archive">Overview</a> to find cases to pick.</div>`;
-  }
 
-  // Group order: scheduled → watching → closed → untracked → sanity-check (collapsible bottom).
-  const groups = TRACK_GROUP_ORDER.map(id => ({
-    id,
-    cases: all.filter(c => caseTrackStatus(c) === id),
-  })).filter(g => g.cases.length > 0);
-
-  const groupLabel = id => id === null ? 'Untracked' : (TRACK_STATUS_BY_ID[id]?.label || id);
-
-  const sanityExpanded = !!STATE.sanityExpanded;
-  const rows = groups.map(g => {
-    const def = g.id ? TRACK_STATUS_BY_ID[g.id] : null;
-    const collapsible = def?.collapsible;
-    if (collapsible) {
-      const tog = sanityExpanded ? '▾' : '▸';
-      const body = sanityExpanded
-        ? g.cases.map(c => renderRouteLane(c)).join('')
-        : '';
-      return `
-        <div class="route-group route-group-sanity">
-          <div class="route-group-header" data-action="toggle-sanity">
-            <span class="route-group-toggle">${tog}</span>
-            <span>${escapeHtml(groupLabel(g.id))}</span>
-            <span class="route-group-count">${g.cases.length}</span>
-          </div>
-          ${body}
-        </div>
-      `;
+  // Bucket every picked case into one of the four visual row types.
+  const moving = [], watch = [], stay = [], sanity = [];
+  for (const c of all) {
+    switch (_classifyRouteRow(c)) {
+      case 'moving': moving.push(c); break;
+      case 'watch':  watch.push(c);  break;
+      case 'stay':   stay.push(c);   break;
+      case 'sanity': sanity.push(c); break;
     }
-    return g.cases.map(c => renderRouteLane(c)).join('');
-  }).join('');
+  }
+  // Overdue first inside the moving group; ties broken by soonest dueAt.
+  moving.sort((a, b) => {
+    const pa = trackStatusPhase(a) === 'overdue' ? 0 : 1;
+    const pb = trackStatusPhase(b) === 'overdue' ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return Date.parse(scheduledHandoff(a).dueAt) - Date.parse(scheduledHandoff(b).dueAt);
+  });
 
-  const stationHeader = `
-    <div class="route-stations">
-      <div class="route-lane-id"></div>
-      <div class="route-lane-cells">
-        ${ROUTE_STATIONS.map(st => `<div class="route-cell route-station-head">${escapeHtml(st)}</div>`).join('')}
+  const overdueCount = moving.filter(c => trackStatusPhase(c) === 'overdue').length;
+  const summary = `${moving.length} moving · ${overdueCount} overdue · ${watch.length} watch`;
+
+  // Stack rows top-to-bottom; absolute positioning means the card has a fixed
+  // height computed from the per-row totals below.
+  const HEADER_TOP = 14;             // distance from card top to station labels
+  const STATIONS_HEIGHT = 30;        // label row height
+  const FIRST_ROW_TOP = HEADER_TOP + STATIONS_HEIGHT + 8;
+  let y = FIRST_ROW_TOP;
+  const segments = [];
+  let movingIdx = 0;
+  for (const c of moving) {
+    segments.push(_renderMovingRow(c, y, +(movingIdx * 0.55).toFixed(2)));
+    y += 66;
+    movingIdx++;
+  }
+  for (const c of watch) { segments.push(_renderWatchRow(c, y)); y += 60; }
+  for (const c of stay)  { segments.push(_renderStayRow(c, y));  y += 48; }
+  const sanityExpanded = !!STATE.sanityExpanded;
+  if (sanity.length > 0) {
+    segments.push(_renderSanityHeader(sanity.length, sanityExpanded, y));
+    y += 46;
+    if (sanityExpanded) {
+      for (const c of sanity) {
+        segments.push(_renderSanitySubRow(c, y));
+        y += 38;
+      }
+    }
+  }
+  const cardHeight = Math.max(y + 14, FIRST_ROW_TOP + 40);
+
+  // Empty state — keep the band chrome so the layout doesn't jump.
+  const emptyBody = all.length === 0
+    ? `<div class="rb-empty">No cases picked yet. Open <a href="#/archive">Overview</a> to find cases to pick.</div>`
+    : segments.join('');
+
+  return `
+    <section class="route-band">
+      <div class="rb-band-titlebar">
+        <div class="rb-band-left">
+          <span class="rb-band-dot"></span>
+          <span class="rb-band-title">HAND-OFF ROUTE BOARD</span>
+          <span class="rb-band-summary">${escapeHtml(summary)}</span>
+        </div>
+        <div class="rb-band-legend">
+          <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
+          <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
+          <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
+        </div>
       </div>
-      <div class="route-lane-meta"></div>
-    </div>
+      <div class="rb-card" style="height:${cardHeight}px;">
+        <div class="rb-guide" style="left:12%;"></div>
+        <div class="rb-guide" style="left:50%;"></div>
+        <div class="rb-guide" style="left:88%;"></div>
+        <div class="rb-station rb-station-user" style="left:12%; top:${HEADER_TOP}px;">
+          <span class="rb-station-square" style="background:#33596B;"></span>
+          <span class="rb-station-label"  style="color:#33596B;">USER</span>
+        </div>
+        <div class="rb-station rb-station-core" style="left:50%; top:${HEADER_TOP}px;">
+          <span class="rb-station-square" style="background:#8A3434;"></span>
+          <span class="rb-station-label"  style="color:#8A3434;">CORE TEAM</span>
+        </div>
+        <div class="rb-station rb-station-hq" style="left:88%; top:${HEADER_TOP}px;">
+          <span class="rb-station-square" style="background:#8C4A2F;"></span>
+          <span class="rb-station-label"  style="color:#8C4A2F;">HQ</span>
+        </div>
+        ${emptyBody}
+      </div>
+    </section>
   `;
-
-  return `<div class="route-board">${stationHeader}<div class="route-lanes">${rows}</div></div>`;
 }
 
 function trackStatusPill(c) {

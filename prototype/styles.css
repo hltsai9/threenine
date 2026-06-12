@@ -1948,10 +1948,9 @@ table.case-table {
   min-height: 78vh;
 }
 .picked-workspace-top {
-  background: white;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  /* The hand-off Route Board brings its own band chrome (green band + white
+   * card), so this container stays transparent and just provides the scroll
+   * envelope. */
   overflow-y: auto;
   min-height: 220px;
 }
@@ -1978,204 +1977,6 @@ table.case-table {
   min-height: 0;
 }
 
-/* --- Aggregate Route Board strip --- */
-
-.route-board {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.route-board-empty {
-  color: var(--text-faint-2);
-  padding: 28px 16px;
-  text-align: center;
-}
-.route-stations,
-.route-lane {
-  display: grid;
-  grid-template-columns: 80px 1fr 220px;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-}
-.route-stations .route-cell.route-station-head {
-  font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-faint-2);
-  text-align: center;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
-  position: static;
-  height: auto;
-}
-.route-lane-cells {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  position: relative;
-  height: 30px;
-}
-.route-cell {
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  height: 100%;
-  gap: 4px;
-}
-.route-dot {
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: var(--accent, #3e7050);
-  box-shadow: 0 0 0 3px rgba(62, 112, 80, 0.18);
-  flex-shrink: 0;
-}
-.route-eye {
-  font-size: 16px;
-  line-height: 1;
-}
-.route-closed-badge {
-  display: inline-block;
-  background: #ddead0;
-  color: #3a6243;
-  border-radius: 10px;
-  padding: 1px 7px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.route-delivered {
-  font-size: 11px;
-  color: #3a6243;
-  background: #ddead0;
-  border-radius: 10px;
-  padding: 2px 8px;
-}
-.route-tag {
-  font-size: 11px;
-  color: var(--text-faint-2);
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Arrow segments tile across the row so the line and the head meet at the dot:
- *   start  = right half of From cell  (50% → 100%)
- *   middle = full cell                (0%  → 100%)
- *   end    = left half of To cell     (0%  → 50%)
- * Arrowhead sits at the To cell's center (50%) — same position the destination
- * dot would occupy — so the head visually attaches to the end of the line. */
-.route-arrow-line {
-  position: absolute;
-  top: 50%; height: 2px;
-  background: linear-gradient(90deg, rgba(62, 112, 80, 0.45), rgba(62, 112, 80, 0.7));
-  transform: translateY(-50%);
-  pointer-events: none;
-  overflow: hidden;
-}
-.route-arrow-line.route-arrow-start.route-arrow-fwd   { left: 50%; width: 50%; }
-.route-arrow-line.route-arrow-middle.route-arrow-fwd  { left: 0;   width: 100%; }
-.route-arrow-line.route-arrow-end.route-arrow-fwd     { left: 0;   width: 50%; }
-.route-arrow-line.route-arrow-start.route-arrow-back  { left: 0;   width: 50%; }
-.route-arrow-line.route-arrow-middle.route-arrow-back { left: 0;   width: 100%; }
-.route-arrow-line.route-arrow-end.route-arrow-back    { left: 50%; width: 50%; }
-.route-arrow-pulse {
-  position: absolute;
-  top: -3px; left: 0;
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--accent, #3e7050);
-  animation: route-pulse 2s linear infinite;
-}
-@keyframes route-pulse {
-  0%   { left: 0;    opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
-.route-arrowhead {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  color: var(--accent, #3e7050);
-  font-size: 13px;
-  line-height: 1;
-  background: transparent;
-}
-
-.route-lane {
-  background: #f7faf6;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-  transition: background 120ms, border-color 120ms;
-}
-.route-lane:hover { background: #eef5ec; }
-.route-lane.lane-selected {
-  background: white;
-  border-color: var(--accent, #3e7050);
-  box-shadow: 0 1px 6px rgba(62, 112, 80, 0.18);
-}
-.route-lane.lane-due .route-arrow-line {
-  background: linear-gradient(90deg, rgba(220, 162, 24, 0.55), rgba(220, 162, 24, 0.8));
-}
-.route-lane.lane-due .route-arrow-pulse { background: #b07a07; }
-.route-lane.lane-due .route-arrowhead   { color: #b07a07; }
-.route-lane.lane-overdue .route-arrow-line {
-  background: linear-gradient(90deg, rgba(196, 64, 64, 0.55), rgba(196, 64, 64, 0.85));
-}
-.route-lane.lane-overdue .route-arrow-pulse { background: #b03434; }
-.route-lane.lane-overdue .route-arrowhead   { color: #b03434; }
-.route-lane.lane-delivered {
-  background: #f0f6ee;
-}
-.route-lane-id { font-size: 12px; }
-.route-lane-meta {
-  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-  font-size: 12px;
-}
-.route-subject {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-faint);
-}
-.route-due {
-  font-size: 11px;
-  background: #e8efe5;
-  color: #486656;
-  border-radius: 10px;
-  padding: 2px 8px;
-}
-.route-lane.lane-due .route-due { background: #fce7c1; color: #6a4a08; }
-.route-lane.lane-overdue .route-due { background: #f6cfcf; color: #6a1c1c; }
-
-.route-group { margin-top: 6px; }
-.route-group-sanity {
-  margin-top: auto;
-  border-top: 1px dashed var(--border);
-  padding-top: 6px;
-}
-.route-group-header {
-  display: flex; align-items: center; gap: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text-faint);
-  padding: 4px 6px;
-  border-radius: 6px;
-  user-select: none;
-}
-.route-group-header:hover { background: #eef5ec; }
-.route-group-toggle { font-family: monospace; }
-.route-group-count {
-  margin-left: auto;
-  background: #ddead0;
-  color: #3a6243;
-  border-radius: 10px;
-  padding: 1px 8px;
-  font-size: 11px;
-  font-weight: 700;
-}
 
 /* --- Picked case list (left pane) --- */
 
@@ -2245,3 +2046,327 @@ table.case-table {
   min-width: 220px;
 }
 .ts-picker:focus { outline: 2px solid var(--accent, #3e7050); outline-offset: 1px; }
+
+/* ============================================================================
+ *  Hand-off Route Board (rb-*)
+ *  Spec build: green band → white card → absolute-positioned per-case rows.
+ *  Stations live at 12% / 50% / 88% of the white card width.
+ * ========================================================================== */
+
+.route-band {
+  background: #234231;
+  border-bottom: 4px solid #2E5641;
+  padding: 18px 36px;
+  margin: 0 -22px 14px;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+/* ---- Band titlebar ---- */
+
+.rb-band-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.rb-band-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.rb-band-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #E8C56A;
+  box-shadow: 0 0 0 2px rgba(232, 197, 106, 0.22);
+}
+.rb-band-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #E6EFE7;
+  text-transform: uppercase;
+}
+.rb-band-summary {
+  font-size: 12px;
+  color: #8FA995;
+  margin-left: 6px;
+}
+.rb-band-legend {
+  display: flex; gap: 14px;
+  font-size: 11px;
+  color: #8FA995;
+  align-items: center;
+}
+.rb-band-legend span {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.rb-legend-swatch {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.rb-legend-solid { background: #2E5641; }
+.rb-legend-ring  { background: white; border: 2px solid #2E5641; box-sizing: border-box; }
+.rb-legend-red   { background: #B05050; }
+
+/* ---- Board card ---- */
+
+.rb-card {
+  position: relative;
+  background: white;
+  border: 1px solid #C5CCC1;
+  border-radius: 16px;
+  padding: 16px 24px;
+  overflow: hidden;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+}
+.rb-empty {
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #7B857E;
+  font-size: 13px;
+}
+.rb-empty a { color: #2E5641; text-decoration: underline; }
+
+/* ---- Vertical guide lines ---- */
+
+.rb-guide {
+  position: absolute;
+  top: 12px; bottom: 12px;
+  width: 0; border-left: 2px dashed #DCE0DA;
+  transform: translateX(-1px);   /* center the 2px stroke on the percentage line */
+  z-index: 0;
+}
+
+/* ---- Station labels ---- */
+
+.rb-station {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  z-index: 2;
+}
+.rb-station-square {
+  width: 12px; height: 12px;
+  border-radius: 4px;
+}
+.rb-station-label {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* ---- Row container (all four row types share) ---- */
+
+.rb-row {
+  position: absolute;
+  left: 16px; right: 16px;
+  cursor: pointer;
+  z-index: 1;
+  border-radius: 8px;
+  transition: background 120ms;
+}
+.rb-row:hover { background: rgba(46, 86, 65, 0.06); }
+.rb-row-selected { background: rgba(46, 86, 65, 0.09); }
+
+/* The percentage-positioned children inside a row are positioned against the
+ * row's own left/right padding, which is the same band the stations occupy. */
+.rb-row > * {
+  position: absolute;
+}
+.rb-id, .rb-watch-id, .rb-stay-id, .rb-sanity-sub-id {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ---- MOVING row (66px tall) ---- */
+
+.rb-row-moving { height: 66px; }
+
+.rb-row-moving .rb-origin-dot {
+  top: 50%;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #33596B;
+  border: 3px solid white;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-moving .rb-line {
+  top: 50%;
+  height: 3px; border-radius: 2px;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+.rb-row-moving .rb-dest-ring {
+  top: 50%;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: white;
+  border: 3.5px solid #2E5641;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-moving .rb-line-arrowhead {
+  top: 50%;
+  width: 0; height: 0;
+  /* CSS triangle pointing right, 10px wide, positioned so its tip sits at the
+   * destination ring's left edge (which is at -8px from the centre). */
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 10px solid #2E5641;
+  transform: translate(calc(-100% - 8px), -50%);
+  z-index: 3;
+}
+.rb-row-moving .rb-travel-track {
+  top: 50%;
+  height: 11px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 2;
+}
+.rb-row-moving .rb-travel-dot {
+  position: absolute;
+  top: 0; left: 0;
+  width: 11px; height: 11px; border-radius: 50%;
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85);
+  animation: rb-travel 3.4s ease-in-out infinite;
+}
+@keyframes rb-travel {
+  0%   { left: 0;                  opacity: 0; }
+  12%  {                           opacity: 1; }
+  85%  {                           opacity: 1; }
+  100% { left: calc(100% - 11px);  opacity: 0; }
+}
+.rb-row-moving .rb-id {
+  top: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: #5B6660;
+  letter-spacing: 0.01em;
+}
+.rb-chip {
+  top: 6px;
+  transform: translateX(-50%);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 2px 9px;
+  white-space: nowrap;
+  z-index: 3;
+}
+.rb-chip-amber   { background: #E8C56A; color: #3A2F12; }
+.rb-chip-overdue { background: #B05050; color: white; }
+
+/* ---- WATCH row (60px tall) ---- */
+
+.rb-row-watch { height: 60px; }
+
+.rb-row-watch .rb-watch-dot {
+  top: 50%;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #8C4A2F;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-watch .rb-watch-ring {
+  top: 50%;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1.5px dashed #C9A53C;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.rb-row-watch .rb-watch-eye {
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex; align-items: center;
+  z-index: 3;
+}
+.rb-row-watch .rb-watch-id {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11.5px;
+  color: #5B6660;
+  z-index: 3;
+}
+
+/* ---- STAY row (48px tall) ---- */
+
+.rb-row-stay { height: 48px; }
+
+.rb-row-stay .rb-stay-dot {
+  top: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #A8BCA8;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-stay .rb-stay-id {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11.5px;
+  color: #7B857E;
+  z-index: 3;
+}
+.rb-row-stay .rb-stay-eye {
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex; align-items: center;
+  z-index: 3;
+}
+
+/* ---- SANITY group header (46px) + sub-rows (38px) ---- */
+
+.rb-row-sanity-header { height: 46px; }
+.rb-row-sanity-header .rb-sanity-dot {
+  top: 50%;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #8AA169;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-sanity-header .rb-sanity-toggle {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px; height: 20px;
+  background: white;
+  border: 1.5px solid #C9D6C5;
+  border-radius: 6px;
+  color: #2E5641;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; line-height: 1;
+  z-index: 3;
+}
+.rb-row-sanity-header .rb-sanity-label {
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  color: #55683F;
+  font-weight: 600;
+  z-index: 3;
+}
+
+.rb-row-sanity-sub { height: 38px; }
+.rb-row-sanity-sub .rb-sanity-sub-dot {
+  top: 50%;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #CBD8BF;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.rb-row-sanity-sub .rb-sanity-sub-id {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11.5px;
+  color: #7B857E;
+  z-index: 3;
+  /* Truncate so long subjects don't overflow the row. */
+  max-width: 78%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

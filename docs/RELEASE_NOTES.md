@@ -90,6 +90,39 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Changed (Hand-off Route Board — spec build)
+
+- **Rebuilt the Route Board to the agreed spec.** Replaces the earlier "three
+  station cells, per-cell arrow segments" prototype with a band + card +
+  absolute-positioned rows layout:
+  - **Band** (full-width, `#234231` background, 4px `#2E5641` bottom border)
+    with title row (amber dot · "HAND-OFF ROUTE BOARD" · "N moving · M overdue
+    · K watch" summary) and a right-side legend.
+  - **White card** inside the band (`#C5CCC1` border, 16px radius), with three
+    full-height dashed guide lines at 12% / 50% / 88% and station labels
+    above (USER `#33596B` · CORE TEAM `#8A3434` · HQ `#8C4A2F`).
+  - **Four row types**, each absolutely positioned by computed top offset:
+    - *MOVING* (66px) — solid origin dot at the From station, 3px route line
+      to the destination (green `#2E5641` or red `#B05050` when overdue), CSS-
+      triangle arrowhead, hollow destination ring, animated traveling dot
+      (3.4s ease-in-out, each row delayed +0.55s), and a deadline chip above
+      the line at 31% (Core) or 70% (HQ) with "today HH:MM" / "Sun HH:MM" /
+      "overdue HH:MM" text.
+    - *WATCH* (60px) — `escalated_to_hq` cases. Dot at HQ with 34px dashed
+      ring, amber outline-eye icon, id to the right. No route line.
+    - *STAY* (48px) — `case_closed` / `need_to_contact_user` / untracked.
+      Quiet `#A8BCA8` dot at User with "id · stays" mono label.
+      `need_to_contact_user` gets a 15px blue-grey outline eye icon to the
+      dot's left.
+    - *SANITY* (46px) — collapsed header showing "Sanity Check · N cases"
+      with a 20px +/- toggle. Expanded reveals one 38px sub-row per case
+      with a 10px pale `#CBD8BF` dot and "id · subject" mono label.
+- **New typography:** Google Fonts adds *Lora* (headings), *IBM Plex Sans*
+  (band/UI), and *IBM Plex Mono* (ids and chips). Existing Source Serif 4 /
+  Libre Franklin / IBM Plex Mono links are retained for the rest of the app.
+- All Route Board class names moved from `.route-*` to `.rb-*` so the old
+  prototype CSS doesn't bleed through.
+
 ### Fixed (Route Board polish)
 
 - **Arrow line and arrowhead no longer separated by an empty gap.** The line
