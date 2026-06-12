@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Added
+
+- **Editable team members on the Owners page (Core Team + HQ).** The read-only roster
+  is now an editor: each team card shows its members in a 3-column grid (name / role /
+  id) with a `+ Add member` button and a per-row ✕ to delete. Edits flow through the
+  same Save / Copy snippet path the desks/teams use, so members survive a reload and
+  can be copied back into `owners.js`. HQ teams gained a `members[]` array in
+  `prototype/owners.js` seeded with three members per team; `ownersSnippet()` now emits
+  the members block for both pools.
+
 ### Changed
 
 - **"This week's rota" now has a Day cell and a Night cell per day, each holding any
@@ -36,6 +46,12 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   promoted `.badge-current` from `.archive-card .badge-current` to a top-level rule so
   it actually styles the badge on the Shifts index card and the detail header (it had
   no style before outside the archive view).
+- **`.case-row` works outside `.section-block-body`.** The grid layout (`1fr 220px
+  120px`) was nested under `.section-block-body .case-row`, so the case rows in the
+  rebuilt shift detail (which uses `.detail-section`) had no grid and rendered as
+  three stacked, unstyled divs — that was the "out of style" you were seeing. The rule
+  is now top-level; the `.section-block-body .case-row` selector keeps the 18px gutter
+  override so the existing handover screen still looks the same.
 - **Clicking a kanban card no longer jumps the page to the top.** The select handler
   now captures `window.scrollX/Y` before `render()` and restores it after, so picking
   a card further down the board keeps the viewport where it was. Affects every column

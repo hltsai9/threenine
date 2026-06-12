@@ -2167,7 +2167,7 @@ function ownersSnippet() {
   const core = window.OWNERS.core.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   const hq = window.OWNERS.hq.map(o =>
-    `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   return `window.OWNERS = {\n  core: [\n${core}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
 }
 
@@ -2213,28 +2213,31 @@ function renderOwnersTable(pool, label, regionLabel) {
     </div>`;
 }
 
-function renderCoreTeamMembers() {
-  const cards = window.OWNERS.core.map(team => {
-    const members = Array.isArray(team.members) ? team.members : [];
-    const rows = members.length
-      ? members.map(m => `
-        <li class="team-member">
-          <span class="team-member-name">${escapeHtml(m.name)}</span>
-          <span class="team-member-role muted">${escapeHtml(m.role || '')}</span>
-        </li>`).join('')
-      : '<li class="muted">No members listed.</li>';
+function renderTeamMembersEditor(pool, heading) {
+  const cards = window.OWNERS[pool].map((team, ti) => {
+    const members = Array.isArray(team.members) ? team.members : (team.members = []);
+    const rows = members.map((m, mi) => `
+        <div class="team-member-row" data-pool="${pool}" data-ti="${ti}" data-mi="${mi}">
+          <input data-mf="name" value="${escapeHtml(m.name || '')}" placeholder="Member name">
+          <input data-mf="role" value="${escapeHtml(m.role || '')}" placeholder="Role (Lead / Engineer / …)">
+          <input class="re-mono" data-mf="id" value="${escapeHtml(m.id || '')}" placeholder="${escapeHtml(team.id || pool)}-mem">
+          <button class="btn-ghost re-del-member" data-pool="${pool}" data-ti="${ti}" data-mi="${mi}" title="Remove member">✕</button>
+        </div>`).join('');
     return `
       <div class="team-card">
         <div class="team-card-head">
           <strong>${escapeHtml(team.name)}</strong>
-          <span class="muted tiny">${escapeHtml(team.region || '')}</span>
+          <span class="muted tiny">${escapeHtml(team[pool === 'core' ? 'region' : 'area'] || '')}</span>
         </div>
-        <ul class="team-members">${rows}</ul>
+        <div class="team-members">${rows || '<div class="muted tiny">No members yet.</div>'}</div>
+        <div class="team-card-foot">
+          <button class="btn" data-add-member data-pool="${pool}" data-ti="${ti}">+ Add member</button>
+        </div>
       </div>`;
   }).join('');
   return `
     <div class="detail-section">
-      <h3>Core Team members</h3>
+      <h3>${escapeHtml(heading)}</h3>
       <div class="team-grid">${cards}</div>
     </div>`;
 }
@@ -2254,7 +2257,8 @@ function renderOwnersPage() {
       <div class="card-body">
         ${renderOwnersTable('core', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
-        ${renderCoreTeamMembers()}
+        ${renderTeamMembersEditor('core', 'Core Team members')}
+        ${renderTeamMembersEditor('hq', 'HQ team members')}
         ${warnHtml}
         <div class="detail-section" style="margin-bottom:0">
           <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
@@ -2332,6 +2336,38 @@ function bindOwnersEditor() {
     render();
   }));
   ed.querySelectorAll('.re-del-owner').forEach(btn => btn.addEventListener('click', () => deleteOwner(btn.dataset.pool, +btn.dataset.oi)));
+
+  // Members editor (per Core Team desk and per HQ team).
+  ed.querySelectorAll('.team-member-row input[data-mf]').forEach(inp => inp.addEventListener('input', () => {
+    const row = inp.closest('.team-member-row');
+    const pool = row.dataset.pool, ti = +row.dataset.ti, mi = +row.dataset.mi, f = inp.dataset.mf;
+    const team = window.OWNERS[pool][ti];
+    if (!Array.isArray(team.members)) team.members = [];
+    const m = team.members[mi];
+    if (!m) return;
+    m[f] = inp.value;
+    refresh();
+  }));
+  ed.querySelectorAll('[data-add-member]').forEach(btn => btn.addEventListener('click', () => {
+    const pool = btn.dataset.pool, ti = +btn.dataset.ti;
+    const team = window.OWNERS[pool][ti];
+    if (!Array.isArray(team.members)) team.members = [];
+    // Suggest a unique id based on the team prefix.
+    const base = String(team.id || pool) + '-mem';
+    const taken = new Set(team.members.map(m => m.id));
+    let nextId = base, n = 1;
+    while (taken.has(nextId)) { n++; nextId = base + n; }
+    team.members.push({ id: nextId, name: '', role: '' });
+    render();
+  }));
+  ed.querySelectorAll('.re-del-member').forEach(btn => btn.addEventListener('click', () => {
+    const pool = btn.dataset.pool, ti = +btn.dataset.ti, mi = +btn.dataset.mi;
+    const team = window.OWNERS[pool][ti];
+    if (!Array.isArray(team.members)) return;
+    team.members.splice(mi, 1);
+    render();
+  }));
+
   document.getElementById('owners-save')?.addEventListener('click', () => saveJsFile('owners', ownersSnippet(), 'owners.js'));
   document.getElementById('owners-copy')?.addEventListener('click', async () => {
     const ta = document.getElementById('owners-output');
@@ -2569,7 +2605,7 @@ function renderShiftDetail(shiftName) {
     </div>
 
     <div class="card"><div class="card-body">
-      <div class="tabs" style="margin-top:-4px">${tabs}</div>
+      <div class="tabs">${tabs}</div>
 
       <div class="summary-bar">
         <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Cases handed to ${escapeHtml(sh.name)}</div></div>

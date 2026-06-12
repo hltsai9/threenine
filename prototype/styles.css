@@ -992,24 +992,50 @@ table.case-table {
   color: var(--text-deep);
 }
 .team-members {
-  list-style: none;
-  padding: 0;
-  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
-.team-member {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+.team-member-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 28px;
+  gap: 6px;
+  align-items: center;
+}
+.team-member-row input {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
   font-size: 12.5px;
-  padding: 4px 0;
+  background: white;
+  color: var(--text);
+  min-width: 0;
+}
+.team-member-row input.re-mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.team-member-row input:focus {
+  outline: none;
+  border-color: var(--accent-soft);
+}
+.team-member-row .btn-ghost {
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-faint-3);
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.team-member-row .btn-ghost:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+.team-card-foot {
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px dashed var(--hairline);
 }
-.team-member:first-child { border-top: none; padding-top: 0; }
-.team-member-name { font-weight: 600; color: var(--text-body); }
-.team-member-role { font-size: 11px; }
 .kanban-card-head {
   display: flex;
   justify-content: space-between;
@@ -1603,15 +1629,16 @@ table.case-table {
   align-items: center;
 }
 .section-block-body { padding: 8px 0; }
-.section-block-body .case-row {
+.case-row {
   display: grid;
   grid-template-columns: 1fr 220px 120px;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 12px 0;
   border-bottom: 1px solid var(--hairline);
   align-items: center;
 }
-.section-block-body .case-row:last-child { border-bottom: none; }
+.case-row:last-child { border-bottom: none; }
+.section-block-body .case-row { padding: 12px 18px; }
 .section-block-empty { padding: 20px; color: var(--text-faint-2); font-size: 13px; text-align: center; font-weight: 500; }
 
 .activity-list { font-size: 12px; padding: 8px 18px; }

@@ -41,8 +41,32 @@ window.OWNERS = {
     },
   ],
   hq: [
-    { id: 'hq-identity', name: 'HQ Identity Team',  area: 'Identity / SSO', tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-data',     name: 'HQ Data Platform',  area: 'Data Platform',  tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
-    { id: 'hq-mobile',   name: 'HQ Mobile App',     area: 'Mobile',         tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue' },
+    {
+      id: 'hq-identity', name: 'HQ Identity Team', area: 'Identity / SSO',
+      tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue',
+      members: [
+        { id: 'hq-identity-lead', name: 'Yuki Tanaka',  role: 'Lead' },
+        { id: 'hq-identity-eng',  name: 'Chen Wei',     role: 'Engineer' },
+        { id: 'hq-identity-eng2', name: 'Sara Khan',    role: 'Engineer' },
+      ],
+    },
+    {
+      id: 'hq-data', name: 'HQ Data Platform', area: 'Data Platform',
+      tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue',
+      members: [
+        { id: 'hq-data-lead', name: 'Min-Joon Kim', role: 'Lead' },
+        { id: 'hq-data-eng',  name: 'Aisha Patel',  role: 'Engineer' },
+        { id: 'hq-data-eng2', name: 'Rohan Iyer',   role: 'Engineer' },
+      ],
+    },
+    {
+      id: 'hq-mobile', name: 'HQ Mobile App', area: 'Mobile',
+      tz: 'Asia/Taipei', office: '09:00–18:00', channel: 'JIRA queue',
+      members: [
+        { id: 'hq-mobile-lead', name: 'Aiko Saito',   role: 'Lead' },
+        { id: 'hq-mobile-eng',  name: 'Marco Bianchi', role: 'Engineer' },
+        { id: 'hq-mobile-eng2', name: 'Tara O\'Neil',  role: 'Engineer' },
+      ],
+    },
   ],
 };
