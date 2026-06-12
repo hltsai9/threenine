@@ -13,17 +13,18 @@ window.THRESHOLDS = {
 // Operators & shifts (window.OPERATORS / window.SHIFTS / window.CURRENT_OPERATOR_ID)
 // live in shifts.js so the roster can be edited without touching this file.
 
-// Owners (window.OWNERS — Local FIT desks & HQ Product Teams) live in owners.js so the
+// Owners (window.OWNERS — Core Team desks & HQ Product Teams) live in owners.js so the
 // directory can be edited without touching this file.
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '2026-06-12' };
-window.CURRENT_WEEK = { id: 'W24-2026', label: 'W24 · June 8 – 14, 2026', startsAt: '2026-06-08T00:00:00Z' };
+// Week boundaries: weeks start on SUNDAY 00:00 UTC. W24 of 2026 starts Sun Jun 7.
+window.CURRENT_WEEK = { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026', startsAt: '2026-06-07T00:00:00Z' };
 
 window.WEEKS = [
-  { id: 'W24-2026', label: 'W24 · June 8 – 14, 2026',   startsAt: '2026-06-08T00:00:00Z', endsAt: '2026-06-15T00:00:00Z', isCurrent: true },
-  { id: 'W23-2026', label: 'W23 · June 1 – 7, 2026',    startsAt: '2026-06-01T00:00:00Z', endsAt: '2026-06-08T00:00:00Z' },
-  { id: 'W22-2026', label: 'W22 · May 25 – 31, 2026', startsAt: '2026-05-25T00:00:00Z', endsAt: '2026-06-01T00:00:00Z' },
-  { id: 'W21-2026', label: 'W21 · May 18 – May 24, 2026', startsAt: '2026-05-18T00:00:00Z', endsAt: '2026-05-25T00:00:00Z' },
+  { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026',     startsAt: '2026-06-07T00:00:00Z', endsAt: '2026-06-14T00:00:00Z', isCurrent: true },
+  { id: 'W23-2026', label: 'W23 · May 31 – June 6, 2026', startsAt: '2026-05-31T00:00:00Z', endsAt: '2026-06-07T00:00:00Z' },
+  { id: 'W22-2026', label: 'W22 · May 24 – 30, 2026',     startsAt: '2026-05-24T00:00:00Z', endsAt: '2026-05-31T00:00:00Z' },
+  { id: 'W21-2026', label: 'W21 · May 17 – 23, 2026',     startsAt: '2026-05-17T00:00:00Z', endsAt: '2026-05-24T00:00:00Z' },
 ];
 
 // Each case mirrors the Excel columns plus the v1 additions from the URD.
@@ -43,6 +44,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58821',
     subject: 'APAC users locked out after MFA reset',
     user: 'Hana Park',
+    assignee: 'op-da',
     fitId: null,
     hqId: null,
     currentOwner: null,
@@ -91,7 +93,7 @@ window.CASES = [
     createdBy: 'op-na',
     history: [
       { at: '2026-06-11T22:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-06-11T22:30:00Z', who: 'op-na', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+      { at: '2026-06-11T22:30:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — APAC desk' },
     ],
   },
   {
@@ -121,7 +123,7 @@ window.CASES = [
     createdBy: 'op-db',
     history: [
       { at: '2026-06-11T13:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-11T13:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-06-11T13:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — EMEA desk' },
       { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'FIT-EMEA: server-side, recommend escalate' },
     ],
   },
@@ -131,6 +133,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58750',
     subject: 'SAML SSO loop after IdP cert rotation',
     user: 'Priya Sharma',
+    assignee: 'op-da',
     fitId: 'fit-amer',
     hqId: 'hq-identity',
     currentOwner: 'hq',
@@ -151,14 +154,14 @@ window.CASES = [
     createdBy: 'op-da',
     history: [
       { at: '2026-06-10T17:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-10T17:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-06-10T17:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
       { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
-      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
+      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
       { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
     ],
   },
@@ -188,16 +191,16 @@ window.CASES = [
     createdBy: 'op-db',
     history: [
       { at: '2026-06-09T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
       { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
-      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
+      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
       { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
-      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Local FIT — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
+      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
     ],
   },
   {
@@ -226,7 +229,7 @@ window.CASES = [
     createdBy: 'op-da',
     history: [
       { at: '2026-06-09T09:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-09T09:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-06-09T09:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
       { at: '2026-06-11T14:00:00Z', who: 'op-da', kind: 'returned', detail: 'Returned to requester (need repro)' },
     ],
     // Case Center "Wait User" substatus detail (mirrors map_wait_user in casecenter.py) —
@@ -238,7 +241,7 @@ window.CASES = [
       dueDateTime: '2026-06-12T10:00:00Z',
       transition: 'Returned to user',
       transitionDateTime: '2026-06-11T14:00:00Z',
-      lastProcessor: { assignee: 'op-da', handlerGrp: 'Local FIT — EMEA', handlerType: 'FIT' },
+      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'FIT' },
     },
   },
   {
@@ -298,7 +301,7 @@ window.CASES = [
     history: [
       { at: '2026-06-12T08:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-06-12T08:15:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-12T08:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-06-12T08:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
     ],
   },
   {
@@ -327,7 +330,7 @@ window.CASES = [
     createdBy: 'op-db',
     history: [
       { at: '2026-06-11T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-11T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+      { at: '2026-06-11T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — APAC desk' },
     ],
   },
   {
@@ -356,7 +359,7 @@ window.CASES = [
     createdBy: 'op-da',
     history: [
       { at: '2026-06-11T18:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-11T18:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-06-11T18:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
     ],
   },
@@ -442,7 +445,7 @@ window.CASES = [
     createdBy: 'op-da',
     history: [
       { at: '2026-06-12T08:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-12T11:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Local FIT — EMEA desk' },
+      { at: '2026-06-12T11:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
     ],
   },
   {
@@ -472,7 +475,7 @@ window.CASES = [
     history: [
       { at: '2026-06-10T20:00:00Z', who: 'op-na', kind: 'created' },
       { at: '2026-06-10T20:30:00Z', who: 'op-na', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-10T21:00:00Z', who: 'op-na', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-06-10T21:00:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity' },
       { at: '2026-06-12T11:00:00Z', who: 'op-da', kind: 'status', detail: 'HQ → Sanity Check' },
     ],
@@ -674,7 +677,7 @@ window.CASES = [
     createdAt: '2026-06-04T10:00:00Z', createdBy: 'op-db',
     history: [
       { at: '2026-06-04T10:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-04T11:00:00Z', who: 'op-db', kind: 'assigned', detail: 'Local FIT — AMER desk' },
+      { at: '2026-06-04T11:00:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-08T08:00:00Z', who: 'op-da', kind: 'rolled_over', detail: 'Carried W23 → W24 (manual rollover)' },
     ],
   },

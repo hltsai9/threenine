@@ -49,7 +49,7 @@ test('fmtDuration: exact day', () => eq(fmtDuration(24 * HOUR), '1d'));
 test('fmtDuration: days + hours', () => eq(fmtDuration(25 * HOUR), '1d 1h'));
 
 /* ---------- statusLabel / displayStatus / isQueued ---------- */
-test('statusLabel: maps known enum', () => eq(statusLabel('with_fit'), 'With Local FIT'));
+test('statusLabel: maps known enum', () => eq(statusLabel('with_fit'), 'With Core Team'));
 test('statusLabel: passthrough unknown', () => eq(statusLabel('weird'), 'weird'));
 test('displayStatus: prefers ccStatusLabel', () => eq(displayStatus({ status: 'with_fit', ccStatusLabel: 'In-Progress Wait User' }), 'In-Progress Wait User'));
 test('displayStatus: falls back to enum label', () => eq(displayStatus({ status: 'closed' }), 'Closed'));
@@ -106,7 +106,7 @@ const holderTotals = app.holderTotals;
 const lifecycle = {
   createdAt: iso(10 * HOUR), status: 'closed', history: [
     { at: iso(10 * HOUR), kind: 'created' },
-    { at: iso(8 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+    { at: iso(8 * HOUR), kind: 'assigned', detail: 'Core Team — APAC' },
     { at: iso(5 * HOUR), kind: 'escalated', detail: 'FIT → HQ' },
     { at: iso(3 * HOUR), kind: 'status', detail: '→ Sanity Check' },
     { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
@@ -130,7 +130,7 @@ test('holderTotals: open Sanity Check case accrues requester time up to now', ()
   const c = {
     createdAt: iso(5 * HOUR), status: 'sanity_check', history: [
       { at: iso(5 * HOUR), kind: 'created' },
-      { at: iso(4 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(4 * HOUR), kind: 'assigned', detail: 'Core Team — APAC' },
       { at: iso(2 * HOUR), kind: 'status', detail: '→ Sanity Check' },
     ],
   };
@@ -141,7 +141,7 @@ test('holderTotals: returned case accrues requester time up to now', () => {
   const c = {
     createdAt: iso(6 * HOUR), status: 'returned_to_requester', history: [
       { at: iso(6 * HOUR), kind: 'created' },
-      { at: iso(5 * HOUR), kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(5 * HOUR), kind: 'assigned', detail: 'Core Team — APAC' },
       { at: iso(2 * HOUR), kind: 'returned', detail: 'Returned to requester' },
     ],
   };
@@ -157,7 +157,7 @@ test('holderTotals: live case (no created event) — first line = assign − cre
   // Live cases arrive with an empty history; assigning to FIT adds only an 'assigned' event.
   const c = {
     createdAt: iso(3 * HOUR), status: 'with_fit', history: [
-      { at: iso(1 * HOUR), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC' },
+      { at: iso(1 * HOUR), who: 'op', kind: 'assigned', detail: 'Core Team — APAC' },
     ],
   };
   const t = holderTotals(c);
@@ -363,24 +363,25 @@ test('mergeLiveCase: new id is added + normalized', () => {
   const c = app.caseById('C-MERGE-NEW');
   eq([c.status, c.subject, c.agentStatus], ['with_fit', 'New one', 'unqueued']);
 });
-test('mergeLiveCase: refresh updates CC fields but preserves all operator work', () => {
+test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves operator work', () => {
   // Simulate operator work on the case: assigned to FIT, notes, history, clocks, queue, handover.
   const c0 = app.caseById('C-MERGE-NEW');
   Object.assign(c0, {
     status: 'with_fit', fitId: 'fit-apac', currentOwner: 'fit', agentStatus: 'queued',
     notes: 'operator notes', slaAccumulatedMs: 3 * HOUR, holdMs: { fit: HOUR, hq: 0 },
-    history: [{ at: iso(2 * HOUR), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC' }],
+    history: [{ at: iso(2 * HOUR), who: 'op', kind: 'assigned', detail: 'Core Team — APAC' }],
     handover: { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false },
   });
-  // Case Center sends back the raw record (In-Progress → 'new', no routing/history).
+  // Case Center sends back the raw record. status IS now a CC-owned field — when CC moves
+  // the case, the board follows along on the next refresh.
   const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'Updated subject', status: 'new', priority: 'high', ccStatusLabel: 'In-Progress' });
   eq(r.added, false);
   const c = app.caseById('C-MERGE-NEW');
-  // CC-owned fields refreshed:
-  eq([c.subject, c.priority, c.ccStatusLabel], ['Updated subject', 'high', 'In-Progress']);
-  // Operator work preserved (NOT reset to the 'new' that In-Progress maps to):
-  eq([c.status, c.fitId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.fit, c.history.length, c.handover.note],
-     ['with_fit', 'fit-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
+  // CC-owned fields refreshed (status moved with the raw payload):
+  eq([c.subject, c.priority, c.ccStatusLabel, c.status], ['Updated subject', 'high', 'In-Progress', 'new']);
+  // Operator's local layer preserved (routing, notes, clocks, queue, history, handover):
+  eq([c.fitId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.fit, c.history.length, c.handover.note],
+     ['fit-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
 });
 test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
   app.location.protocol = 'https:'; app.__LIVE__ = true;

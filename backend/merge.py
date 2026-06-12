@@ -20,7 +20,7 @@ from .db import Case
 # local/persist.py and prototype/app.js. On a live refresh only these are overlaid onto
 # an existing case, so an ingestion run never resets operator routing/status.
 CC_OWNED_FIELDS = (
-    "subject", "ccStatusLabel", "priority", "caseLink",
+    "subject", "ccStatusLabel", "priority", "caseLink", "status",
     "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
 )
 

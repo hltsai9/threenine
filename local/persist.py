@@ -30,7 +30,7 @@ STORE = os.path.join(HERE, "cases.store.json")
 # /api/cases refresh never resets a case you've assigned/moved back to its raw CC status.
 # Must stay in sync with CC_OWNED_FIELDS in prototype/app.js.
 CC_OWNED_FIELDS = (
-    "subject", "ccStatusLabel", "priority", "caseLink",
+    "subject", "ccStatusLabel", "priority", "caseLink", "status",
     "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
 )
 

@@ -384,26 +384,47 @@ function fmtClockShort(iso) {
   const pad = n => String(n).padStart(2, '0');
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-// Local HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
+// Shifts are displayed in Mountain Standard Time (UTC-7, no DST — IANA "America/Phoenix").
+// Changing this constant retargets every shift-time render: the sidebar shift-ends clock,
+// the Shifts page roster headers, and the shift-card subtitles. Case timestamps still use
+// the viewer's own local time (see fmtAbsolute).
+const SHIFT_TZ = 'America/Phoenix';
+const SHIFT_TZ_LABEL = 'MST';
+
+// Convert an ISO UTC instant to "HH:MM" in the shift timezone via Intl.DateTimeFormat.
+function _shiftTzHHMM(iso) {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: SHIFT_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date(iso));
+  } catch (e) {
+    // Fallback: hard-coded UTC-7 (MST is UTC-7 year-round, no DST).
+    const d = new Date(iso);
+    const ms = d.getTime() - 7 * 60 * 60 * 1000;
+    const utc = new Date(ms);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}`;
+  }
+}
+
+// Shift-time HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
 function fmtLocalTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d)) return '—';
-  const pad = n => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+  return `${_shiftTzHHMM(iso)} ${SHIFT_TZ_LABEL}`;
 }
-// Render a "HH:MM – HH:MM UTC" coverage window in local time (display only; the roster
-// still stores the canonical UTC text). Falls back to the raw string if unparseable.
+// Render a "HH:MM – HH:MM UTC" coverage window in the shift timezone (display only; the
+// roster still stores the canonical UTC text). Falls back to the raw string if unparseable.
 function fmtShiftHoursLocal(hoursUtc) {
   const m = String(hoursUtc || '').match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
   if (!m) return hoursUtc || '—';
   const base = new Date();
-  const toLocal = (h, min) => {
+  const toShiftTz = (h, min) => {
     const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), +h, +min));
-    const pad = n => String(n).padStart(2, '0');
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return _shiftTzHHMM(d.toISOString());
   };
-  return `${toLocal(m[1], m[2])} – ${toLocal(m[3], m[4])}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+  return `${toShiftTz(m[1], m[2])} – ${toShiftTz(m[3], m[4])} ${SHIFT_TZ_LABEL}`;
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({
@@ -432,7 +453,7 @@ function ownerInOfficeHours(owner) {
 function statusLabel(s) {
   return ({
     new: 'New',
-    with_fit: 'With Local FIT',
+    with_fit: 'With Core Team',
     with_hq: 'With HQ Product Team',
     sanity_check: 'Sanity Check',
     returned_to_requester: 'Returned to Requester',
@@ -483,8 +504,8 @@ function derivePromptsForCase(c) {
 }
 
 const PROMPT_DEFS = {
-  assign_fit:           { label: 'Assign to Local FIT',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
-  chase_fit:            { label: 'Chase Local FIT — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
+  chase_fit:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
   chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   verify_fix:           { label: 'Verify reported fix (Sanity Check)',   icon: 'V', cls: 'icon-verify',   action: 'Verify & close' },
@@ -671,6 +692,17 @@ function needsHandoverNote(c) {
   return !author || author.shift !== op.shift;
 }
 
+// True if this case is assigned (in Case Center) to whoever's currently signed in. The
+// match is permissive because the operator roster (op-da, op-db, …) and Case Center
+// account ids aren't centrally mapped: we compare against the operator's id and name.
+function isAssignedToMe(c) {
+  if (!c || !c.assignee) return false;
+  const op = getOperator(STATE.operatorId);
+  if (!op) return false;
+  const a = String(c.assignee).toLowerCase();
+  return a === String(op.id).toLowerCase() || a === String(op.name).toLowerCase();
+}
+
 function handoverPendingCases() {
   const shiftEndsSoon =
     (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
@@ -729,7 +761,7 @@ function renderCaseList() {
   // band (everything else in that status) — the row dimension is the agent status.
   const columns = [
     { id: 'new',    label: 'New',                              statuses: ['new'] },
-    { id: 'fit',    label: 'With Local FIT',                   statuses: ['with_fit'] },
+    { id: 'fit',    label: 'With Core Team',                   statuses: ['with_fit'] },
     { id: 'hq',     label: 'With HQ Product Team',             statuses: ['with_hq'] },
     { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
   ];
@@ -892,11 +924,13 @@ function renderKanbanCard(c) {
     <button class="btn-tiny kanban-handover-btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover" title="Write a handover note for this shift" onclick="event.stopPropagation()">⚠ Note</button>
   ` : '';
 
+  const mine = isAssignedToMe(c);
   return `
-    <div class="kanban-card ${isSel ? 'is-selected' : ''}" data-action="kanban-select" data-case-id="${c.id}">
+    <div class="kanban-card ${isSel ? 'is-selected' : ''} ${mine ? 'is-mine' : ''}" data-action="kanban-select" data-case-id="${c.id}">
       <div class="kanban-card-head">
         <span class="mono muted">${c.id}</span>
         <div class="kanban-card-head-right">
+          ${mine ? '<span class="kanban-mine" title="Assigned to you">● me</span>' : ''}
           <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
           ${bellState}
           ${isQueued(c) ? '<span class="kanban-queued" title="In your queue">★</span>' : ''}
@@ -963,7 +997,7 @@ function ownershipSegments(c) {
     const d = (ev.detail || '').toLowerCase();
     switch (ev.kind) {
       case 'created': return 'triage';
-      case 'assigned': return 'fit';      // assignment is always to Local FIT
+      case 'assigned': return 'fit';      // assignment is always to Core Team
       case 'escalated': return 'hq';
       case 'returned': return 'requester';
       case 'closed': case 'cancelled': return 'done';
@@ -1015,7 +1049,7 @@ function holderTotals(c) {
 
 const HOLDER_META = {
   triage:    { label: 'First line',       cls: 'tl-triage' },
-  fit:       { label: 'Local FIT',        cls: 'tl-fit' },
+  fit:       { label: 'Core Team',        cls: 'tl-fit' },
   hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
   requester: { label: 'With requester',   cls: 'tl-requester' },
   done:      { label: 'Closed',           cls: 'tl-done' },
@@ -1232,7 +1266,7 @@ function renderCaseDetailBody(c) {
                 <div class="state ${firstLineHolding ? 'running' : ''}">${firstLineHolding ? 'Holding now' : 'Idle'}</div>
               </div>
               <div class="clock">
-                <div class="label">Local FIT</div>
+                <div class="label">Core Team</div>
                 <div class="value">${fmtDuration(fitMs)}</div>
                 <div class="state ${c.currentOwner === 'fit' ? 'running' : ''}">${c.currentOwner === 'fit' ? 'Holding now' : 'Idle'}</div>
               </div>
@@ -1279,7 +1313,7 @@ function renderCaseDetailBody(c) {
             <div class="detail-row"><span class="k">User</span><span class="v">${c.user ? escapeHtml(c.user) : '<span class="muted">—</span>'}${c.userDept ? ` <span class="muted">· ${escapeHtml(c.userDept)}</span>` : ''}</span></div>
             ${c.reporter ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporter)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
             ${c.assignee ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assignee)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
-            <div class="detail-row"><span class="k">Local FIT</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">Core Team</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
@@ -1364,7 +1398,7 @@ function statusTransitions(c) {
   const t = [];
   switch (c.status) {
     case 'new':
-      t.push({ kind: 'assign_fit', label: 'Assign to Local FIT' });
+      t.push({ kind: 'assign_fit', label: 'Assign to Core Team' });
       t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
     case 'with_fit':
@@ -1390,6 +1424,61 @@ function statusTransitions(c) {
 }
 
 /* ---------- Weekly Archive ---------- */
+
+// Day-of-week index where weeks start. 0 = Sunday (per the team's convention; matches
+// the W24-2026 seed that starts on Sun Jun 7). Change here if the week ever moves.
+const WEEK_STARTS_ON = 0;
+
+// Find an existing window.WEEKS bucket whose [startsAt, endsAt) contains `createdAt`,
+// or auto-create one when no week fits. The new week is inserted in date order so the
+// archive list stays sorted (newest first). Week id format: `W{weekNumber}-{year}`.
+function weekIdFor(createdAtIso) {
+  const t = Date.parse(createdAtIso);
+  if (isNaN(t)) return window.CURRENT_WEEK.id;
+  const weeks = window.WEEKS || [];
+  const hit = weeks.find(w => {
+    const s = Date.parse(w.startsAt), e = Date.parse(w.endsAt);
+    return !isNaN(s) && !isNaN(e) && t >= s && t < e;
+  });
+  if (hit) return hit.id;
+  // No fitting week — build a fresh one anchored to the case's createdAt.
+  const created = new Date(t);
+  // Find the Sunday at-or-before the created date (UTC).
+  const dayOffset = (created.getUTCDay() - WEEK_STARTS_ON + 7) % 7;
+  const start = new Date(Date.UTC(created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate() - dayOffset));
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const week = {
+    id: `W${weekNumberFor(start)}-${start.getUTCFullYear()}`,
+    label: weekLabel(start, end),
+    startsAt: start.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    endsAt: end.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+  };
+  // Avoid colliding with an existing id (e.g. a same-numbered week from a different year).
+  if (weeks.some(w => w.id === week.id)) week.id = `${week.id}-${start.getUTCDate()}`;
+  weeks.push(week);
+  weeks.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+  return week.id;
+}
+
+// Sunday-anchored week number: 1 = the week containing Jan 1.
+function weekNumberFor(sundayStart) {
+  const y = sundayStart.getUTCFullYear();
+  const jan1 = new Date(Date.UTC(y, 0, 1));
+  const firstSundayOffset = (jan1.getUTCDay() - WEEK_STARTS_ON + 7) % 7;
+  const firstWeekStart = new Date(Date.UTC(y, 0, 1 - firstSundayOffset));
+  return Math.floor((sundayStart - firstWeekStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
+}
+
+function weekLabel(start, end) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','June','July','Aug','Sept','Oct','Nov','Dec'];
+  const last = new Date(end.getTime() - 24 * 60 * 60 * 1000);   // inclusive end day
+  const sm = MONTHS[start.getUTCMonth()], em = MONTHS[last.getUTCMonth()];
+  const sd = start.getUTCDate(), ed = last.getUTCDate();
+  const yr = last.getUTCFullYear();
+  const w = weekNumberFor(start);
+  const range = sm === em ? `${sm} ${sd} – ${ed}` : `${sm} ${sd} – ${em} ${ed}`;
+  return `W${w} · ${range}, ${yr}`;
+}
 
 function weekStats(weekId) {
   const cases = STATE.cases.filter(c => !c.deletedAt && c.weekId === weekId);
@@ -1511,7 +1600,7 @@ function renderArchiveWeek(weekId) {
             <th>ID</th>
             <th>Subject / Case Link</th>
             <th>User</th>
-            <th>Local FIT</th>
+            <th>Core Team</th>
             <th>HQ Product Team</th>
             <th>Status</th>
             <th>Process Time</th>
@@ -1964,8 +2053,14 @@ function ownerRefCounts(pool, id) {
 
 function ownersSnippet() {
   const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const renderMembers = (members) => {
+    if (!Array.isArray(members) || !members.length) return '';
+    const inner = members.map(m =>
+      `        { id: ${q(m.id)}, name: ${q(m.name)}, role: ${q(m.role || '')} }`).join(',\n');
+    return `,\n      members: [\n${inner},\n      ]`;
+  };
   const fit = window.OWNERS.fit.map(o =>
-    `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
+    `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   const hq = window.OWNERS.hq.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
   return `window.OWNERS = {\n  fit: [\n${fit}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
@@ -2013,6 +2108,32 @@ function renderOwnersTable(pool, label, regionLabel) {
     </div>`;
 }
 
+function renderCoreTeamMembers() {
+  const cards = window.OWNERS.fit.map(team => {
+    const members = Array.isArray(team.members) ? team.members : [];
+    const rows = members.length
+      ? members.map(m => `
+        <li class="team-member">
+          <span class="team-member-name">${escapeHtml(m.name)}</span>
+          <span class="team-member-role muted">${escapeHtml(m.role || '')}</span>
+        </li>`).join('')
+      : '<li class="muted">No members listed.</li>';
+    return `
+      <div class="team-card">
+        <div class="team-card-head">
+          <strong>${escapeHtml(team.name)}</strong>
+          <span class="muted tiny">${escapeHtml(team.region || '')}</span>
+        </div>
+        <ul class="team-members">${rows}</ul>
+      </div>`;
+  }).join('');
+  return `
+    <div class="detail-section">
+      <h3>Core Team members</h3>
+      <div class="team-grid">${cards}</div>
+    </div>`;
+}
+
 function renderOwnersPage() {
   const warns = ownersWarnings();
   const warnHtml = warns.length
@@ -2021,13 +2142,14 @@ function renderOwnersPage() {
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
-      <div class="subtitle">Local FIT desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
+      <div class="subtitle">Core Team desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
     </div></div>
     <div class="card roster-editor" id="owners-editor">
       <div class="card-header"><span>Edit FIT desks &amp; HQ teams</span></div>
       <div class="card-body">
-        ${renderOwnersTable('fit', 'Local FIT desks', 'Region')}
+        ${renderOwnersTable('fit', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
+        ${renderCoreTeamMembers()}
         ${warnHtml}
         <div class="detail-section" style="margin-bottom:0">
           <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
@@ -2287,7 +2409,7 @@ function renderStatusFlow() {
         </g>
         <g class="flow-node">
           <rect x="220" y="40" width="160" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
-          <text x="300" y="76" text-anchor="middle" font-weight="600" font-size="13">With Local FIT</text>
+          <text x="300" y="76" text-anchor="middle" font-weight="600" font-size="13">With Core Team</text>
         </g>
         <g class="flow-node">
           <rect x="440" y="40" width="180" height="60" rx="8" fill="#fee2e2" stroke="#991b1b" stroke-width="2"/>
@@ -2373,10 +2495,10 @@ function renderStatusFlow() {
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Local FIT</td><td><span class="pill pill-with_fit">With Local FIT</span></td><td>FIT hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>FIT hold-clock starts</td></tr>
         <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Local FIT</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
         <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
@@ -2397,7 +2519,7 @@ function renderClockModel() {
     id: 'C-EXAMPLE', status: 'closed', subject: 'Example case', createdAt: ago(10),
     history: [
       { at: ago(10), who: 'op', kind: 'created', detail: 'Case opened (triage)' },
-      { at: ago(8), who: 'op', kind: 'assigned', detail: 'Local FIT — APAC desk' },
+      { at: ago(8), who: 'op', kind: 'assigned', detail: 'Core Team — APAC desk' },
       { at: ago(5), who: 'op', kind: 'escalated', detail: 'FIT → HQ Product Team' },
       { at: ago(3), who: 'op', kind: 'status', detail: '→ Sanity Check' },
       { at: ago(1), who: 'op', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
@@ -2424,7 +2546,7 @@ function renderClockModel() {
 
     <div class="flow-container">
       <h2 style="margin-top:0;">How each clock is counted</h2>
-      <p class="muted tiny" style="margin:0 0 10px;">The case detail shows four clocks — SLA, First line, Local FIT, HQ. The “With requester” row below isn't a separate clock; it's the requester-attributed time you see on the ownership timeline.</p>
+      <p class="muted tiny" style="margin:0 0 10px;">The case detail shows four clocks — SLA, First line, Core Team, HQ. The “With requester” row below isn't a separate clock; it's the requester-attributed time you see on the ownership timeline.</p>
       <table class="transition-table">
         <thead>
           <tr><th>Clock</th><th>What it measures</th><th>Starts</th><th>Pauses / stops</th><th>Banked</th></tr>
@@ -2445,9 +2567,9 @@ function renderClockModel() {
             <td>Summed from history segments.</td>
           </tr>
           <tr>
-            <td>${swatch('tl-fit')}<strong>Local FIT</strong></td>
-            <td>Time the case sat with the Local FIT desk.</td>
-            <td>On <em>Assign to Local FIT</em>.</td>
+            <td>${swatch('tl-fit')}<strong>Core Team</strong></td>
+            <td>Time the case sat with the Core Team desk.</td>
+            <td>On <em>Assign to Core Team</em>.</td>
             <td>On escalate / return / close.</td>
             <td>Summed from history segments.</td>
           </tr>
@@ -2469,17 +2591,17 @@ function renderClockModel() {
       </table>
 
       <h2>Worked example</h2>
-      <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Local FIT → HQ → Sanity Check → Closed. The bar below is the exact component shown on the case detail.</p>
+      <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Core Team → HQ → Sanity Check → Closed. The bar below is the exact component shown on the case detail.</p>
       ${renderOwnershipTimeline(example)}
       <div class="clock-grid" style="margin-top:16px;">
         <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">runs through Sanity Check (no explicit return)</div></div>
         <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage only</div></div>
-        <div class="clock"><div class="label">${swatch('tl-fit')}Local FIT</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-fit')}Core Team</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-requester')}With requester</div><div class="value">${fmtDuration(requesterMs)}</div><div class="state">incl. Sanity Check</div></div>
       </div>
 
-      <p class="muted tiny" style="margin-top:14px;">First line + Local FIT + HQ + With requester add up to the case's lifetime (${fmtDuration(lifeMs)}). <strong>Sanity Check</strong> counts as <em>With requester</em> time. <strong>SLA · time on us</strong> runs the whole lifetime and pauses only on an explicit <em>Return to requester</em> — so here it equals the full ${fmtDuration(slaMsEx)}.</p>
+      <p class="muted tiny" style="margin-top:14px;">First line + Core Team + HQ + With requester add up to the case's lifetime (${fmtDuration(lifeMs)}). <strong>Sanity Check</strong> counts as <em>With requester</em> time. <strong>SLA · time on us</strong> runs the whole lifetime and pauses only on an explicit <em>Return to requester</em> — so here it equals the full ${fmtDuration(slaMsEx)}.</p>
     </div>
   `;
 }
@@ -2547,7 +2669,7 @@ function handlePrompt(caseId, kind) {
   if (kind === 'assign_fit') {
     const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
-      <h3>Assign to Local FIT</h3>
+      <h3>Assign to Core Team</h3>
       <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
       <label>FIT desk</label>
       <select data-field="fitId">${opts}</select>
@@ -2563,8 +2685,8 @@ function handlePrompt(caseId, kind) {
       c.holdStartedAt = new Date(NOW).toISOString();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
       const fitName = getOwner('fit', fitId).name;
-      logHistory(c, op, 'assigned', `Local FIT — ${fitName}`);
-      showToast(`${c.id} assigned to ${fitName}. Status is now With Local FIT.`, 'success');
+      logHistory(c, op, 'assigned', `Core Team — ${fitName}`);
+      showToast(`${c.id} assigned to ${fitName}. Status is now With Core Team.`, 'success');
       render();
       return true;
     });
@@ -2732,7 +2854,7 @@ function handlePrompt(caseId, kind) {
     const fit = getOwner('fit', c.fitId);
     const hq = getOwner('hq', c.hqId);
     const opts = [];
-    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Local FIT)</option>`);
+    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Core Team)</option>`);
     if (c.hqId) opts.push(`<option value="hq">Resume with ${escapeHtml(hq.name)} (HQ Product Team)</option>`);
     opts.push(`<option value="sanity_check">Move to Sanity Check (requester says it's fixed)</option>`);
     opts.push(`<option value="new">Resume unassigned (status: New)</option>`);
@@ -2761,7 +2883,7 @@ function handlePrompt(caseId, kind) {
         c.status = 'with_fit';
         c.holdStartedAt = new Date(NOW).toISOString();
         c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-        detail = `Requester replied · resumed to Local FIT (${getOwner('fit', c.fitId).name})`;
+        detail = `Requester replied · resumed to Core Team (${getOwner('fit', c.fitId).name})`;
       } else if (dest === 'hq') {
         c.currentOwner = 'hq';
         c.status = 'with_hq';
@@ -3084,7 +3206,7 @@ function handleReassign(caseId, type) {
   const op = getOperator(STATE.operatorId);
   const dir = type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq;
   const currentId = type === 'fit' ? c.fitId : c.hqId;
-  const typeLabel = type === 'fit' ? 'Local FIT' : 'HQ Product Team';
+  const typeLabel = type === 'fit' ? 'Core Team' : 'HQ Product Team';
   const detailLabel = type === 'fit' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
 
   const opts = [
@@ -3293,6 +3415,7 @@ setInterval(updateClock, CLOCK_TICK_MS);
 // statuses into the board's status enum; everything else falls back here.
 function normalizeLiveCase(c) {
   const nowIso = new Date(NOW).toISOString();
+  const createdAt = c.createdAt || c.slaStartedAt || nowIso;
   return Object.assign({
     flags: [],
     priority: 'medium',
@@ -3305,7 +3428,9 @@ function normalizeLiveCase(c) {
     reminder: undefined,
     agentStatus: 'unqueued',
     history: [],
-    weekId: window.CURRENT_WEEK.id,   // default to current week so live cases show on the board
+    // Bucket into the week that contains createdAt; auto-create one if none fits, so a
+    // brand-new case from a future/past week always lands somewhere.
+    weekId: weekIdFor(createdAt),
     caseLink: '',
     requester: '',
     notes: '',
@@ -3316,12 +3441,12 @@ function normalizeLiveCase(c) {
 }
 
 // Fields Case Center authoritatively owns — these are refreshed onto an existing case. Everything
-// else (board status, FIT/HQ routing, history, notes, clocks, queue, handover, reminder, flags)
-// is operator-local and is PRESERVED across a refresh, so re-fetching a case never wipes the work
-// you've done on it. Notably `status` is preserved: once you've moved a case to With FIT / HQ /
-// Sanity Check, a refresh won't snap it back to the column its raw Case Center status maps to.
+// else (FIT/HQ routing, history, notes, clocks, queue, handover, reminder, flags) is
+// operator-local and is PRESERVED across a refresh, so re-fetching a case never wipes the work
+// you've done on it. `status` IS refreshed: when Case Center moves a case (e.g. resolved /
+// returned to user), the board moves it to the matching column on the next refresh.
 const CC_OWNED_FIELDS = [
-  'subject', 'ccStatusLabel', 'priority', 'caseLink',
+  'subject', 'ccStatusLabel', 'priority', 'caseLink', 'status',
   'user', 'userDept', 'reporter', 'reporterDept', 'assignee', 'assigneeDept',
   'processTimeline',   // Case Center's per-stage processing log (drives the Process timeline)
   'waitUser',          // "Wait User" substatus detail (reason / due / last processor)

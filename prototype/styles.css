@@ -811,6 +811,68 @@ table.case-table {
   border-color: var(--accent-soft);
   box-shadow: 0 0 0 2px rgba(78,128,99,.3), 0 5px 16px rgba(24,20,52,.06);
 }
+/* Case is assigned (in Case Center) to the current operator. */
+.kanban-card.is-mine {
+  background: var(--accent-bg);
+  border-color: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 1px 2px rgba(20,33,26,.04), 0 5px 16px rgba(78,128,99,.18);
+}
+.kanban-card.is-mine.is-selected {
+  box-shadow: 0 0 0 2px rgba(78,128,99,.5), 0 5px 16px rgba(20,33,26,.08);
+}
+.kanban-mine {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: white;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--accent-soft);
+  letter-spacing: .02em;
+}
+
+/* Core Team members readout on the Owners page */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.team-card {
+  background: var(--chip-soft-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+}
+.team-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-deep);
+}
+.team-members {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.team-member {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  padding: 4px 0;
+  border-top: 1px dashed var(--hairline);
+}
+.team-member:first-child { border-top: none; padding-top: 0; }
+.team-member-name { font-weight: 600; color: var(--text-body); }
+.team-member-role { font-size: 11px; }
 .kanban-card-head {
   display: flex;
   justify-content: space-between;

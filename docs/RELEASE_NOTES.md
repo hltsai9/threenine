@@ -10,7 +10,50 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Added
+
+- **Three Core Teams seeded with three members each.** Each `window.OWNERS.fit` desk now
+  carries a `members` array (`id` / `name` / `role`) — APAC: Hana Park (lead), Kenji Sato,
+  Mei Lin; EMEA: Lukas Berg (lead), Sofia Ricci, Omar Haddad; AMER: Jordan Reed (lead),
+  Ava Nguyen, Diego Alvarez. The Owners page renders a "Core Team members" read-only grid
+  below the existing tables and `ownersSnippet()` writes `members:` so saved snippets
+  preserve the roster.
+- **"Assigned to you" highlight on board cards.** `renderCard` now adds an `is-mine`
+  class and a small `● me` chip when `c.assignee` matches the current operator's id or
+  name (case-insensitive), via a new `isAssignedToMe(c)` helper. CSS gives those cards a
+  tinted background, an accent ring, and a stronger highlight when also selected. Two
+  seed cases (C-1041, C-1044) carry `assignee: 'op-da'` so the highlight is visible in
+  the demo out of the box.
+
 ### Changed
+
+- **Case Center refresh now moves cases when their status changes.** Added `status` to
+  `CC_OWNED_FIELDS` in `prototype/app.js`, `local/persist.py`, and `backend/merge.py`, so
+  a live refresh updates the board column to whatever Case Center currently has. The
+  operator's local layer (FIT/HQ routing, notes, clocks, queue, handover, reminders) is
+  still preserved across a refresh — only the CC-owned fields change. Updated the
+  `mergeLiveCase` characterization test to expect status to follow CC.
+- **"Local FIT" wording → "Core Team" everywhere user-visible.** Renamed across
+  `prototype/app.js`, `prototype/data.js`, `prototype/owners.js` doc comments,
+  `prototype/tests/run.cjs`, and `prototype/tour.js`. The internal status enum
+  `with_fit` and the pill CSS class `pill-with_fit` are unchanged (column id stays).
+- **Week boundaries start on Sunday.** `window.CURRENT_WEEK` and `window.WEEKS` in
+  `prototype/data.js` shifted by one day: W24-2026 now spans Sun Jun 7 – Sat Jun 13,
+  W23 spans May 31 – Jun 6, W22 spans May 24 – 30, W21 spans May 17 – 23 (labels
+  rewritten accordingly). A new `WEEK_STARTS_ON = 0` constant in `app.js` encodes the
+  Sunday-first convention for future code.
+- **Auto-create a week bucket when a new case has no matching window.** `normalizeLiveCase`
+  now resolves `weekId` via a new `weekIdFor(createdAt)` helper that searches `window.WEEKS`
+  for a containing `[startsAt, endsAt)` window; on no hit it builds a fresh week anchored
+  to the Sunday at-or-before `createdAt` (with a `weekNumberFor()` / `weekLabel()` helper
+  pair) and inserts it sorted in `window.WEEKS`. Cases now always land somewhere, even
+  if they pre-date or post-date the seed week list.
+- **Shift times rendered in Mountain Standard Time.** Added `SHIFT_TZ = "America/Phoenix"`
+  / `SHIFT_TZ_LABEL = "MST"` and reworked `fmtLocalTime` / `fmtShiftHoursLocal` to format
+  via `Intl.DateTimeFormat` with a `timeZone` option (with a hard-coded UTC-7 fallback
+  if Intl rejects the IANA name). The sidebar shift-ends clock, the Shifts page roster
+  headers, and shift-card subtitles all now show MST; case timestamps still render in
+  the viewer's own local time via the unchanged `fmtAbsolute`.
 
 - **Follow-ups to the Case Center JSON adapter.** `map_process_timeline()` now reads each
   item's sub-transition via the shared `sub_transition(it)` helper instead of the removed

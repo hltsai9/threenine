@@ -26,7 +26,7 @@
       selector: '.kanban',
       placement: 'bottom',
       title: 'The board — two statuses per case',
-      body: 'Everything happens here. The four columns are the Case Center status (the real, external status): New → With Local FIT → With HQ Product Team → Sanity Check / With Requester. Each column then splits top/bottom — that row split is the first-line agent status.',
+      body: 'Everything happens here. The four columns are the Case Center status (the real, external status): New → With Core Team → With HQ Product Team → Sanity Check / With Requester. Each column then splits top/bottom — that row split is the first-line agent status.',
     },
     {
       kind: 'pointer',
