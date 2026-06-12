@@ -49,43 +49,43 @@ test('fmtDuration: exact day', () => eq(fmtDuration(24 * HOUR), '1d'));
 test('fmtDuration: days + hours', () => eq(fmtDuration(25 * HOUR), '1d 1h'));
 
 /* ---------- statusLabel / displayStatus / isQueued ---------- */
-test('statusLabel: maps known enum', () => eq(statusLabel('with_fit'), 'With Core Team'));
+test('statusLabel: maps known enum', () => eq(statusLabel('with_core'), 'With Core Team'));
 test('statusLabel: passthrough unknown', () => eq(statusLabel('weird'), 'weird'));
-test('displayStatus: prefers ccStatusLabel', () => eq(displayStatus({ status: 'with_fit', ccStatusLabel: 'In-Progress Wait User' }), 'In-Progress Wait User'));
+test('displayStatus: prefers ccStatusLabel', () => eq(displayStatus({ status: 'with_core', ccStatusLabel: 'In-Progress Wait User' }), 'In-Progress Wait User'));
 test('displayStatus: falls back to enum label', () => eq(displayStatus({ status: 'closed' }), 'Closed'));
 test('isQueued: queued → true', () => ok(isQueued({ agentStatus: 'queued' })));
 test('isQueued: unqueued → false', () => ok(!isQueued({ agentStatus: 'unqueued' })));
 
 /* ---------- caseSlaMs ---------- */
 test('caseSlaMs: paused → accumulated only', () =>
-  eq(caseSlaMs({ slaAccumulatedMs: 5 * HOUR, slaPaused: true, status: 'with_fit', slaStartedAt: iso(2 * HOUR) }), 5 * HOUR));
+  eq(caseSlaMs({ slaAccumulatedMs: 5 * HOUR, slaPaused: true, status: 'with_core', slaStartedAt: iso(2 * HOUR) }), 5 * HOUR));
 test('caseSlaMs: closed → accumulated only (no running segment)', () =>
   eq(caseSlaMs({ slaAccumulatedMs: 3 * HOUR, slaPaused: false, status: 'closed', slaStartedAt: iso(2 * HOUR) }), 3 * HOUR));
 test('caseSlaMs: running → accumulated + segment to now', () =>
-  eq(caseSlaMs({ slaAccumulatedMs: HOUR, slaPaused: false, status: 'with_fit', slaStartedAt: iso(2 * HOUR) }), 3 * HOUR));
+  eq(caseSlaMs({ slaAccumulatedMs: HOUR, slaPaused: false, status: 'with_core', slaStartedAt: iso(2 * HOUR) }), 3 * HOUR));
 
 /* ---------- caseHoldMs ---------- */
 test('caseHoldMs: not current owner → stored total only', () =>
-  eq(caseHoldMs({ holdMs: { fit: 2 * HOUR, hq: 0 }, currentOwner: null }, 'fit'), 2 * HOUR));
+  eq(caseHoldMs({ holdMs: { core: 2 * HOUR, hq: 0 }, currentOwner: null }, 'core'), 2 * HOUR));
 test('caseHoldMs: current owner → adds running segment', () =>
-  eq(caseHoldMs({ holdMs: { fit: HOUR, hq: 0 }, currentOwner: 'fit', holdStartedAt: iso(HOUR) }, 'fit'), 2 * HOUR));
-test('caseHoldMs: other kind unaffected by running fit segment', () =>
-  eq(caseHoldMs({ holdMs: { fit: HOUR, hq: 30 * 60000 }, currentOwner: 'fit', holdStartedAt: iso(HOUR) }, 'hq'), 30 * 60000));
+  eq(caseHoldMs({ holdMs: { core: HOUR, hq: 0 }, currentOwner: 'core', holdStartedAt: iso(HOUR) }, 'core'), 2 * HOUR));
+test('caseHoldMs: other kind unaffected by running core segment', () =>
+  eq(caseHoldMs({ holdMs: { core: HOUR, hq: 30 * 60000 }, currentOwner: 'core', holdStartedAt: iso(HOUR) }, 'hq'), 30 * 60000));
 
 /* ---------- derivePromptsForCase ---------- */
 const kinds = c => derivePromptsForCase(c).map(p => p.kind);
 test('derive: closed → none', () => eq(kinds({ status: 'closed' }), []));
 test('derive: resolved → none', () => eq(kinds({ status: 'resolved' }), []));
-test('derive: new + unassigned → assign_fit', () => eq(kinds({ id: 'X', status: 'new', fitId: null }), ['assign_fit']));
-test('derive: new + already assigned → none', () => eq(kinds({ id: 'X', status: 'new', fitId: 'core-apac' }), []));
-test('derive: with_fit + cannot resolve → escalate', () =>
-  eq(kinds({ id: 'X', status: 'with_fit', fitCannotResolve: true, lastOwnerContact: { at: iso(0) } }), ['escalate_to_hq']));
-test('derive: with_fit + idle past threshold → chase_fit', () =>
-  eq(kinds({ id: 'X', status: 'with_fit', lastOwnerContact: { at: iso((TH.fitIdleHours + 1) * HOUR) } }), ['chase_fit']));
-test('derive: with_fit + fresh contact → none', () =>
-  eq(kinds({ id: 'X', status: 'with_fit', lastOwnerContact: { at: iso(Math.max(0, TH.fitIdleHours - 1) * HOUR) } }), []));
-test('derive: with_fit + never contacted → chase_fit (idle = Infinity)', () =>
-  eq(kinds({ id: 'X', status: 'with_fit' }), ['chase_fit']));
+test('derive: new + unassigned → assign_core', () => eq(kinds({ id: 'X', status: 'new', coreId: null }), ['assign_core']));
+test('derive: new + already assigned → none', () => eq(kinds({ id: 'X', status: 'new', coreId: 'core-apac' }), []));
+test('derive: with_core + cannot resolve → escalate', () =>
+  eq(kinds({ id: 'X', status: 'with_core', coreCannotResolve: true, lastOwnerContact: { at: iso(0) } }), ['escalate_to_hq']));
+test('derive: with_core + idle past threshold → chase_core', () =>
+  eq(kinds({ id: 'X', status: 'with_core', lastOwnerContact: { at: iso((TH.coreIdleHours + 1) * HOUR) } }), ['chase_core']));
+test('derive: with_core + fresh contact → none', () =>
+  eq(kinds({ id: 'X', status: 'with_core', lastOwnerContact: { at: iso(Math.max(0, TH.coreIdleHours - 1) * HOUR) } }), []));
+test('derive: with_core + never contacted → chase_core (idle = Infinity)', () =>
+  eq(kinds({ id: 'X', status: 'with_core' }), ['chase_core']));
 test('derive: with_hq + idle past threshold → chase_hq', () =>
   eq(kinds({ id: 'X', status: 'with_hq', lastOwnerContact: { at: iso((TH.hqIdleHours + 1) * HOUR) } }), ['chase_hq']));
 test('derive: sanity_check → verify_fix', () => eq(kinds({ id: 'X', status: 'sanity_check' }), ['verify_fix']));
@@ -93,10 +93,10 @@ test('derive: sanity_check → verify_fix', () => eq(kinds({ id: 'X', status: 's
 /* ---------- needsHandoverNote ---------- */
 test('handover: closed → false', () => ok(!needsHandoverNote({ status: 'closed' })));
 test('handover: new → false', () => ok(!needsHandoverNote({ status: 'new' })));
-test('handover: open + no note → true', () => ok(needsHandoverNote({ status: 'with_fit', handover: null })));
-test('handover: open + stale note → true', () => ok(needsHandoverNote({ status: 'with_fit', handover: { staleForCurrentShift: true } })));
+test('handover: open + no note → true', () => ok(needsHandoverNote({ status: 'with_core', handover: null })));
+test('handover: open + stale note → true', () => ok(needsHandoverNote({ status: 'with_core', handover: { staleForCurrentShift: true } })));
 test('handover: open + fresh note by current shift → false', () =>
-  ok(!needsHandoverNote({ status: 'with_fit', handover: { staleForCurrentShift: false, author: opId } })));
+  ok(!needsHandoverNote({ status: 'with_core', handover: { staleForCurrentShift: false, author: opId } })));
 
 /* ---------- ownership/holder totals (drives the clocks, incl. First line) ----------
  * holderTotals reconstructs possession segments from case history; the case-detail clocks
@@ -112,10 +112,10 @@ const lifecycle = {
     { at: iso(1 * HOUR), kind: 'closed', detail: 'Resolution: fixed' },
   ],
 };
-test('holderTotals: full lifecycle splits triage/fit/hq; sanity → requester', () => {
+test('holderTotals: full lifecycle splits triage/core/hq; sanity → requester', () => {
   const t = holderTotals(lifecycle);
-  // triage 10→8h, fit 8→5h, hq 5→3h, Sanity-Check 3→1h counted as requester.
-  eq([t.triage, t.fit, t.hq, t.requester], [2 * HOUR, 3 * HOUR, 2 * HOUR, 2 * HOUR]);
+  // triage 10→8h, core 8→5h, hq 5→3h, Sanity-Check 3→1h counted as requester.
+  eq([t.triage, t.core, t.hq, t.requester], [2 * HOUR, 3 * HOUR, 2 * HOUR, 2 * HOUR]);
 });
 test('holderTotals: first-line time = triage only (no sanity)', () => {
   const t = holderTotals(lifecycle);
@@ -135,7 +135,7 @@ test('holderTotals: open Sanity Check case accrues requester time up to now', ()
     ],
   };
   const t = holderTotals(c);
-  eq([t.triage, t.fit, t.requester], [1 * HOUR, 2 * HOUR, 2 * HOUR]);
+  eq([t.triage, t.core, t.requester], [1 * HOUR, 2 * HOUR, 2 * HOUR]);
 });
 test('holderTotals: returned case accrues requester time up to now', () => {
   const c = {
@@ -146,23 +146,23 @@ test('holderTotals: returned case accrues requester time up to now', () => {
     ],
   };
   const t = holderTotals(c);
-  eq([t.triage, t.fit, t.requester], [1 * HOUR, 3 * HOUR, 2 * HOUR]);
+  eq([t.triage, t.core, t.requester], [1 * HOUR, 3 * HOUR, 2 * HOUR]);
 });
 test('holderTotals: open case with no history accrues triage from creation', () => {
   // A brand-new live case (empty history) has been in first line since it was created.
   const t = holderTotals({ createdAt: iso(HOUR), status: 'new', history: [] });
-  eq([t.triage, t.fit, t.hq, t.requester], [HOUR, 0, 0, 0]);
+  eq([t.triage, t.core, t.hq, t.requester], [HOUR, 0, 0, 0]);
 });
 test('holderTotals: live case (no created event) — first line = assign − create', () => {
   // Live cases arrive with an empty history; assigning to FIT adds only an 'assigned' event.
   const c = {
-    createdAt: iso(3 * HOUR), status: 'with_fit', history: [
+    createdAt: iso(3 * HOUR), status: 'with_core', history: [
       { at: iso(1 * HOUR), who: 'op', kind: 'assigned', detail: 'Core Team — APAC' },
     ],
   };
   const t = holderTotals(c);
   eq(t.triage, 2 * HOUR);   // assign (1h ago) − create (3h ago) = 2h on first line
-  eq(t.fit, 1 * HOUR);      // assign (1h ago) → now = 1h with FIT
+  eq(t.core, 1 * HOUR);      // assign (1h ago) → now = 1h with FIT
 });
 
 /* ---------- process timeline (Case Center per-stage processing log) ----------
@@ -223,7 +223,7 @@ test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && ap
 test('seed: every case has a non-empty string id', () =>
   ok(app.CASES.every(c => typeof c.id === 'string' && c.id.trim())));
 test('seed: thresholds present and numeric', () =>
-  ok(typeof TH.fitIdleHours === 'number' && typeof TH.hqIdleHours === 'number'));
+  ok(typeof TH.coreIdleHours === 'number' && typeof TH.hqIdleHours === 'number'));
 
 /* ---------- action handlers (handlePrompt outcomes) ----------
  * handlePrompt opens a modal via showModal(html, onSubmit) then mutates the case on submit.
@@ -236,15 +236,15 @@ app.showToast = (m, t) => toasts.push({ m, t });
 let _modal = null;
 app.showModal = (html, onSubmit) => { _modal = { html, onSubmit }; };
 
-const FIT = app.OWNERS.fit[0].id;
+const FIT = app.OWNERS.core[0].id;
 const HQ = app.OWNERS.hq[0].id;
 const SCRATCH_ID = app.CASES[0].id;
 function scratch(props) {
   const c = app.caseById(SCRATCH_ID);
   Object.assign(c, {
-    status: 'new', agentStatus: 'unqueued', fitId: null, hqId: null, currentOwner: null,
-    fitCannotResolve: false, slaPaused: false, slaAccumulatedMs: 0, slaStartedAt: iso(0),
-    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null, lastOwnerContact: null,
+    status: 'new', agentStatus: 'unqueued', coreId: null, hqId: null, currentOwner: null,
+    coreCannotResolve: false, slaPaused: false, slaAccumulatedMs: 0, slaStartedAt: iso(0),
+    holdMs: { core: 0, hq: 0 }, holdStartedAt: null, lastOwnerContact: null,
     handover: null, reminder: null, closedAt: undefined, resolutionCode: undefined,
     history: [], user: 'Test User',
   }, props);
@@ -271,17 +271,17 @@ function directPrompt(caseId, kind) {               // no-modal handler
 }
 const lastKind = c => c.history[c.history.length - 1].kind;
 
-test('assign_fit: routes new case to FIT and starts the hold clock', () => {
-  const c = scratch({ status: 'new', fitId: null });
-  submitPrompt(SCRATCH_ID, 'assign_fit', { fitId: FIT });
-  eq([c.status, c.currentOwner, c.fitId, lastKind(c)], ['with_fit', 'fit', FIT, 'assigned']);
+test('assign_core: routes new case to FIT and starts the hold clock', () => {
+  const c = scratch({ status: 'new', coreId: null });
+  submitPrompt(SCRATCH_ID, 'assign_core', { coreId: FIT });
+  eq([c.status, c.currentOwner, c.coreId, lastKind(c)], ['with_core', 'core', FIT, 'assigned']);
   ok(c.holdStartedAt && c.lastOwnerContact && c.lastOwnerContact.channel === 'Slack');
 });
 
 test('escalate_to_hq: stops FIT clock, starts HQ, clears cannot-resolve', () => {
-  const c = scratch({ status: 'with_fit', currentOwner: 'fit', fitId: FIT, holdStartedAt: iso(2 * HOUR), fitCannotResolve: true });
+  const c = scratch({ status: 'with_core', currentOwner: 'core', coreId: FIT, holdStartedAt: iso(2 * HOUR), coreCannotResolve: true });
   submitPrompt(SCRATCH_ID, 'escalate_to_hq', { hqId: HQ, reason: 'needs product' });
-  eq([c.status, c.currentOwner, c.hqId, c.fitCannotResolve, c.holdMs.fit, lastKind(c)],
+  eq([c.status, c.currentOwner, c.hqId, c.coreCannotResolve, c.holdMs.core, lastKind(c)],
      ['with_hq', 'hq', HQ, false, 2 * HOUR, 'escalated']);
 });
 
@@ -313,26 +313,26 @@ test('approaching_sla: first line can return a New case to the requester (4.9)',
 });
 test('statusTransitions: New offers assign + return-to-requester (4.9)', () => {
   const kinds = app.statusTransitions({ status: 'new' }).map(t => t.kind);
-  ok(kinds.includes('assign_fit') && kinds.includes('approaching_sla'), 'New has both');
+  ok(kinds.includes('assign_core') && kinds.includes('approaching_sla'), 'New has both');
 });
 
 test('resume: restarts the SLA clock and routes back to FIT', () => {
-  const c = scratch({ status: 'returned_to_requester', slaPaused: true, fitId: FIT, slaStartedAt: iso(10 * HOUR) });
-  submitPrompt(SCRATCH_ID, 'resume', { dest: 'fit', note: '' });
+  const c = scratch({ status: 'returned_to_requester', slaPaused: true, coreId: FIT, slaStartedAt: iso(10 * HOUR) });
+  submitPrompt(SCRATCH_ID, 'resume', { dest: 'core', note: '' });
   eq([c.status, c.currentOwner, c.slaPaused, c.slaStartedAt, lastKind(c)],
-     ['with_fit', 'fit', false, iso(0), 'resumed']);
+     ['with_core', 'core', false, iso(0), 'resumed']);
 });
 
 test('cancel: marks cancelled, banks clocks, warns', () => {
-  const c = scratch({ status: 'with_fit', currentOwner: 'fit', fitId: FIT, holdStartedAt: iso(HOUR), slaStartedAt: iso(HOUR) });
+  const c = scratch({ status: 'with_core', currentOwner: 'core', coreId: FIT, holdStartedAt: iso(HOUR), slaStartedAt: iso(HOUR) });
   submitPrompt(SCRATCH_ID, 'cancel', { reason: 'duplicate' });
-  eq([c.status, c.currentOwner, c.holdMs.fit, c.slaAccumulatedMs, lastKind(c)],
+  eq([c.status, c.currentOwner, c.holdMs.core, c.slaAccumulatedMs, lastKind(c)],
      ['cancelled', null, HOUR, HOUR, 'cancelled']);
   eq(toasts[0].t, 'warn');
 });
 
 test('toggle_queue: flips agent status both ways with history', () => {
-  const c = scratch({ status: 'with_fit', agentStatus: 'unqueued' });
+  const c = scratch({ status: 'with_core', agentStatus: 'unqueued' });
   directPrompt(SCRATCH_ID, 'toggle_queue');
   eq([c.agentStatus, lastKind(c)], ['queued', 'queue_added']);
   directPrompt(SCRATCH_ID, 'toggle_queue');
@@ -347,7 +347,7 @@ test('move_to_sanity_check: direct status change', () => {
 
 test('unknown / missing case id is a no-op', () => {
   _modal = null; toasts.length = 0;
-  app.handlePrompt('NO-SUCH-CASE', 'assign_fit');
+  app.handlePrompt('NO-SUCH-CASE', 'assign_core');
   eq([_modal, toasts.length], [null, 0]);
 });
 
@@ -358,17 +358,17 @@ test('mergeLiveCase: malformed records → null', () => {
      [null, null, null, null, null]);
 });
 test('mergeLiveCase: new id is added + normalized', () => {
-  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'New one', status: 'with_fit' });
+  const r = mergeLiveCase({ id: 'C-MERGE-NEW', subject: 'New one', status: 'with_core' });
   eq([r.added, r.id], [true, 'C-MERGE-NEW']);
   const c = app.caseById('C-MERGE-NEW');
-  eq([c.status, c.subject, c.agentStatus], ['with_fit', 'New one', 'unqueued']);
+  eq([c.status, c.subject, c.agentStatus], ['with_core', 'New one', 'unqueued']);
 });
 test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves operator work', () => {
   // Simulate operator work on the case: assigned to FIT, notes, history, clocks, queue, handover.
   const c0 = app.caseById('C-MERGE-NEW');
   Object.assign(c0, {
-    status: 'with_fit', fitId: 'core-apac', currentOwner: 'fit', agentStatus: 'queued',
-    notes: 'operator notes', slaAccumulatedMs: 3 * HOUR, holdMs: { fit: HOUR, hq: 0 },
+    status: 'with_core', coreId: 'core-apac', currentOwner: 'core', agentStatus: 'queued',
+    notes: 'operator notes', slaAccumulatedMs: 3 * HOUR, holdMs: { core: HOUR, hq: 0 },
     history: [{ at: iso(2 * HOUR), who: 'op', kind: 'assigned', detail: 'Core Team — APAC' }],
     handover: { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false },
   });
@@ -380,8 +380,8 @@ test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves oper
   // CC-owned fields refreshed (status moved with the raw payload):
   eq([c.subject, c.priority, c.ccStatusLabel, c.status], ['Updated subject', 'high', 'In-Progress', 'new']);
   // Operator's local layer preserved (routing, notes, clocks, queue, history, handover):
-  eq([c.fitId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.fit, c.history.length, c.handover.note],
-     ['core-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
+  eq([c.coreId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.core, c.history.length, c.handover.note],
+     ['core-apac', 'core', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
 });
 test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
   app.location.protocol = 'https:'; app.__LIVE__ = true;

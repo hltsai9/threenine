@@ -18,7 +18,7 @@ Board case contract (what /api/cases returns per case)
 ------------------------------------------------------
 Required:  id (str), subject (str), status (one of the board statuses below)
 Status enum (this is the *Case Center status*, it drives the kanban columns):
-    new | with_fit | with_hq | sanity_check | returned_to_requester
+    new | with_core | with_hq | sanity_check | returned_to_requester
     | resolved | closed | cancelled
 Optional (sensible defaults applied in the browser if omitted):
     caseLink (built from BASE_URL + caseId), ccStatusLabel (the displayed CC status),
@@ -110,7 +110,7 @@ def _load_secrets():
 # (caseStatus, sub-transition) pair first, then fall back to caseStatus alone.
 # The sub-transition comes from r["subStatus"]["transition"] in the new format.
 # Board enum values:
-#   new | with_fit | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
+#   new | with_core | with_hq | sanity_check | returned_to_requester | resolved | closed | cancelled
 #
 # Notes on choices (Case Center is coarser than the board in two places):
 #   - "In-Progress Wait User" -> returned_to_requester (waiting on the user; SLA-paused).
@@ -118,7 +118,7 @@ def _load_secrets():
 #     so the column is identical either way — change here if you prefer the green pill.
 #   - "Close" -> closed (the board's terminal/closed state; 'resolved' is the same column-less
 #     terminal outcome). Change to "resolved" if you want to distinguish them.
-#   - "In-Progress" / "Open" -> new (the operator then moves it to with_fit / with_hq).
+#   - "In-Progress" / "Open" -> new (the operator then moves it to with_core / with_hq).
 STATUS_MAP = {
     # (caseStatus, sub-transition): board_status
     ("In-Progress", "Return"):    "new",                    # requester returned the case to IT
@@ -133,12 +133,12 @@ STATUS_MAP_BY_STATUS = {
     "Drop":            "cancelled",
 }
 # Refinement layer for ambiguous caseStatus values (e.g. "In-Progress" can mean either
-# triage or with the local FIT). The board status here is taken from the LAST item in the
+# triage or with the Core Team). The board status here is taken from the LAST item in the
 # case's processTimeline: its `processType` tells us which stage the case is currently in.
 # Consulted after the (status, substatus) pair and before the caseStatus-alone fallback.
 STATUS_MAP_BY_PROCESS_TYPE = {
     "1st  Line":    "new",
-    "Service Team": "with_fit",
+    "Service Team": "with_core",
 }
 
 
@@ -291,7 +291,7 @@ def map_record(r):
     case_id = str(r.get("caseId") or "")
     transition = sub_transition(r)
     # The last processTimeline item's processType refines an ambiguous caseStatus —
-    # e.g. "In-Progress" alone can mean either triage or with the local FIT, but the
+    # e.g. "In-Progress" alone can mean either triage or with the Core Team, but the
     # last stage's processType ("1st  Line" vs "Service Team") disambiguates.
     last_pt = last_process_type(r)
     # The end user the case is about. Case Center now carries this at the top level as

@@ -252,7 +252,7 @@ seedBoot(loadState());
 function getOperator(id) { return window.OPERATORS.find(o => o.id === id); }
 function getOwner(type, id) {
   if (!id) return null;
-  return (type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq).find(o => o.id === id) || null;
+  return (type === 'core' ? window.OWNERS.core : window.OWNERS.hq).find(o => o.id === id) || null;
 }
 function caseById(id) { return STATE.cases.find(c => c.id === id); }
 
@@ -288,7 +288,7 @@ function caseSlaMs(c) {
   }
   return total;
 }
-function caseHoldMs(c, kind /* 'fit' | 'hq' */) {
+function caseHoldMs(c, kind /* 'core' | 'hq' */) {
   let total = c.holdMs?.[kind] || 0;
   if (c.currentOwner === kind && c.holdStartedAt) {
     total += Math.max(0, NOW.getTime() - new Date(c.holdStartedAt).getTime());
@@ -457,7 +457,7 @@ function ownerInOfficeHours(owner) {
 function statusLabel(s) {
   return ({
     new: 'New',
-    with_fit: 'With Core Team',
+    with_core: 'With Core Team',
     with_hq: 'With HQ Product Team',
     sanity_check: 'Sanity Check',
     returned_to_requester: 'Returned to Requester',
@@ -490,13 +490,13 @@ function derivePromptsForCase(c) {
     : Infinity;
 
   const prompts = [];
-  if (c.status === 'new' && !c.fitId) {
-    prompts.push({ caseId: c.id, kind: 'assign_fit' });
+  if (c.status === 'new' && !c.coreId) {
+    prompts.push({ caseId: c.id, kind: 'assign_core' });
   }
-  if (c.status === 'with_fit' && c.fitCannotResolve) {
+  if (c.status === 'with_core' && c.coreCannotResolve) {
     prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
-  } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
-    prompts.push({ caseId: c.id, kind: 'chase_fit' });
+  } else if (c.status === 'with_core' && ownerIdleHrs > window.THRESHOLDS.coreIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_core' });
   }
   if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
     prompts.push({ caseId: c.id, kind: 'chase_hq' });
@@ -508,8 +508,8 @@ function derivePromptsForCase(c) {
 }
 
 const PROMPT_DEFS = {
-  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
-  chase_fit:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  assign_core:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
+  chase_core:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
   chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   verify_fix:           { label: 'Verify reported fix (Sanity Check)',   icon: 'V', cls: 'icon-verify',   action: 'Verify & close' },
@@ -628,7 +628,7 @@ function renderSidebar() {
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
   const navOwners = document.getElementById('nav-owners-count');
-  if (navOwners) navOwners.textContent = (window.OWNERS.fit.length + window.OWNERS.hq.length);
+  if (navOwners) navOwners.textContent = (window.OWNERS.core.length + window.OWNERS.hq.length);
   const navArchive = document.getElementById('nav-archive-count');
   if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
@@ -718,7 +718,7 @@ function handoverPendingCases() {
 function renderWatchlists(sla, escalated) {
   if (sla.length === 0 && escalated.length === 0) return '';
   const row = c => {
-    const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+    const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
     return `
       <a class="watch-row" href="#/cases/${c.id}">
         <span class="mono muted">${c.id}</span>
@@ -765,7 +765,7 @@ function renderCaseList() {
   // band (everything else in that status) — the row dimension is the agent status.
   const columns = [
     { id: 'new',    label: 'New',                              statuses: ['new'] },
-    { id: 'fit',    label: 'With Core Team',                   statuses: ['with_fit'] },
+    { id: 'core',    label: 'With Core Team',                   statuses: ['with_core'] },
     { id: 'hq',     label: 'With HQ Product Team',             statuses: ['with_hq'] },
     { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
   ];
@@ -908,7 +908,7 @@ function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
 
 function renderKanbanCard(c) {
   const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
-  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
   const isSel = STATE.kanbanSelected === c.id;
   const bellState = c.reminder
     ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
@@ -1001,7 +1001,7 @@ function ownershipSegments(c) {
     const d = (ev.detail || '').toLowerCase();
     switch (ev.kind) {
       case 'created': return 'triage';
-      case 'assigned': return 'fit';      // assignment is always to Core Team
+      case 'assigned': return 'core';      // assignment is always to Core Team
       case 'escalated': return 'hq';
       case 'returned': return 'requester';
       case 'closed': case 'cancelled': return 'done';
@@ -1009,7 +1009,7 @@ function ownershipSegments(c) {
         // Sanity Check = waiting on the requester to confirm the fix → counted as requester time.
         if (/sanity check/.test(d)) return 'requester';
         if (/\bhq\b|product team/.test(d)) return 'hq';
-        if (/local fit|→ fit|\bfit\b/.test(d)) return 'fit';
+        if (/core team|→ core|\bcore\b/i.test(d)) return 'core';
         if (/requester|returned/.test(d)) return 'requester';
         if (/resolved|closed/.test(d)) return 'done';
         if (/unassigned|\bnew\b/.test(d)) return 'triage';
@@ -1044,7 +1044,7 @@ function ownershipSegments(c) {
 // Sanity Check is classified as requester time (see ownershipSegments), so there is no separate
 // "sanity" bucket — that span lands in `requester`.
 function holderTotals(c) {
-  const tot = { triage: 0, fit: 0, hq: 0, requester: 0 };
+  const tot = { triage: 0, core: 0, hq: 0, requester: 0 };
   for (const s of ownershipSegments(c)) {
     if (s.holder in tot) tot[s.holder] += Math.max(0, s.end - s.start);
   }
@@ -1053,7 +1053,7 @@ function holderTotals(c) {
 
 const HOLDER_META = {
   triage:    { label: 'First line',       cls: 'tl-triage' },
-  fit:       { label: 'Core Team',        cls: 'tl-fit' },
+  core:       { label: 'Core Team',        cls: 'tl-core' },
   hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
   requester: { label: 'With requester',   cls: 'tl-requester' },
   done:      { label: 'Closed',           cls: 'tl-done' },
@@ -1220,14 +1220,14 @@ function renderWaitUser(c) {
 }
 
 function renderCaseDetailBody(c) {
-  const fit = getOwner('fit', c.fitId);
+  const core = getOwner('core', c.coreId);
   const hq = getOwner('hq', c.hqId);
 
   const slaMs = caseSlaMs(c);
   // FIT/HQ time spent is derived from the ownership timeline so the clocks and the
   // timeline legend always agree (same source: the case history).
   const hold = holderTotals(c);
-  const fitMs = hold.fit;
+  const coreMs = hold.core;
   const hqMs = hold.hq;
   // First-line handling = time the case sat directly with the first-line agent during triage
   // (status New). Sanity Check counts as requester time, not first-line, so it's excluded.
@@ -1271,8 +1271,8 @@ function renderCaseDetailBody(c) {
               </div>
               <div class="clock">
                 <div class="label">Core Team</div>
-                <div class="value">${fmtDuration(fitMs)}</div>
-                <div class="state ${c.currentOwner === 'fit' ? 'running' : ''}">${c.currentOwner === 'fit' ? 'Holding now' : 'Idle'}</div>
+                <div class="value">${fmtDuration(coreMs)}</div>
+                <div class="state ${c.currentOwner === 'core' ? 'running' : ''}">${c.currentOwner === 'core' ? 'Holding now' : 'Idle'}</div>
               </div>
               <div class="clock">
                 <div class="label">HQ Product Team</div>
@@ -1317,7 +1317,7 @@ function renderCaseDetailBody(c) {
             <div class="detail-row"><span class="k">User</span><span class="v">${c.user ? escapeHtml(c.user) : '<span class="muted">—</span>'}${c.userDept ? ` <span class="muted">· ${escapeHtml(c.userDept)}</span>` : ''}</span></div>
             ${c.reporter ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporter)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
             ${c.assignee ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assignee)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
-            <div class="detail-row"><span class="k">Core Team</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">Core Team</span><span class="v">${core ? `${escapeHtml(core.name)} ${renderTzHint(core)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="core">${core ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
@@ -1381,8 +1381,8 @@ function renderDetailActions(c) {
   }
 
   // Non-status actions stay as buttons.
-  if (c.status === 'with_fit') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to Core Team</button>`);
+  if (c.status === 'with_core') {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_core">Send reminder to Core Team</button>`);
   }
   if (c.status === 'with_hq') {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
@@ -1402,10 +1402,10 @@ function statusTransitions(c) {
   const t = [];
   switch (c.status) {
     case 'new':
-      t.push({ kind: 'assign_fit', label: 'Assign to Core Team' });
+      t.push({ kind: 'assign_core', label: 'Assign to Core Team' });
       t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
-    case 'with_fit':
+    case 'with_core':
       t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
       t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
@@ -1547,7 +1547,7 @@ function renderArchiveWeek(weekId) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const rows = cases.length === 0 ? '' : cases.map(c => {
-    const fit = getOwner('fit', c.fitId);
+    const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
     const carry = c.carriedFrom ? ` <span class="flag" title="Carried from ${escapeHtml(c.carriedFrom)}">↩ ${escapeHtml(c.carriedFrom)}</span>` : '';
@@ -1559,7 +1559,7 @@ function renderArchiveWeek(weekId) {
           <div><a class="link-inline" href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
         </td>
         <td>${escapeHtml(c.user)}</td>
-        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${core ? escapeHtml(core.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
@@ -2117,9 +2117,9 @@ function bindRosterEditor() {
 
 function makeOwnerId(pool, name, exceptIndex) {
   // Drop boilerplate words so "Core Team — LATAM desk" -> core-latam, "HQ Identity Team" -> hq-identity.
-  const cleaned = String(name || '').toLowerCase().replace(/\b(core|fit|hq|desk|team|product|the)\b/g, ' ');
-  // Core Team desks (pool 'fit') slug under the 'core-' prefix; HQ teams stay 'hq-'.
-  const prefix = pool === 'fit' ? 'core' : pool;
+  const cleaned = String(name || '').toLowerCase().replace(/\b(core|core|hq|desk|team|product|the)\b/g, ' ');
+  // Core Team desks (pool 'core') slug under the 'core-' prefix; HQ teams stay 'hq-'.
+  const prefix = pool === 'core' ? 'core' : pool;
   const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || prefix;
   const want = prefix + '-' + base;
   const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
@@ -2129,7 +2129,7 @@ function makeOwnerId(pool, name, exceptIndex) {
 }
 
 function ownerRefCounts(pool, id) {
-  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  const field = pool === 'core' ? 'coreId' : 'hqId';
   let n = 0;
   for (const c of STATE.cases) if (c[field] === id) n++;
   return n;
@@ -2143,16 +2143,16 @@ function ownersSnippet() {
       `        { id: ${q(m.id)}, name: ${q(m.name)}, role: ${q(m.role || '')} }`).join(',\n');
     return `,\n      members: [\n${inner},\n      ]`;
   };
-  const fit = window.OWNERS.fit.map(o =>
+  const core = window.OWNERS.core.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   const hq = window.OWNERS.hq.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
-  return `window.OWNERS = {\n  fit: [\n${fit}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
+  return `window.OWNERS = {\n  core: [\n${core}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
 }
 
 function ownersWarnings() {
   const w = [];
-  ['fit', 'hq'].forEach(pool => {
+  ['core', 'hq'].forEach(pool => {
     const ids = window.OWNERS[pool].map(o => o.id);
     [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate ${pool.toUpperCase()} id: ${id}` }));
     window.OWNERS[pool].forEach(o => {
@@ -2164,17 +2164,17 @@ function ownersWarnings() {
 }
 
 function renderOwnerRows(pool) {
-  const key = pool === 'fit' ? 'region' : 'area';
+  const key = pool === 'core' ? 'region' : 'area';
   return window.OWNERS[pool].map((o, i) => {
     const refs = ownerRefCounts(pool, o.id);
     return `
     <tr data-pool="${pool}" data-oi="${i}">
-      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
-      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'core' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'core' ? 'Region' : 'Area'}"></td>
       <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
       <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
       <td><input data-of="channel" value="${escapeHtml(o.channel || '')}" placeholder="Slack / JIRA"></td>
-      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool === 'fit' ? 'core' : pool}-…"></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool === 'core' ? 'core' : pool}-…"></td>
       <td class="re-refs tiny ${refs ? '' : 'muted'}" title="cases routed to this owner">${refs ? refs + ' ref' + (refs === 1 ? '' : 's') : '—'}</td>
       <td class="re-x"><button class="btn-ghost re-del-owner" data-pool="${pool}" data-oi="${i}" title="Remove">✕</button></td>
     </tr>`;
@@ -2188,12 +2188,12 @@ function renderOwnersTable(pool, label, regionLabel) {
       <div class="re-scroll"><table class="re-table"><thead><tr>
         <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
       </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
-      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'Core Team desk' : 'HQ team'}</button></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'core' ? 'Core Team desk' : 'HQ team'}</button></div>
     </div>`;
 }
 
 function renderCoreTeamMembers() {
-  const cards = window.OWNERS.fit.map(team => {
+  const cards = window.OWNERS.core.map(team => {
     const members = Array.isArray(team.members) ? team.members : [];
     const rows = members.length
       ? members.map(m => `
@@ -2222,7 +2222,7 @@ function renderOwnersPage() {
   const warns = ownersWarnings();
   const warnHtml = warns.length
     ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
-    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+    : `<div class="re-ok">✓ ${window.OWNERS.core.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
@@ -2231,7 +2231,7 @@ function renderOwnersPage() {
     <div class="card roster-editor" id="owners-editor">
       <div class="card-header"><span>Edit Core Team desks &amp; HQ teams</span></div>
       <div class="card-body">
-        ${renderOwnersTable('fit', 'Core Team desks', 'Region')}
+        ${renderOwnersTable('core', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
         ${renderCoreTeamMembers()}
         ${warnHtml}
@@ -2248,8 +2248,8 @@ function renderOwnersPage() {
 function deleteOwner(pool, i) {
   const o = window.OWNERS[pool][i];
   if (!o) return;
-  const field = pool === 'fit' ? 'fitId' : 'hqId';
-  const kind = pool === 'fit' ? 'Core Team desk' : 'HQ team';
+  const field = pool === 'core' ? 'coreId' : 'hqId';
+  const kind = pool === 'core' ? 'Core Team desk' : 'HQ team';
   const refs = ownerRefCounts(pool, o.id);
   const others = window.OWNERS[pool].filter((_, j) => j !== i);
   const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
@@ -2305,7 +2305,7 @@ function bindOwnersEditor() {
   }));
   ed.querySelectorAll('[data-add-owner]').forEach(btn => btn.addEventListener('click', () => {
     const pool = btn.dataset.addOwner;
-    window.OWNERS[pool].push(pool === 'fit'
+    window.OWNERS[pool].push(pool === 'core'
       ? { id: '', name: '', region: '', tz: 'America/Phoenix', office: '08:00–17:00', channel: '', _idEdited: false }
       : { id: '', name: '', area: '', tz: 'Asia/Taipei', office: '09:00–18:00', channel: '', _idEdited: false });
     render();
@@ -2664,10 +2664,10 @@ function renderStatusFlow() {
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_core">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
         <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
+        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
         <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
@@ -2697,7 +2697,7 @@ function renderClockModel() {
   const t = holderTotals(example);
   const firstLine = t.triage;        // Sanity Check is requester time, not first-line
   const requesterMs = t.requester;   // includes the Sanity Check span (see ownershipSegments)
-  const lifeMs = t.triage + t.fit + t.hq + t.requester;
+  const lifeMs = t.triage + t.core + t.hq + t.requester;
   // SLA runs the whole time the case is on us and pauses only on an explicit "Return to
   // requester". This example never returns, so SLA spans the full lifetime — Sanity Check is
   // requester-attributed in the breakdown but does not pause SLA.
@@ -2736,7 +2736,7 @@ function renderClockModel() {
             <td>Summed from history segments.</td>
           </tr>
           <tr>
-            <td>${swatch('tl-fit')}<strong>Core Team</strong></td>
+            <td>${swatch('tl-core')}<strong>Core Team</strong></td>
             <td>Time the case sat with the Core Team desk.</td>
             <td>On <em>Assign to Core Team</em>.</td>
             <td>On escalate / return / close.</td>
@@ -2765,7 +2765,7 @@ function renderClockModel() {
       <div class="clock-grid" style="margin-top:16px;">
         <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">runs through Sanity Check (no explicit return)</div></div>
         <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage only</div></div>
-        <div class="clock"><div class="label">${swatch('tl-fit')}Core Team</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-core')}Core Team</div><div class="value">${fmtDuration(t.core)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-requester')}With requester</div><div class="value">${fmtDuration(requesterMs)}</div><div class="state">incl. Sanity Check</div></div>
       </div>
@@ -2835,27 +2835,27 @@ function handlePrompt(caseId, kind) {
   const c = caseById(caseId);
   if (!c) return;
 
-  if (kind === 'assign_fit') {
-    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
+  if (kind === 'assign_core') {
+    const opts = window.OWNERS.core.map(f => `<option value="${f.id}"${f.id === c.coreId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
       <h3>Assign to Core Team</h3>
       <div class="modal-sub">Pick the Core Team desk that should triage this case.</div>
       <label>Core Team desk</label>
-      <select data-field="fitId">${opts}</select>
+      <select data-field="coreId">${opts}</select>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn btn-primary" data-modal-submit>Assign</button>
       </div>
     `, (modal) => {
-      const fitId = fieldVal(modal, 'fitId');
-      c.fitId = fitId;
-      c.currentOwner = 'fit';
-      c.status = 'with_fit';
+      const coreId = fieldVal(modal, 'coreId');
+      c.coreId = coreId;
+      c.currentOwner = 'core';
+      c.status = 'with_core';
       c.holdStartedAt = new Date(NOW).toISOString();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-      const fitName = getOwner('fit', fitId).name;
-      logHistory(c, op, 'assigned', `Core Team — ${fitName}`);
-      showToast(`${c.id} assigned to ${fitName}. Status is now With Core Team.`, 'success');
+      const coreName = getOwner('core', coreId).name;
+      logHistory(c, op, 'assigned', `Core Team — ${coreName}`);
+      showToast(`${c.id} assigned to ${coreName}. Status is now With Core Team.`, 'success');
       render();
       return true;
     });
@@ -2879,14 +2879,14 @@ function handlePrompt(caseId, kind) {
       const hqId = fieldVal(modal, 'hqId');
       const reason = fieldVal(modal, 'reason').trim();
       // stop FIT clock, start HQ clock
-      if (c.currentOwner === 'fit' && c.holdStartedAt) {
-        c.holdMs.fit += new Date(NOW) - new Date(c.holdStartedAt);
+      if (c.currentOwner === 'core' && c.holdStartedAt) {
+        c.holdMs.core += new Date(NOW) - new Date(c.holdStartedAt);
       }
       c.hqId = hqId;
       c.currentOwner = 'hq';
       c.status = 'with_hq';
       c.holdStartedAt = new Date(NOW).toISOString();
-      c.fitCannotResolve = false;
+      c.coreCannotResolve = false;
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
       const hqName = getOwner('hq', hqId).name;
       logHistory(c, op, 'escalated', `Core Team → ${hqName}${reason ? ' · ' + reason : ''}`);
@@ -2897,9 +2897,9 @@ function handlePrompt(caseId, kind) {
     return;
   }
 
-  if (kind === 'chase_fit' || kind === 'chase_hq') {
-    const owner = c.currentOwner === 'fit' ? getOwner('fit', c.fitId) : getOwner('hq', c.hqId);
-    const channel = c.currentOwner === 'fit' ? 'Slack' : 'JIRA';
+  if (kind === 'chase_core' || kind === 'chase_hq') {
+    const owner = c.currentOwner === 'core' ? getOwner('core', c.coreId) : getOwner('hq', c.hqId);
+    const channel = c.currentOwner === 'core' ? 'Slack' : 'JIRA';
     showModal(`
       <h3>Send reminder to ${escapeHtml(owner?.name || 'owner')}</h3>
       <div class="modal-sub">Channel: ${escapeHtml(channel)} · ${renderTzHint(owner)}</div>
@@ -2913,8 +2913,8 @@ function handlePrompt(caseId, kind) {
       const msg = fieldVal(modal, 'msg').trim();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       logHistory(c, op, 'reminder', `Reminder via ${channel}${msg ? ': ' + msg : ''}`);
-      const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
-      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
+      const threshold = c.currentOwner === 'core' ? window.THRESHOLDS.coreIdleHours : window.THRESHOLDS.hqIdleHours;
+      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'core' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
       render();
       return true;
     });
@@ -3020,10 +3020,10 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'resume') {
-    const fit = getOwner('fit', c.fitId);
+    const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     const opts = [];
-    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Core Team)</option>`);
+    if (c.coreId) opts.push(`<option value="core">Resume with ${escapeHtml(core.name)} (Core Team)</option>`);
     if (c.hqId) opts.push(`<option value="hq">Resume with ${escapeHtml(hq.name)} (HQ Product Team)</option>`);
     opts.push(`<option value="sanity_check">Move to Sanity Check (requester says it's fixed)</option>`);
     opts.push(`<option value="new">Resume unassigned (status: New)</option>`);
@@ -3047,12 +3047,12 @@ function handlePrompt(caseId, kind) {
       c.slaStartedAt = new Date(NOW).toISOString();
 
       let detail;
-      if (dest === 'fit') {
-        c.currentOwner = 'fit';
-        c.status = 'with_fit';
+      if (dest === 'core') {
+        c.currentOwner = 'core';
+        c.status = 'with_core';
         c.holdStartedAt = new Date(NOW).toISOString();
         c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-        detail = `Requester replied · resumed to Core Team (${getOwner('fit', c.fitId).name})`;
+        detail = `Requester replied · resumed to Core Team (${getOwner('core', c.coreId).name})`;
       } else if (dest === 'hq') {
         c.currentOwner = 'hq';
         c.status = 'with_hq';
@@ -3069,9 +3069,9 @@ function handlePrompt(caseId, kind) {
         c.status = 'new';
         c.holdStartedAt = null;
         c.lastOwnerContact = null;
-        c.fitId = null;
+        c.coreId = null;
         c.hqId = null;
-        c.fitCannotResolve = false;
+        c.coreCannotResolve = false;
         detail = `Requester replied · resumed unassigned (Core Team/HQ cleared)`;
       }
       if (note) detail += ` · ${note}`;
@@ -3373,10 +3373,10 @@ function handleReassign(caseId, type) {
   const c = caseById(caseId);
   if (!c) return;
   const op = getOperator(STATE.operatorId);
-  const dir = type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq;
-  const currentId = type === 'fit' ? c.fitId : c.hqId;
-  const typeLabel = type === 'fit' ? 'Core Team' : 'HQ Product Team';
-  const detailLabel = type === 'fit' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
+  const dir = type === 'core' ? window.OWNERS.core : window.OWNERS.hq;
+  const currentId = type === 'core' ? c.coreId : c.hqId;
+  const typeLabel = type === 'core' ? 'Core Team' : 'HQ Product Team';
+  const detailLabel = type === 'core' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
 
   const opts = [
     `<option value="">— Unassign —</option>`,
@@ -3409,7 +3409,7 @@ function handleReassign(caseId, type) {
     }
 
     // Update the contact pointer.
-    if (type === 'fit') c.fitId = newId;
+    if (type === 'core') c.coreId = newId;
     else c.hqId = newId;
 
     // Decide currentOwner / status / new clock segment.
@@ -3419,9 +3419,9 @@ function handleReassign(caseId, type) {
       const wasReturned = c.status === 'returned_to_requester';
       if (wasActive || wasNew) {
         c.currentOwner = type;
-        c.status = type === 'fit' ? 'with_fit' : 'with_hq';
+        c.status = type === 'core' ? 'with_core' : 'with_hq';
         c.holdStartedAt = new Date(NOW).toISOString();
-        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'fit' ? 'Slack' : 'JIRA' };
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'core' ? 'Slack' : 'JIRA' };
       } else if (wasReturned) {
         // Just updating the contact for when SLA resumes; don't restart the clock.
       }
@@ -3431,11 +3431,11 @@ function handleReassign(caseId, type) {
       if (c.currentOwner === type) {
         c.currentOwner = null;
         c.lastOwnerContact = null;
-        const otherType = type === 'fit' ? 'hq' : 'fit';
-        const otherId = otherType === 'fit' ? c.fitId : c.hqId;
+        const otherType = type === 'core' ? 'hq' : 'core';
+        const otherId = otherType === 'core' ? c.coreId : c.hqId;
         if (otherId) {
           c.currentOwner = otherType;
-          c.status = otherType === 'fit' ? 'with_fit' : 'with_hq';
+          c.status = otherType === 'core' ? 'with_core' : 'with_hq';
           c.holdStartedAt = new Date(NOW).toISOString();
         } else {
           c.status = 'new';
@@ -3443,7 +3443,7 @@ function handleReassign(caseId, type) {
       }
     }
 
-    if (type === 'fit') c.fitCannotResolve = false;
+    if (type === 'core') c.coreCannotResolve = false;
 
     const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${reason ? ' · ' + reason : ''}`;
     logHistory(c, op, currentId ? 'reassigned' : 'assigned', detail);
@@ -3590,9 +3590,9 @@ function normalizeLiveCase(c) {
     flags: [],
     priority: 'medium',
     caseType: 'access',
-    fitId: null, hqId: null, currentOwner: null,
+    coreId: null, hqId: null, currentOwner: null,
     slaPaused: false, slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 0, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
     reminder: undefined,

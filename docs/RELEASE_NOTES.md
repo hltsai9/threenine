@@ -10,6 +10,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Changed
+
+- **Complete `fit` → `core` internal rename.** Every remaining `fit` identifier and
+  string token swapped to `core` so the codebase reads consistently with the user-visible
+  "Core Team" naming. Status enum `'with_fit'` → `'with_core'` (and its CSS class
+  `pill-with_fit` → `pill-with_core`); ownership-timeline class `tl-fit` → `tl-core`.
+  Case fields `c.fitId` → `c.coreId`, `c.fitCannotResolve` → `c.coreCannotResolve`;
+  `c.holdMs.fit` → `c.holdMs.core`. Owner pool `window.OWNERS.fit` → `window.OWNERS.core`
+  (the dict key in the snippet writer too). Prompt kinds `assign_fit` / `chase_fit` →
+  `assign_core` / `chase_core`. Threshold `window.THRESHOLDS.fitIdleHours` →
+  `coreIdleHours`. Owner-type literal `'fit'` → `'core'` (used by `currentOwner`,
+  `getOwner(type, …)`, `data-type` attributes, the `dest === 'fit'` resume switch).
+  Local variables in the affected scopes (`const fit`, `fitMs`, `fitName`) renamed too.
+  The history-detail matcher regex in `holderTotals` was rewritten from `/local
+  fit|→ fit|\bfit\b/` to `/core team|→ core|\bcore\b/i` so it still classifies the
+  renamed "Core Team — …" detail strings as Core Team time. `holderTotals` now
+  returns `{ triage, core, hq, requester }` (was `{ triage, fit, … }`); the
+  characterization tests follow. `local/casecenter.py` `STATUS_MAP_BY_PROCESS_TYPE`
+  maps `"Service Team"` to `"with_core"`. The CSS `auto-fit` grid keyword is
+  unaffected (it's a CSS spec value, not a domain identifier). Everything compiles
+  and 77/77 tests pass.
+
 ### Added
 
 - **"This week's rota" editor on the Shifts page (drag-to-assign + save).** New card

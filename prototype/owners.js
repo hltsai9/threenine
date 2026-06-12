@@ -5,13 +5,13 @@
 // The in-app Owners editor (Owners page) generates exactly the block below; paste its
 // output here to make changes permanent.
 //
-//   fit: Core Team desks  — { id, name, region, tz, office, channel, members[] }
+//   core: Core Team desks  — { id, name, region, tz, office, channel, members[] }
 //   hq:  HQ Product Teams — { id, name, area,   tz, office, channel }
-// Case routing references these by id (case.fitId / case.hqId). Each Core Team carries
+// Case routing references these by id (case.coreId / case.hqId). Each Core Team carries
 // a small `members` roster (id, name, role) so cards can show who on the team owns it.
 
 window.OWNERS = {
-  fit: [
+  core: [
     {
       id: 'core-apac', name: 'Core Team — APAC desk', region: 'APAC',
       tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-apac',

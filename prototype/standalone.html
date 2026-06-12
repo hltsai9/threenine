@@ -621,7 +621,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   letter-spacing: .01em;
 }
 .pill-new                  { background: var(--col-new-tint);      color: var(--col-new-deep); }
-.pill-with_fit             { background: var(--col-local-tint);    color: var(--col-local-deep); }
+.pill-with_core             { background: var(--col-local-tint);    color: var(--col-local-deep); }
 .pill-with_hq              { background: var(--col-hq-tint);       color: var(--col-hq-deep); }
 .pill-sanity_check         { background: var(--col-sanity-tint);   color: var(--col-sanity-deep); }
 .pill-returned_to_requester{ background: #d7f0ec;                  color: var(--col-hq-deep); }
@@ -1250,7 +1250,7 @@ table.case-table {
 .tl-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 /* holder colors mapped to CommuGround palette */
 .tl-triage    { background: #cfd5ee; color: var(--col-new-deep); }
-.tl-fit       { background: #f8c5dc; color: var(--col-local-deep); }
+.tl-core       { background: #f8c5dc; color: var(--col-local-deep); }
 .tl-hq        { background: #a7e0d9; color: var(--col-hq-deep); }
 .tl-sanity    { background: #cdc3f4; color: var(--col-sanity-deep); }
 .tl-requester { background: #b4e6df; color: var(--col-hq-deep); }
@@ -1987,7 +1987,7 @@ window.API_BASE = '';
 window.NOW = new Date('2026-06-12T13:00:00Z');
 
 window.THRESHOLDS = {
-  fitIdleHours: 4,
+  coreIdleHours: 4,
   hqIdleHours: 8,
   approachingSlaHours: 20,
   shiftEndingSoonMinutes: 60,
@@ -2013,7 +2013,7 @@ window.WEEKS = [
 // Each case mirrors the Excel columns plus the v1 additions from the URD.
 // Two statuses per case:
 //   status      = Case Center status (the real external status). Drives the kanban
-//                 COLUMNS. values: new | with_fit | with_hq | sanity_check |
+//                 COLUMNS. values: new | with_core | with_hq | sanity_check |
 //                 returned_to_requester | resolved | closed | cancelled
 //   agentStatus = first-line agent status (how the agent is handling it). Drives the
 //                 top/bottom band split inside each column. values: queued | unqueued
@@ -2028,7 +2028,7 @@ window.CASES = [
     subject: 'APAC users locked out after MFA reset',
     user: 'Hana Park',
     assignee: 'op-da',
-    fitId: null,
+    coreId: null,
     hqId: null,
     currentOwner: null,
     status: 'new',
@@ -2039,7 +2039,7 @@ window.CASES = [
     slaStartedAt: '2026-06-12T05:12:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
@@ -2056,10 +2056,10 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58800',
     subject: 'Login fails sporadically — APAC region',
     user: 'Wei Zhang',
-    fitId: 'core-apac',
+    coreId: 'core-apac',
     hqId: null,
-    currentOwner: 'fit',
-    status: 'with_fit',
+    currentOwner: 'core',
+    status: 'with_core',
     flags: [],
     priority: 'medium',
     caseType: 'access',
@@ -2067,7 +2067,7 @@ window.CASES = [
     slaStartedAt: '2026-06-11T22:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: '2026-06-11T22:30:00Z',
     lastOwnerContact: { at: '2026-06-12T07:30:00Z', channel: 'Slack' },
     handover: { note: 'Pinged Core Team APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
@@ -2085,10 +2085,10 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58805',
     subject: 'Bulk export from Reports stalls at 80%',
     user: 'Marcus O’Donnell',
-    fitId: 'core-emea',
+    coreId: 'core-emea',
     hqId: null,
-    currentOwner: 'fit',
-    status: 'with_fit',
+    currentOwner: 'core',
+    status: 'with_core',
     flags: [],
     priority: 'medium',
     caseType: 'data',
@@ -2096,12 +2096,12 @@ window.CASES = [
     slaStartedAt: '2026-06-11T13:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: '2026-06-11T13:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
     handover: { note: 'Core Team EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
     notes: 'Core Team confirmed nothing client-side; suspect HQ Data Platform.',
-    fitCannotResolve: true,
+    coreCannotResolve: true,
     createdAt: '2026-06-11T13:00:00Z',
     createdBy: 'op-db',
     history: [
@@ -2117,7 +2117,7 @@ window.CASES = [
     subject: 'SAML SSO loop after IdP cert rotation',
     user: 'Priya Sharma',
     assignee: 'op-da',
-    fitId: 'core-amer',
+    coreId: 'core-amer',
     hqId: 'hq-identity',
     currentOwner: 'hq',
     status: 'with_hq',
@@ -2128,7 +2128,7 @@ window.CASES = [
     slaStartedAt: '2026-06-10T17:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 4 * 3600 * 1000, hq: 0 },
+    holdMs: { core: 4 * 3600 * 1000, hq: 0 },
     holdStartedAt: '2026-06-11T01:00:00Z',
     lastOwnerContact: { at: '2026-06-11T19:00:00Z', channel: 'JIRA' },
     handover: { note: 'HQ Identity assigned Tue PM PT. No update in ~18h. Re-ping today.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:55:00Z' },
@@ -2154,7 +2154,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58702',
     subject: 'Mobile push notifications missing for iOS 18.4',
     user: 'Ana Souza',
-    fitId: 'core-amer',
+    coreId: 'core-amer',
     hqId: 'hq-mobile',
     currentOwner: 'hq',
     status: 'sanity_check',
@@ -2165,7 +2165,7 @@ window.CASES = [
     slaStartedAt: '2026-06-09T15:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 6 * 3600 * 1000, hq: 30 * 3600 * 1000 },
+    holdMs: { core: 6 * 3600 * 1000, hq: 30 * 3600 * 1000 },
     holdStartedAt: '2026-06-12T08:00:00Z',
     lastOwnerContact: { at: '2026-06-12T08:00:00Z', channel: 'JIRA' },
     handover: { note: 'HQ Mobile pushed fix in 4.12.1. Need to verify with requester before close.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T10:15:00Z' },
@@ -2192,7 +2192,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58680',
     subject: 'Unknown error in Reports v3 — needs requester repro',
     user: 'Liam Walsh',
-    fitId: 'core-emea',
+    coreId: 'core-emea',
     hqId: null,
     currentOwner: null,
     status: 'returned_to_requester',
@@ -2203,7 +2203,7 @@ window.CASES = [
     slaStartedAt: '2026-06-09T09:00:00Z',
     slaPaused: true,
     slaAccumulatedMs: 18 * 3600 * 1000,
-    holdMs: { fit: 6 * 3600 * 1000, hq: 0 },
+    holdMs: { core: 6 * 3600 * 1000, hq: 0 },
     holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-11T14:00:00Z', channel: 'Email' },
     handover: { note: 'Returned to requester for steps to reproduce. SLA paused.', author: 'op-da', from: 'Day', to: 'Night', at: '2026-06-11T19:30:00Z' },
@@ -2232,7 +2232,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58590',
     subject: 'Password reset email delayed (resolved last week)',
     user: 'Tom Becker',
-    fitId: 'core-emea',
+    coreId: 'core-emea',
     hqId: 'hq-identity',
     currentOwner: null,
     status: 'closed',
@@ -2243,7 +2243,7 @@ window.CASES = [
     slaStartedAt: '2026-06-04T10:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 32 * 3600 * 1000,
-    holdMs: { fit: 5 * 3600 * 1000, hq: 18 * 3600 * 1000 },
+    holdMs: { core: 5 * 3600 * 1000, hq: 18 * 3600 * 1000 },
     holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-06T11:00:00Z', channel: 'JIRA' },
     handover: null,
@@ -2263,10 +2263,10 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58840',
     subject: 'CFO laptop cannot reach VPN — exec',
     user: 'Elena Rossi',
-    fitId: 'core-emea',
+    coreId: 'core-emea',
     hqId: null,
-    currentOwner: 'fit',
-    status: 'with_fit',
+    currentOwner: 'core',
+    status: 'with_core',
     flags: ['escalated'],
     priority: 'high',
     caseType: 'network',
@@ -2274,7 +2274,7 @@ window.CASES = [
     slaStartedAt: '2026-06-12T08:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: '2026-06-12T08:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
     handover: null,
@@ -2293,10 +2293,10 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58680B',
     subject: 'Slow Salesforce export — running 22h on us',
     user: 'Yui Tanaka',
-    fitId: 'core-apac',
+    coreId: 'core-apac',
     hqId: null,
-    currentOwner: 'fit',
-    status: 'with_fit',
+    currentOwner: 'core',
+    status: 'with_core',
     flags: [],
     priority: 'medium',
     caseType: 'data',
@@ -2304,7 +2304,7 @@ window.CASES = [
     slaStartedAt: '2026-06-11T15:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: '2026-06-11T15:30:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
     handover: { note: 'Core Team looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
@@ -2322,7 +2322,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58770',
     subject: 'Dashboard tile data stale — owned by me, no handover yet',
     user: 'Kofi Mensah',
-    fitId: 'core-amer',
+    coreId: 'core-amer',
     hqId: 'hq-data',
     currentOwner: 'hq',
     status: 'with_hq',
@@ -2333,7 +2333,7 @@ window.CASES = [
     slaStartedAt: '2026-06-11T18:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 4 * 3600 * 1000, hq: 0 },
+    holdMs: { core: 4 * 3600 * 1000, hq: 0 },
     holdStartedAt: '2026-06-12T03:00:00Z',
     lastOwnerContact: { at: '2026-06-12T10:00:00Z', channel: 'JIRA' },
     handover: { note: 'Last shift\'s note (out of date for current shift).', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:55:00Z', staleForCurrentShift: true },
@@ -2351,7 +2351,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58620',
     subject: 'Cancelled — duplicate of CC-58590',
     user: 'Tom Becker',
-    fitId: null,
+    coreId: null,
     hqId: null,
     currentOwner: null,
     status: 'cancelled',
@@ -2362,7 +2362,7 @@ window.CASES = [
     slaStartedAt: '2026-06-10T09:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 1 * 3600 * 1000,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
@@ -2380,7 +2380,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58850',
     subject: 'Slack outage report — APAC weekend rotation',
     user: 'Cheng Liu',
-    fitId: null,
+    coreId: null,
     hqId: null,
     currentOwner: null,
     status: 'new',
@@ -2391,7 +2391,7 @@ window.CASES = [
     slaStartedAt: '2026-06-12T11:30:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
@@ -2408,10 +2408,10 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58830',
     subject: 'EMEA users — Outlook calendar invites duplicated',
     user: 'Astrid Berg',
-    fitId: 'core-emea',
+    coreId: 'core-emea',
     hqId: null,
-    currentOwner: 'fit',
-    status: 'with_fit',
+    currentOwner: 'core',
+    status: 'with_core',
     flags: [],
     priority: 'low',
     caseType: 'productivity',
@@ -2419,7 +2419,7 @@ window.CASES = [
     slaStartedAt: '2026-06-12T08:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 },
+    holdMs: { core: 0, hq: 0 },
     holdStartedAt: '2026-06-12T11:30:00Z',
     lastOwnerContact: { at: '2026-06-12T12:30:00Z', channel: 'Slack' },
     handover: { note: 'Core Team EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
@@ -2437,7 +2437,7 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58712',
     subject: 'Identity provider intermittent 5xx — exec affected',
     user: 'Daniel Field',
-    fitId: 'core-amer',
+    coreId: 'core-amer',
     hqId: 'hq-identity',
     currentOwner: 'hq',
     status: 'sanity_check',
@@ -2448,7 +2448,7 @@ window.CASES = [
     slaStartedAt: '2026-06-10T20:00:00Z',
     slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 3 * 3600 * 1000, hq: 22 * 3600 * 1000 },
+    holdMs: { core: 3 * 3600 * 1000, hq: 22 * 3600 * 1000 },
     holdStartedAt: '2026-06-12T11:00:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'JIRA' },
     handover: { note: 'HQ Identity reports retries normalized. Need to verify with exec contact.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:30:00Z' },
@@ -2470,12 +2470,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58510',
     subject: 'New laptop missing certificates',
     user: 'Sara Mendez',
-    fitId: 'core-amer', hqId: null, currentOwner: null,
+    coreId: 'core-amer', hqId: null, currentOwner: null,
     status: 'closed', flags: [], priority: 'medium', caseType: 'access',
     weekId: 'W23-2026',
     slaStartedAt: '2026-06-02T13:00:00Z', slaPaused: false,
     slaAccumulatedMs: 6 * 3600 * 1000,
-    holdMs: { fit: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-02T18:00:00Z', channel: 'Slack' },
     handover: null,
     notes: 'Core Team pushed certs via MDM. Closed.',
@@ -2491,12 +2491,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58530',
     subject: 'Reports v3 dropdowns empty for AMER',
     user: 'Diego Romero',
-    fitId: 'core-amer', hqId: 'hq-data', currentOwner: null,
+    coreId: 'core-amer', hqId: 'hq-data', currentOwner: null,
     status: 'closed', flags: [], priority: 'medium', caseType: 'data',
     weekId: 'W23-2026',
     slaStartedAt: '2026-06-03T15:00:00Z', slaPaused: false,
     slaAccumulatedMs: 26 * 3600 * 1000,
-    holdMs: { fit: 4 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
+    holdMs: { core: 4 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-04T16:00:00Z', channel: 'JIRA' },
     handover: null,
     notes: 'HQ Data fixed query timeout. Closed.',
@@ -2513,12 +2513,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58495',
     subject: 'Duplicate of CC-58400',
     user: 'Lin Wei',
-    fitId: null, hqId: null, currentOwner: null,
+    coreId: null, hqId: null, currentOwner: null,
     status: 'cancelled', flags: [], priority: 'low', caseType: 'access',
     weekId: 'W23-2026',
     slaStartedAt: '2026-06-01T10:00:00Z', slaPaused: false,
     slaAccumulatedMs: 1 * 3600 * 1000,
-    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 0, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: null, handover: null,
     notes: 'Duplicate.',
     createdAt: '2026-06-01T10:00:00Z', createdBy: 'op-na',
@@ -2532,12 +2532,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58555',
     subject: 'iPad provisioning hung at step 4',
     user: 'Mei Tanaka',
-    fitId: 'core-apac', hqId: null, currentOwner: null,
+    coreId: 'core-apac', hqId: null, currentOwner: null,
     status: 'closed', flags: [], priority: 'low', caseType: 'mobile',
     weekId: 'W23-2026',
     slaStartedAt: '2026-06-04T22:00:00Z', slaPaused: false,
     slaAccumulatedMs: 18 * 3600 * 1000,
-    holdMs: { fit: 12 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 12 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-05T18:00:00Z', channel: 'Slack' },
     handover: null,
     notes: 'Returned to user for reset, then closed.',
@@ -2556,12 +2556,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58300',
     subject: 'VPN client auth loop on Windows',
     user: 'Petra Schmidt',
-    fitId: 'core-emea', hqId: null, currentOwner: null,
+    coreId: 'core-emea', hqId: null, currentOwner: null,
     status: 'closed', flags: [], priority: 'medium', caseType: 'network',
     weekId: 'W22-2026',
     slaStartedAt: '2026-05-26T09:00:00Z', slaPaused: false,
     slaAccumulatedMs: 9 * 3600 * 1000,
-    holdMs: { fit: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-26T17:00:00Z', channel: 'Slack' },
     handover: null,
     notes: 'Core Team EMEA reset client; closed.',
@@ -2577,12 +2577,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58320',
     subject: 'Exec laptop disk encryption failed mid-update',
     user: 'Keith Walters',
-    fitId: 'core-amer', hqId: 'hq-identity', currentOwner: null,
+    coreId: 'core-amer', hqId: 'hq-identity', currentOwner: null,
     status: 'closed', flags: ['escalated'], priority: 'high', caseType: 'access',
     weekId: 'W22-2026',
     slaStartedAt: '2026-05-27T14:00:00Z', slaPaused: false,
     slaAccumulatedMs: 22 * 3600 * 1000,
-    holdMs: { fit: 5 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
+    holdMs: { core: 5 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-28T11:00:00Z', channel: 'JIRA' },
     handover: null,
     notes: 'HQ Identity team rolled back update; closed with workaround.',
@@ -2600,12 +2600,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58360',
     subject: 'Weekend: APAC mass SSO failures',
     user: 'Hiro Sato',
-    fitId: 'core-apac', hqId: 'hq-identity', currentOwner: null,
+    coreId: 'core-apac', hqId: 'hq-identity', currentOwner: null,
     status: 'closed', flags: ['weekend'], priority: 'high', caseType: 'access',
     weekId: 'W22-2026',
     slaStartedAt: '2026-05-30T07:00:00Z', slaPaused: false,
     slaAccumulatedMs: 14 * 3600 * 1000,
-    holdMs: { fit: 3 * 3600 * 1000, hq: 9 * 3600 * 1000 }, holdStartedAt: null,
+    holdMs: { core: 3 * 3600 * 1000, hq: 9 * 3600 * 1000 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-30T20:00:00Z', channel: 'JIRA' },
     handover: null,
     notes: 'Identity issued cert refresh; closed Sat night.',
@@ -2623,12 +2623,12 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58100',
     subject: 'Office printer queue stuck — EMEA',
     user: 'Ronan Doyle',
-    fitId: 'core-emea', hqId: null, currentOwner: null,
+    coreId: 'core-emea', hqId: null, currentOwner: null,
     status: 'closed', flags: [], priority: 'low', caseType: 'productivity',
     weekId: 'W21-2026',
     slaStartedAt: '2026-05-20T11:00:00Z', slaPaused: false,
     slaAccumulatedMs: 4 * 3600 * 1000,
-    holdMs: { fit: 3 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 3 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-20T14:00:00Z', channel: 'Slack' },
     handover: null,
     notes: 'Restarted print spooler.',
@@ -2647,13 +2647,13 @@ window.CASES = [
     caseLink: 'https://case-center.example/CC-58475',
     subject: 'Intermittent push notification delays — multi-week',
     user: 'Alicia Romero',
-    fitId: 'core-amer', hqId: null, currentOwner: 'fit',
-    status: 'with_fit', flags: [], priority: 'medium', caseType: 'mobile',
+    coreId: 'core-amer', hqId: null, currentOwner: 'core',
+    status: 'with_core', flags: [], priority: 'medium', caseType: 'mobile',
     weekId: 'W24-2026',
     carriedFrom: 'W23-2026',
     slaStartedAt: '2026-06-04T10:00:00Z', slaPaused: false,
     slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 }, holdStartedAt: '2026-06-04T11:00:00Z',
+    holdMs: { core: 0, hq: 0 }, holdStartedAt: '2026-06-04T11:00:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
     handover: { note: 'Carried over from W23. Core Team AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
     notes: 'Reproducible only intermittently; Core Team collecting client logs.',
@@ -2714,13 +2714,13 @@ window.ROTA = [
 // The in-app Owners editor (Owners page) generates exactly the block below; paste its
 // output here to make changes permanent.
 //
-//   fit: Core Team desks  — { id, name, region, tz, office, channel, members[] }
+//   core: Core Team desks  — { id, name, region, tz, office, channel, members[] }
 //   hq:  HQ Product Teams — { id, name, area,   tz, office, channel }
-// Case routing references these by id (case.fitId / case.hqId). Each Core Team carries
+// Case routing references these by id (case.coreId / case.hqId). Each Core Team carries
 // a small `members` roster (id, name, role) so cards can show who on the team owns it.
 
 window.OWNERS = {
-  fit: [
+  core: [
     {
       id: 'core-apac', name: 'Core Team — APAC desk', region: 'APAC',
       tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-apac',
@@ -3011,7 +3011,7 @@ seedBoot(loadState());
 function getOperator(id) { return window.OPERATORS.find(o => o.id === id); }
 function getOwner(type, id) {
   if (!id) return null;
-  return (type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq).find(o => o.id === id) || null;
+  return (type === 'core' ? window.OWNERS.core : window.OWNERS.hq).find(o => o.id === id) || null;
 }
 function caseById(id) { return STATE.cases.find(c => c.id === id); }
 
@@ -3047,7 +3047,7 @@ function caseSlaMs(c) {
   }
   return total;
 }
-function caseHoldMs(c, kind /* 'fit' | 'hq' */) {
+function caseHoldMs(c, kind /* 'core' | 'hq' */) {
   let total = c.holdMs?.[kind] || 0;
   if (c.currentOwner === kind && c.holdStartedAt) {
     total += Math.max(0, NOW.getTime() - new Date(c.holdStartedAt).getTime());
@@ -3216,7 +3216,7 @@ function ownerInOfficeHours(owner) {
 function statusLabel(s) {
   return ({
     new: 'New',
-    with_fit: 'With Core Team',
+    with_core: 'With Core Team',
     with_hq: 'With HQ Product Team',
     sanity_check: 'Sanity Check',
     returned_to_requester: 'Returned to Requester',
@@ -3249,13 +3249,13 @@ function derivePromptsForCase(c) {
     : Infinity;
 
   const prompts = [];
-  if (c.status === 'new' && !c.fitId) {
-    prompts.push({ caseId: c.id, kind: 'assign_fit' });
+  if (c.status === 'new' && !c.coreId) {
+    prompts.push({ caseId: c.id, kind: 'assign_core' });
   }
-  if (c.status === 'with_fit' && c.fitCannotResolve) {
+  if (c.status === 'with_core' && c.coreCannotResolve) {
     prompts.push({ caseId: c.id, kind: 'escalate_to_hq' });
-  } else if (c.status === 'with_fit' && ownerIdleHrs > window.THRESHOLDS.fitIdleHours) {
-    prompts.push({ caseId: c.id, kind: 'chase_fit' });
+  } else if (c.status === 'with_core' && ownerIdleHrs > window.THRESHOLDS.coreIdleHours) {
+    prompts.push({ caseId: c.id, kind: 'chase_core' });
   }
   if (c.status === 'with_hq' && ownerIdleHrs > window.THRESHOLDS.hqIdleHours) {
     prompts.push({ caseId: c.id, kind: 'chase_hq' });
@@ -3267,8 +3267,8 @@ function derivePromptsForCase(c) {
 }
 
 const PROMPT_DEFS = {
-  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
-  chase_fit:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
+  assign_core:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
+  chase_core:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
   chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   verify_fix:           { label: 'Verify reported fix (Sanity Check)',   icon: 'V', cls: 'icon-verify',   action: 'Verify & close' },
@@ -3387,7 +3387,7 @@ function renderSidebar() {
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
   const navOwners = document.getElementById('nav-owners-count');
-  if (navOwners) navOwners.textContent = (window.OWNERS.fit.length + window.OWNERS.hq.length);
+  if (navOwners) navOwners.textContent = (window.OWNERS.core.length + window.OWNERS.hq.length);
   const navArchive = document.getElementById('nav-archive-count');
   if (navArchive) navArchive.textContent = window.WEEKS.length;
 }
@@ -3477,7 +3477,7 @@ function handoverPendingCases() {
 function renderWatchlists(sla, escalated) {
   if (sla.length === 0 && escalated.length === 0) return '';
   const row = c => {
-    const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+    const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
     return `
       <a class="watch-row" href="#/cases/${c.id}">
         <span class="mono muted">${c.id}</span>
@@ -3524,7 +3524,7 @@ function renderCaseList() {
   // band (everything else in that status) — the row dimension is the agent status.
   const columns = [
     { id: 'new',    label: 'New',                              statuses: ['new'] },
-    { id: 'fit',    label: 'With Core Team',                   statuses: ['with_fit'] },
+    { id: 'core',    label: 'With Core Team',                   statuses: ['with_core'] },
     { id: 'hq',     label: 'With HQ Product Team',             statuses: ['with_hq'] },
     { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
   ];
@@ -3667,7 +3667,7 @@ function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
 
 function renderKanbanCard(c) {
   const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
-  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'fit' ? c.fitId : c.hqId) : null;
+  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
   const isSel = STATE.kanbanSelected === c.id;
   const bellState = c.reminder
     ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
@@ -3760,7 +3760,7 @@ function ownershipSegments(c) {
     const d = (ev.detail || '').toLowerCase();
     switch (ev.kind) {
       case 'created': return 'triage';
-      case 'assigned': return 'fit';      // assignment is always to Core Team
+      case 'assigned': return 'core';      // assignment is always to Core Team
       case 'escalated': return 'hq';
       case 'returned': return 'requester';
       case 'closed': case 'cancelled': return 'done';
@@ -3768,7 +3768,7 @@ function ownershipSegments(c) {
         // Sanity Check = waiting on the requester to confirm the fix → counted as requester time.
         if (/sanity check/.test(d)) return 'requester';
         if (/\bhq\b|product team/.test(d)) return 'hq';
-        if (/local fit|→ fit|\bfit\b/.test(d)) return 'fit';
+        if (/core team|→ core|\bcore\b/i.test(d)) return 'core';
         if (/requester|returned/.test(d)) return 'requester';
         if (/resolved|closed/.test(d)) return 'done';
         if (/unassigned|\bnew\b/.test(d)) return 'triage';
@@ -3803,7 +3803,7 @@ function ownershipSegments(c) {
 // Sanity Check is classified as requester time (see ownershipSegments), so there is no separate
 // "sanity" bucket — that span lands in `requester`.
 function holderTotals(c) {
-  const tot = { triage: 0, fit: 0, hq: 0, requester: 0 };
+  const tot = { triage: 0, core: 0, hq: 0, requester: 0 };
   for (const s of ownershipSegments(c)) {
     if (s.holder in tot) tot[s.holder] += Math.max(0, s.end - s.start);
   }
@@ -3812,7 +3812,7 @@ function holderTotals(c) {
 
 const HOLDER_META = {
   triage:    { label: 'First line',       cls: 'tl-triage' },
-  fit:       { label: 'Core Team',        cls: 'tl-fit' },
+  core:       { label: 'Core Team',        cls: 'tl-core' },
   hq:        { label: 'HQ Product Team',  cls: 'tl-hq' },
   requester: { label: 'With requester',   cls: 'tl-requester' },
   done:      { label: 'Closed',           cls: 'tl-done' },
@@ -3979,14 +3979,14 @@ function renderWaitUser(c) {
 }
 
 function renderCaseDetailBody(c) {
-  const fit = getOwner('fit', c.fitId);
+  const core = getOwner('core', c.coreId);
   const hq = getOwner('hq', c.hqId);
 
   const slaMs = caseSlaMs(c);
   // FIT/HQ time spent is derived from the ownership timeline so the clocks and the
   // timeline legend always agree (same source: the case history).
   const hold = holderTotals(c);
-  const fitMs = hold.fit;
+  const coreMs = hold.core;
   const hqMs = hold.hq;
   // First-line handling = time the case sat directly with the first-line agent during triage
   // (status New). Sanity Check counts as requester time, not first-line, so it's excluded.
@@ -4030,8 +4030,8 @@ function renderCaseDetailBody(c) {
               </div>
               <div class="clock">
                 <div class="label">Core Team</div>
-                <div class="value">${fmtDuration(fitMs)}</div>
-                <div class="state ${c.currentOwner === 'fit' ? 'running' : ''}">${c.currentOwner === 'fit' ? 'Holding now' : 'Idle'}</div>
+                <div class="value">${fmtDuration(coreMs)}</div>
+                <div class="state ${c.currentOwner === 'core' ? 'running' : ''}">${c.currentOwner === 'core' ? 'Holding now' : 'Idle'}</div>
               </div>
               <div class="clock">
                 <div class="label">HQ Product Team</div>
@@ -4076,7 +4076,7 @@ function renderCaseDetailBody(c) {
             <div class="detail-row"><span class="k">User</span><span class="v">${c.user ? escapeHtml(c.user) : '<span class="muted">—</span>'}${c.userDept ? ` <span class="muted">· ${escapeHtml(c.userDept)}</span>` : ''}</span></div>
             ${c.reporter ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporter)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
             ${c.assignee ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assignee)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
-            <div class="detail-row"><span class="k">Core Team</span><span class="v">${fit ? `${escapeHtml(fit.name)} ${renderTzHint(fit)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="fit">${fit ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">Core Team</span><span class="v">${core ? `${escapeHtml(core.name)} ${renderTzHint(core)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="core">${core ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
@@ -4140,8 +4140,8 @@ function renderDetailActions(c) {
   }
 
   // Non-status actions stay as buttons.
-  if (c.status === 'with_fit') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to Core Team</button>`);
+  if (c.status === 'with_core') {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_core">Send reminder to Core Team</button>`);
   }
   if (c.status === 'with_hq') {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
@@ -4161,10 +4161,10 @@ function statusTransitions(c) {
   const t = [];
   switch (c.status) {
     case 'new':
-      t.push({ kind: 'assign_fit', label: 'Assign to Core Team' });
+      t.push({ kind: 'assign_core', label: 'Assign to Core Team' });
       t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
-    case 'with_fit':
+    case 'with_core':
       t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
       t.push({ kind: 'approaching_sla', label: 'Return to requester' });
       break;
@@ -4306,7 +4306,7 @@ function renderArchiveWeek(weekId) {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const rows = cases.length === 0 ? '' : cases.map(c => {
-    const fit = getOwner('fit', c.fitId);
+    const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
     const carry = c.carriedFrom ? ` <span class="flag" title="Carried from ${escapeHtml(c.carriedFrom)}">↩ ${escapeHtml(c.carriedFrom)}</span>` : '';
@@ -4318,7 +4318,7 @@ function renderArchiveWeek(weekId) {
           <div><a class="link-inline" href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
         </td>
         <td>${escapeHtml(c.user)}</td>
-        <td>${fit ? escapeHtml(fit.name) : '<span class="muted">—</span>'}</td>
+        <td>${core ? escapeHtml(core.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
@@ -4876,9 +4876,9 @@ function bindRosterEditor() {
 
 function makeOwnerId(pool, name, exceptIndex) {
   // Drop boilerplate words so "Core Team — LATAM desk" -> core-latam, "HQ Identity Team" -> hq-identity.
-  const cleaned = String(name || '').toLowerCase().replace(/\b(core|fit|hq|desk|team|product|the)\b/g, ' ');
-  // Core Team desks (pool 'fit') slug under the 'core-' prefix; HQ teams stay 'hq-'.
-  const prefix = pool === 'fit' ? 'core' : pool;
+  const cleaned = String(name || '').toLowerCase().replace(/\b(core|core|hq|desk|team|product|the)\b/g, ' ');
+  // Core Team desks (pool 'core') slug under the 'core-' prefix; HQ teams stay 'hq-'.
+  const prefix = pool === 'core' ? 'core' : pool;
   const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || prefix;
   const want = prefix + '-' + base;
   const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
@@ -4888,7 +4888,7 @@ function makeOwnerId(pool, name, exceptIndex) {
 }
 
 function ownerRefCounts(pool, id) {
-  const field = pool === 'fit' ? 'fitId' : 'hqId';
+  const field = pool === 'core' ? 'coreId' : 'hqId';
   let n = 0;
   for (const c of STATE.cases) if (c[field] === id) n++;
   return n;
@@ -4902,16 +4902,16 @@ function ownersSnippet() {
       `        { id: ${q(m.id)}, name: ${q(m.name)}, role: ${q(m.role || '')} }`).join(',\n');
     return `,\n      members: [\n${inner},\n      ]`;
   };
-  const fit = window.OWNERS.fit.map(o =>
+  const core = window.OWNERS.core.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   const hq = window.OWNERS.hq.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')} },`).join('\n');
-  return `window.OWNERS = {\n  fit: [\n${fit}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
+  return `window.OWNERS = {\n  core: [\n${core}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
 }
 
 function ownersWarnings() {
   const w = [];
-  ['fit', 'hq'].forEach(pool => {
+  ['core', 'hq'].forEach(pool => {
     const ids = window.OWNERS[pool].map(o => o.id);
     [...new Set(ids.filter((id, i) => id && ids.indexOf(id) !== i))].forEach(id => w.push({ err: 1, msg: `Duplicate ${pool.toUpperCase()} id: ${id}` }));
     window.OWNERS[pool].forEach(o => {
@@ -4923,17 +4923,17 @@ function ownersWarnings() {
 }
 
 function renderOwnerRows(pool) {
-  const key = pool === 'fit' ? 'region' : 'area';
+  const key = pool === 'core' ? 'region' : 'area';
   return window.OWNERS[pool].map((o, i) => {
     const refs = ownerRefCounts(pool, o.id);
     return `
     <tr data-pool="${pool}" data-oi="${i}">
-      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
-      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'core' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'core' ? 'Region' : 'Area'}"></td>
       <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
       <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
       <td><input data-of="channel" value="${escapeHtml(o.channel || '')}" placeholder="Slack / JIRA"></td>
-      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool === 'fit' ? 'core' : pool}-…"></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool === 'core' ? 'core' : pool}-…"></td>
       <td class="re-refs tiny ${refs ? '' : 'muted'}" title="cases routed to this owner">${refs ? refs + ' ref' + (refs === 1 ? '' : 's') : '—'}</td>
       <td class="re-x"><button class="btn-ghost re-del-owner" data-pool="${pool}" data-oi="${i}" title="Remove">✕</button></td>
     </tr>`;
@@ -4947,12 +4947,12 @@ function renderOwnersTable(pool, label, regionLabel) {
       <div class="re-scroll"><table class="re-table"><thead><tr>
         <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
       </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
-      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'Core Team desk' : 'HQ team'}</button></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'core' ? 'Core Team desk' : 'HQ team'}</button></div>
     </div>`;
 }
 
 function renderCoreTeamMembers() {
-  const cards = window.OWNERS.fit.map(team => {
+  const cards = window.OWNERS.core.map(team => {
     const members = Array.isArray(team.members) ? team.members : [];
     const rows = members.length
       ? members.map(m => `
@@ -4981,7 +4981,7 @@ function renderOwnersPage() {
   const warns = ownersWarnings();
   const warnHtml = warns.length
     ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
-    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+    : `<div class="re-ok">✓ ${window.OWNERS.core.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
@@ -4990,7 +4990,7 @@ function renderOwnersPage() {
     <div class="card roster-editor" id="owners-editor">
       <div class="card-header"><span>Edit Core Team desks &amp; HQ teams</span></div>
       <div class="card-body">
-        ${renderOwnersTable('fit', 'Core Team desks', 'Region')}
+        ${renderOwnersTable('core', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
         ${renderCoreTeamMembers()}
         ${warnHtml}
@@ -5007,8 +5007,8 @@ function renderOwnersPage() {
 function deleteOwner(pool, i) {
   const o = window.OWNERS[pool][i];
   if (!o) return;
-  const field = pool === 'fit' ? 'fitId' : 'hqId';
-  const kind = pool === 'fit' ? 'Core Team desk' : 'HQ team';
+  const field = pool === 'core' ? 'coreId' : 'hqId';
+  const kind = pool === 'core' ? 'Core Team desk' : 'HQ team';
   const refs = ownerRefCounts(pool, o.id);
   const others = window.OWNERS[pool].filter((_, j) => j !== i);
   const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
@@ -5064,7 +5064,7 @@ function bindOwnersEditor() {
   }));
   ed.querySelectorAll('[data-add-owner]').forEach(btn => btn.addEventListener('click', () => {
     const pool = btn.dataset.addOwner;
-    window.OWNERS[pool].push(pool === 'fit'
+    window.OWNERS[pool].push(pool === 'core'
       ? { id: '', name: '', region: '', tz: 'America/Phoenix', office: '08:00–17:00', channel: '', _idEdited: false }
       : { id: '', name: '', area: '', tz: 'Asia/Taipei', office: '09:00–18:00', channel: '', _idEdited: false });
     render();
@@ -5423,10 +5423,10 @@ function renderStatusFlow() {
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_core">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
         <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
+        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
         <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
@@ -5456,7 +5456,7 @@ function renderClockModel() {
   const t = holderTotals(example);
   const firstLine = t.triage;        // Sanity Check is requester time, not first-line
   const requesterMs = t.requester;   // includes the Sanity Check span (see ownershipSegments)
-  const lifeMs = t.triage + t.fit + t.hq + t.requester;
+  const lifeMs = t.triage + t.core + t.hq + t.requester;
   // SLA runs the whole time the case is on us and pauses only on an explicit "Return to
   // requester". This example never returns, so SLA spans the full lifetime — Sanity Check is
   // requester-attributed in the breakdown but does not pause SLA.
@@ -5495,7 +5495,7 @@ function renderClockModel() {
             <td>Summed from history segments.</td>
           </tr>
           <tr>
-            <td>${swatch('tl-fit')}<strong>Core Team</strong></td>
+            <td>${swatch('tl-core')}<strong>Core Team</strong></td>
             <td>Time the case sat with the Core Team desk.</td>
             <td>On <em>Assign to Core Team</em>.</td>
             <td>On escalate / return / close.</td>
@@ -5524,7 +5524,7 @@ function renderClockModel() {
       <div class="clock-grid" style="margin-top:16px;">
         <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">runs through Sanity Check (no explicit return)</div></div>
         <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage only</div></div>
-        <div class="clock"><div class="label">${swatch('tl-fit')}Core Team</div><div class="value">${fmtDuration(t.fit)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-core')}Core Team</div><div class="value">${fmtDuration(t.core)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
         <div class="clock"><div class="label">${swatch('tl-requester')}With requester</div><div class="value">${fmtDuration(requesterMs)}</div><div class="state">incl. Sanity Check</div></div>
       </div>
@@ -5594,27 +5594,27 @@ function handlePrompt(caseId, kind) {
   const c = caseById(caseId);
   if (!c) return;
 
-  if (kind === 'assign_fit') {
-    const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
+  if (kind === 'assign_core') {
+    const opts = window.OWNERS.core.map(f => `<option value="${f.id}"${f.id === c.coreId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
       <h3>Assign to Core Team</h3>
       <div class="modal-sub">Pick the Core Team desk that should triage this case.</div>
       <label>Core Team desk</label>
-      <select data-field="fitId">${opts}</select>
+      <select data-field="coreId">${opts}</select>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn btn-primary" data-modal-submit>Assign</button>
       </div>
     `, (modal) => {
-      const fitId = fieldVal(modal, 'fitId');
-      c.fitId = fitId;
-      c.currentOwner = 'fit';
-      c.status = 'with_fit';
+      const coreId = fieldVal(modal, 'coreId');
+      c.coreId = coreId;
+      c.currentOwner = 'core';
+      c.status = 'with_core';
       c.holdStartedAt = new Date(NOW).toISOString();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-      const fitName = getOwner('fit', fitId).name;
-      logHistory(c, op, 'assigned', `Core Team — ${fitName}`);
-      showToast(`${c.id} assigned to ${fitName}. Status is now With Core Team.`, 'success');
+      const coreName = getOwner('core', coreId).name;
+      logHistory(c, op, 'assigned', `Core Team — ${coreName}`);
+      showToast(`${c.id} assigned to ${coreName}. Status is now With Core Team.`, 'success');
       render();
       return true;
     });
@@ -5638,14 +5638,14 @@ function handlePrompt(caseId, kind) {
       const hqId = fieldVal(modal, 'hqId');
       const reason = fieldVal(modal, 'reason').trim();
       // stop FIT clock, start HQ clock
-      if (c.currentOwner === 'fit' && c.holdStartedAt) {
-        c.holdMs.fit += new Date(NOW) - new Date(c.holdStartedAt);
+      if (c.currentOwner === 'core' && c.holdStartedAt) {
+        c.holdMs.core += new Date(NOW) - new Date(c.holdStartedAt);
       }
       c.hqId = hqId;
       c.currentOwner = 'hq';
       c.status = 'with_hq';
       c.holdStartedAt = new Date(NOW).toISOString();
-      c.fitCannotResolve = false;
+      c.coreCannotResolve = false;
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
       const hqName = getOwner('hq', hqId).name;
       logHistory(c, op, 'escalated', `Core Team → ${hqName}${reason ? ' · ' + reason : ''}`);
@@ -5656,9 +5656,9 @@ function handlePrompt(caseId, kind) {
     return;
   }
 
-  if (kind === 'chase_fit' || kind === 'chase_hq') {
-    const owner = c.currentOwner === 'fit' ? getOwner('fit', c.fitId) : getOwner('hq', c.hqId);
-    const channel = c.currentOwner === 'fit' ? 'Slack' : 'JIRA';
+  if (kind === 'chase_core' || kind === 'chase_hq') {
+    const owner = c.currentOwner === 'core' ? getOwner('core', c.coreId) : getOwner('hq', c.hqId);
+    const channel = c.currentOwner === 'core' ? 'Slack' : 'JIRA';
     showModal(`
       <h3>Send reminder to ${escapeHtml(owner?.name || 'owner')}</h3>
       <div class="modal-sub">Channel: ${escapeHtml(channel)} · ${renderTzHint(owner)}</div>
@@ -5672,8 +5672,8 @@ function handlePrompt(caseId, kind) {
       const msg = fieldVal(modal, 'msg').trim();
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       logHistory(c, op, 'reminder', `Reminder via ${channel}${msg ? ': ' + msg : ''}`);
-      const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
-      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
+      const threshold = c.currentOwner === 'core' ? window.THRESHOLDS.coreIdleHours : window.THRESHOLDS.hqIdleHours;
+      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'core' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
       render();
       return true;
     });
@@ -5779,10 +5779,10 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'resume') {
-    const fit = getOwner('fit', c.fitId);
+    const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     const opts = [];
-    if (c.fitId) opts.push(`<option value="fit">Resume with ${escapeHtml(fit.name)} (Core Team)</option>`);
+    if (c.coreId) opts.push(`<option value="core">Resume with ${escapeHtml(core.name)} (Core Team)</option>`);
     if (c.hqId) opts.push(`<option value="hq">Resume with ${escapeHtml(hq.name)} (HQ Product Team)</option>`);
     opts.push(`<option value="sanity_check">Move to Sanity Check (requester says it's fixed)</option>`);
     opts.push(`<option value="new">Resume unassigned (status: New)</option>`);
@@ -5806,12 +5806,12 @@ function handlePrompt(caseId, kind) {
       c.slaStartedAt = new Date(NOW).toISOString();
 
       let detail;
-      if (dest === 'fit') {
-        c.currentOwner = 'fit';
-        c.status = 'with_fit';
+      if (dest === 'core') {
+        c.currentOwner = 'core';
+        c.status = 'with_core';
         c.holdStartedAt = new Date(NOW).toISOString();
         c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'Slack' };
-        detail = `Requester replied · resumed to Core Team (${getOwner('fit', c.fitId).name})`;
+        detail = `Requester replied · resumed to Core Team (${getOwner('core', c.coreId).name})`;
       } else if (dest === 'hq') {
         c.currentOwner = 'hq';
         c.status = 'with_hq';
@@ -5828,9 +5828,9 @@ function handlePrompt(caseId, kind) {
         c.status = 'new';
         c.holdStartedAt = null;
         c.lastOwnerContact = null;
-        c.fitId = null;
+        c.coreId = null;
         c.hqId = null;
-        c.fitCannotResolve = false;
+        c.coreCannotResolve = false;
         detail = `Requester replied · resumed unassigned (Core Team/HQ cleared)`;
       }
       if (note) detail += ` · ${note}`;
@@ -6132,10 +6132,10 @@ function handleReassign(caseId, type) {
   const c = caseById(caseId);
   if (!c) return;
   const op = getOperator(STATE.operatorId);
-  const dir = type === 'fit' ? window.OWNERS.fit : window.OWNERS.hq;
-  const currentId = type === 'fit' ? c.fitId : c.hqId;
-  const typeLabel = type === 'fit' ? 'Core Team' : 'HQ Product Team';
-  const detailLabel = type === 'fit' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
+  const dir = type === 'core' ? window.OWNERS.core : window.OWNERS.hq;
+  const currentId = type === 'core' ? c.coreId : c.hqId;
+  const typeLabel = type === 'core' ? 'Core Team' : 'HQ Product Team';
+  const detailLabel = type === 'core' ? o => `${escapeHtml(o.name)} (${escapeHtml(o.region)})` : o => `${escapeHtml(o.name)} (${escapeHtml(o.area)})`;
 
   const opts = [
     `<option value="">— Unassign —</option>`,
@@ -6168,7 +6168,7 @@ function handleReassign(caseId, type) {
     }
 
     // Update the contact pointer.
-    if (type === 'fit') c.fitId = newId;
+    if (type === 'core') c.coreId = newId;
     else c.hqId = newId;
 
     // Decide currentOwner / status / new clock segment.
@@ -6178,9 +6178,9 @@ function handleReassign(caseId, type) {
       const wasReturned = c.status === 'returned_to_requester';
       if (wasActive || wasNew) {
         c.currentOwner = type;
-        c.status = type === 'fit' ? 'with_fit' : 'with_hq';
+        c.status = type === 'core' ? 'with_core' : 'with_hq';
         c.holdStartedAt = new Date(NOW).toISOString();
-        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'fit' ? 'Slack' : 'JIRA' };
+        c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: type === 'core' ? 'Slack' : 'JIRA' };
       } else if (wasReturned) {
         // Just updating the contact for when SLA resumes; don't restart the clock.
       }
@@ -6190,11 +6190,11 @@ function handleReassign(caseId, type) {
       if (c.currentOwner === type) {
         c.currentOwner = null;
         c.lastOwnerContact = null;
-        const otherType = type === 'fit' ? 'hq' : 'fit';
-        const otherId = otherType === 'fit' ? c.fitId : c.hqId;
+        const otherType = type === 'core' ? 'hq' : 'core';
+        const otherId = otherType === 'core' ? c.coreId : c.hqId;
         if (otherId) {
           c.currentOwner = otherType;
-          c.status = otherType === 'fit' ? 'with_fit' : 'with_hq';
+          c.status = otherType === 'core' ? 'with_core' : 'with_hq';
           c.holdStartedAt = new Date(NOW).toISOString();
         } else {
           c.status = 'new';
@@ -6202,7 +6202,7 @@ function handleReassign(caseId, type) {
       }
     }
 
-    if (type === 'fit') c.fitCannotResolve = false;
+    if (type === 'core') c.coreCannotResolve = false;
 
     const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${reason ? ' · ' + reason : ''}`;
     logHistory(c, op, currentId ? 'reassigned' : 'assigned', detail);
@@ -6349,9 +6349,9 @@ function normalizeLiveCase(c) {
     flags: [],
     priority: 'medium',
     caseType: 'access',
-    fitId: null, hqId: null, currentOwner: null,
+    coreId: null, hqId: null, currentOwner: null,
     slaPaused: false, slaAccumulatedMs: 0,
-    holdMs: { fit: 0, hq: 0 }, holdStartedAt: null,
+    holdMs: { core: 0, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
     reminder: undefined,
