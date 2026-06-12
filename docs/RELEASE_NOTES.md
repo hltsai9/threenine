@@ -10,7 +10,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Fixed
+
+- **Clicking a kanban card no longer jumps the page to the top.** The select handler
+  now captures `window.scrollX/Y` before `render()` and restores it after, so picking
+  a card further down the board keeps the viewport where it was. Affects every column
+  / band, not just `is-mine` cards.
+
 ### Changed
+
+- **"Assigned to me" cards float to the top of their column.** Extended `sortCases`
+  in `renderCaseList` to order by `isAssignedToMe(c)` first (mine → top), then the
+  existing priority and createdAt tiers. Applies inside both the queued and backlog
+  bands.
 
 - **Complete `fit` → `core` internal rename.** Every remaining `fit` identifier and
   string token swapped to `core` so the codebase reads consistently with the user-visible
