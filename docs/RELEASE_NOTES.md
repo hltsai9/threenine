@@ -90,6 +90,32 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Added (Shifts page · multi-week rota)
+
+- **Per-week rota editing.** The Shifts page rota editor now lets the team
+  edit not just *this week* but also the next three weeks (current → W+3, four
+  tabs in total: e.g. W24 · W25 · W26 · W27). Selecting a tab swaps the
+  schedule grid to that week's rota; saving persists every changed week.
+- New seed in `shifts.js`: `window.ROTA_BY_WEEK = { 'W24-2026': window.ROTA,
+  'W25-2026': […], 'W26-2026': […], 'W27-2026': […] }`. The current week's
+  entry is the same array as `window.ROTA` so existing reads keep working.
+- `window.WEEKS` extended with W25 / W26 / W27 (`isFuture: true`) so the
+  archive index also surfaces the upcoming buckets.
+- `rosterSnippet()` emits a multi-week block (`window.ROTA_BY_WEEK = { … }`)
+  alongside the original `window.ROTA = [ … ]` so a copy/paste captures
+  every edited week.
+- `scheduledHandoff()` now picks the rota for the week containing the
+  computed `dueAt`, so a "next Day shift" lookup that crosses into a future
+  week honours that week's edited schedule.
+
+### Fixed (small)
+
+- **Importing a case by ID auto-picks it.** Typing a Case Center ID into the
+  `+ Import case by ID` modal now sets `agentStatus = 'queued'` on the new
+  case (provided it isn't already closed/cancelled) so it lands directly in
+  the Picked workspace and on the Route Board. The "Added from Case Center"
+  toast now ends in "· picked." to confirm.
+
 ### Changed (Hand-off Route Board — spec build)
 
 - **Rebuilt the Route Board to the agreed spec.** Replaces the earlier "three

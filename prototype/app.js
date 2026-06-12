@@ -135,7 +135,8 @@ function saveState() {
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
-      rota: window.ROTA,                  // the in-session "This week's rota" assignments
+      rota: window.ROTA,                  // current week's rota (kept in sync with rotaByWeek[current])
+      rotaByWeek: window.ROTA_BY_WEEK,    // current + next 3 weeks' rotas (Shifts-page editor)
     }));
   } catch (e) { /* SecurityError on some file:// origins, ignore */ }
 }
@@ -152,6 +153,12 @@ function loadState() {
       STATE.operatorId = parsed.operatorId;
     }
     if (Array.isArray(parsed.rota)) window.ROTA = parsed.rota;
+    if (parsed.rotaByWeek && typeof parsed.rotaByWeek === 'object') {
+      window.ROTA_BY_WEEK = parsed.rotaByWeek;
+      // Keep the current week's rota and window.ROTA pointing at the same array.
+      const cur = window.CURRENT_WEEK?.id;
+      if (cur && window.ROTA_BY_WEEK[cur]) window.ROTA = window.ROTA_BY_WEEK[cur];
+    }
     return true;
   } catch (e) {
     return false;
@@ -172,6 +179,10 @@ function resetState() {
   window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
   window.CURRENT_OPERATOR_ID = SEED_ROSTER.currentOperatorId;
   window.ROTA = structuredClone(SEED_ROSTER.rota);
+  window.ROTA_BY_WEEK = structuredClone(SEED_ROSTER.rotaByWeek);
+  // Keep ROTA and ROTA_BY_WEEK[current] pointing at the same array.
+  const curW = window.CURRENT_WEEK?.id;
+  if (curW) window.ROTA_BY_WEEK[curW] = window.ROTA;
   window.OWNERS = structuredClone(SEED_OWNERS);
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
   STATE.lastListRoute = '#/cases';
@@ -186,6 +197,7 @@ const SEED_ROSTER = {
   shifts: structuredClone(window.SHIFTS),
   currentOperatorId: window.CURRENT_OPERATOR_ID,
   rota: structuredClone(window.ROTA || []),
+  rotaByWeek: structuredClone(window.ROTA_BY_WEEK || {}),
 };
 // Pristine owner directory, so "Reset to seed" can undo in-session Owners-editor changes.
 const SEED_OWNERS = structuredClone(window.OWNERS);
@@ -749,8 +761,15 @@ function scheduledHandoff(c) {
     if (dueUtcMs <= nowMs) continue;
     if (targetDay && targetDay !== dayName) continue;
     if (!targetDay) {
-      // Need the target shift to exist on that day per the rota.
-      const rotaDay = (window.ROTA || []).find(r => r.day === dayName);
+      // Need the target shift to exist on that day per the rota for the week
+      // that contains `dueUtcMs` — so a "next Day shift" lookup spanning into a
+      // future week honours that week's edited rota.
+      const dueWeek = (window.WEEKS || []).find(w => {
+        const s = Date.parse(w.startsAt), e = Date.parse(w.endsAt);
+        return dueUtcMs >= s && dueUtcMs < e;
+      });
+      const rota = dueWeek && window.ROTA_BY_WEEK?.[dueWeek.id] || window.ROTA || [];
+      const rotaDay = rota.find(r => r.day === dayName);
       const onShift = rotaDay && rotaDay.shifts?.[targetShift] && rotaDay.shifts[targetShift].length > 0;
       if (!onShift) continue;
     }
@@ -2149,13 +2168,20 @@ function rosterSnippet() {
   }).join('\n');
   const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
     ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
-  const rota = normalizeRota().map(r => {
+  const rotaToBlock = (rotaArr) => normalizeRota(rotaArr).map(r => {
     const inner = Object.entries(r.shifts)
       .map(([name, ids]) => `${q(name)}: [${ids.map(q).join(', ')}]`)
       .join(', ');
-    return `  { day: ${q(r.day)}, shifts: { ${inner} } },`;
+    return `    { day: ${q(r.day)}, shifts: { ${inner} } },`;
   }).join('\n');
-  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};\n\nwindow.ROTA = [\n${rota}\n];`;
+  const curId = window.CURRENT_WEEK?.id;
+  const rotaBlock = rotaToBlock(curId ? rotaForWeek(curId) : window.ROTA).replace(/^    /gm, '  ');
+  const weekIds = editableWeekIds();
+  const rotaByWeek = weekIds.map(id => {
+    const body = rotaToBlock(rotaForWeek(id));
+    return `  ${q(id)}: [\n${body}\n  ],`;
+  }).join('\n');
+  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};\n\nwindow.ROTA = [\n${rotaBlock}\n];\n\nwindow.ROTA_BY_WEEK = {\n${rotaByWeek}\n};`;
 }
 
 function rosterWarnings() {
@@ -2366,7 +2392,7 @@ function bindRotaEditor() {
       const shiftName = cell.dataset.rotaDropShift;
       const opId = dragOpId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
       if (!opId || isNaN(dayIdx) || !shiftName) return;
-      const rota = window.ROTA;
+      const rota = rotaForWeek(editingWeekId());
       if (!rota[dayIdx] || !rota[dayIdx].shifts[shiftName]) return;
       // Same cell → no-op.
       if (dragFromDay === dayIdx && dragFromShift === shiftName) return;
@@ -2389,19 +2415,30 @@ function bindRotaEditor() {
       const dayIdx = +btn.dataset.rotaRemoveDay;
       const shiftName = btn.dataset.rotaRemoveShift;
       const opId = btn.dataset.rotaRemoveOp;
-      const cell = window.ROTA[dayIdx] && window.ROTA[dayIdx].shifts[shiftName];
+      const rota = rotaForWeek(editingWeekId());
+      const cell = rota[dayIdx] && rota[dayIdx].shifts[shiftName];
       if (!cell) return;
-      window.ROTA[dayIdx].shifts[shiftName] = cell.filter(id => id !== opId);
+      rota[dayIdx].shifts[shiftName] = cell.filter(id => id !== opId);
+      render();
+    });
+  });
+
+  // Week-picker tabs.
+  ed.querySelectorAll('[data-rota-week-id]').forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      STATE.editingRotaWeekId = tab.dataset.rotaWeekId;
       render();
     });
   });
 
   document.getElementById('rota-save')?.addEventListener('click', () => {
-    // Snapshot the current rota as the new "seed" so the editor reports "Saved"; persist
-    // it via the shared saveState() (localStorage + server when running on http(s)).
+    // Snapshot the current rotaByWeek as the new "seed" so the editor reports "Saved";
+    // persist via the shared saveState() (localStorage + server when running on http(s)).
     SEED_ROSTER.rota = structuredClone(window.ROTA || []);
+    SEED_ROSTER.rotaByWeek = structuredClone(window.ROTA_BY_WEEK || {});
     saveState();
-    // Refresh the shifts.js snippet so a copy/paste captures the rota too.
+    // Refresh the shifts.js snippet so a copy/paste captures every week.
     const ta = document.getElementById('roster-output');
     if (ta) ta.value = rosterSnippet();
     if (/^https?:$/.test(location.protocol)) saveJsFile('shifts', rosterSnippet(), 'shifts.js');
@@ -2411,6 +2448,9 @@ function bindRotaEditor() {
 
   document.getElementById('rota-reset')?.addEventListener('click', () => {
     window.ROTA = structuredClone(SEED_ROSTER.rota || []);
+    window.ROTA_BY_WEEK = structuredClone(SEED_ROSTER.rotaByWeek || {});
+    const cur = window.CURRENT_WEEK?.id;
+    if (cur) window.ROTA_BY_WEEK[cur] = window.ROTA;
     render();
   });
 }
@@ -2742,16 +2782,49 @@ function operatorColor(op) {
   return _ROTA_COLORS[idx];
 }
 
+// The four week-ids the Shifts page lets the team edit: current + next three.
+// Ordered current → future so the tabs read W24 · W25 · W26 · W27.
+function editableWeekIds() {
+  const all = window.WEEKS || [];
+  const cur = all.find(w => w.isCurrent) || all[0];
+  if (!cur) return [];
+  const sorted = all.slice().sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  const i = sorted.findIndex(w => w.id === cur.id);
+  return sorted.slice(i, i + 4).map(w => w.id);
+}
+
+// Which week the editor is currently displaying. Defaults to the current week.
+function editingWeekId() {
+  const ids = editableWeekIds();
+  if (STATE.editingRotaWeekId && ids.includes(STATE.editingRotaWeekId)) return STATE.editingRotaWeekId;
+  return ids[0] || window.CURRENT_WEEK?.id;
+}
+
+// Read the rota for a given week, lazily creating one (cloned from the current
+// week's rota) if it doesn't exist yet.
+function rotaForWeek(weekId) {
+  if (!window.ROTA_BY_WEEK) window.ROTA_BY_WEEK = {};
+  if (!window.ROTA_BY_WEEK[weekId]) {
+    window.ROTA_BY_WEEK[weekId] = structuredClone(window.ROTA || []);
+  }
+  return window.ROTA_BY_WEEK[weekId];
+}
+
 function rotaDirty() {
-  const a = JSON.stringify(window.ROTA || []);
-  const b = JSON.stringify(SEED_ROSTER.rota || []);
-  return a !== b;
+  const seed = SEED_ROSTER.rotaByWeek || {};
+  const live = window.ROTA_BY_WEEK || {};
+  for (const id of editableWeekIds()) {
+    if (JSON.stringify(seed[id] || []) !== JSON.stringify(live[id] || [])) return true;
+  }
+  return false;
 }
 
 // One-off migration for the older single-operator rota format (`{ day, operatorId }`).
 // Returns the rota in the new shape (`{ day, shifts: { [shiftName]: [opId, …] } }`).
-function normalizeRota() {
-  const rota = Array.isArray(window.ROTA) ? window.ROTA : [];
+// Operates on the given rota array (or window.ROTA when omitted) and returns the
+// normalised copy without mutating the source.
+function normalizeRota(rotaArr) {
+  const rota = Array.isArray(rotaArr) ? rotaArr : (Array.isArray(window.ROTA) ? window.ROTA : []);
   const shifts = (window.SHIFTS || []).map(s => s.name);
   return rota.map(r => {
     const out = { day: r.day, shifts: {} };
@@ -2772,9 +2845,16 @@ function normalizeRota() {
 }
 
 function renderRotaEditor() {
-  // Always work against the normalized shape so the renderer can stay simple.
-  window.ROTA = normalizeRota();
-  const rota = window.ROTA;
+  const editIds = editableWeekIds();
+  const editId = editingWeekId();
+  // Make sure the chosen week's rota is normalised into the shape the renderer
+  // and event handlers expect, and persist that normalised copy back.
+  window.ROTA_BY_WEEK[editId] = normalizeRota(rotaForWeek(editId));
+  // Keep window.ROTA pointing at the current week's rota.
+  const curId = window.CURRENT_WEEK?.id;
+  if (curId && window.ROTA_BY_WEEK[curId]) window.ROTA = window.ROTA_BY_WEEK[curId];
+
+  const rota = window.ROTA_BY_WEEK[editId];
   const shiftNames = (window.SHIFTS || []).map(s => s.name);
 
   const renderChip = (op) => `
@@ -2786,6 +2866,22 @@ function renderRotaEditor() {
 
   const palette = window.OPERATORS.map(renderChip).join('')
     || '<span class="muted">No operators defined yet.</span>';
+
+  // Week-picker tabs (current + next 3).
+  const tabs = editIds.map(id => {
+    const w = (window.WEEKS || []).find(x => x.id === id);
+    const label = w ? w.label.split(' · ')[0] : id;
+    const sub = w ? w.label.split(' · ').slice(1).join(' · ') : '';
+    const isCur = w?.isCurrent;
+    const isEditing = id === editId;
+    return `
+      <button type="button" class="rota-week-tab${isEditing ? ' active' : ''}${isCur ? ' is-current' : ''}"
+              data-rota-week-id="${escapeHtml(id)}"
+              title="${escapeHtml(w?.label || id)}">
+        <span class="rota-week-tab-id">${escapeHtml(label)}${isCur ? ' · this week' : ''}</span>
+        ${sub ? `<span class="rota-week-tab-sub">${escapeHtml(sub)}</span>` : ''}
+      </button>`;
+  }).join('');
 
   // Header row: an empty label cell, then 7 day labels.
   const headerRow = `
@@ -2820,13 +2916,19 @@ function renderRotaEditor() {
       ${cells}`;
   }).join('');
 
+  const editingWeek = (window.WEEKS || []).find(w => w.id === editId);
+  const headerLabel = editingWeek?.isCurrent
+    ? `This week's rota · ${escapeHtml(editingWeek.label)}`
+    : `Rota · ${escapeHtml(editingWeek?.label || editId)}`;
+
   return `
-    <div class="card rota-editor" id="rota-editor">
+    <div class="card rota-editor" id="rota-editor" data-editing-week="${escapeHtml(editId)}">
       <div class="card-header">
-        <span>This week's rota</span>
-        <span class="muted tiny">Drag operators onto a Day or Night cell · drag a chip away to remove · Save to persist</span>
+        <span>${headerLabel}</span>
+        <span class="muted tiny">Pick a week, drag operators onto a Day or Night cell, then Save</span>
       </div>
       <div class="card-body">
+        <div class="rota-week-tabs">${tabs}</div>
         <div class="detail-section">
           <h3>Operators</h3>
           <div class="rota-palette">${palette}</div>
@@ -3848,13 +3950,18 @@ async function addCaseById(id) {
       const m = mergeLiveCase(raw);
       if (!m) continue;
       if (m.added) added++;
+      // Auto-pick imported cases — the operator typed the ID specifically to
+      // follow up on this case, so it belongs in the Picked workspace from
+      // the moment it lands rather than sitting unpicked in the Overview.
+      const c = caseById(m.id);
+      if (c && !['closed', 'cancelled'].includes(c.status)) c.agentStatus = 'queued';
       STATE.kanbanSelected = m.id;
       if (!firstId) firstId = m.id;
     }
     if (!firstId) { showToast(`Case ${id} returned a malformed record.`, 'warn'); return; }
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
-    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from Case Center.`, 'success');
+    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from Case Center · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
     showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');

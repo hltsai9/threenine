@@ -2370,3 +2370,41 @@ table.case-table {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- Rota week-picker tabs ---- */
+
+.rota-week-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.rota-week-tab {
+  background: white;
+  border: 1px solid var(--border, #C5CCC1);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  transition: background 120ms, border-color 120ms, box-shadow 120ms;
+}
+.rota-week-tab:hover { background: #f7faf6; border-color: #b4c5b6; }
+.rota-week-tab.active {
+  background: #2E5641;
+  border-color: #2E5641;
+  color: white;
+  box-shadow: 0 2px 6px rgba(46, 86, 65, 0.18);
+}
+.rota-week-tab.is-current:not(.active) {
+  border-color: #2E5641;
+}
+.rota-week-tab-id {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+.rota-week-tab-sub {
+  font-size: 11px;
+  color: #7B857E;
+}
+.rota-week-tab.active .rota-week-tab-sub { color: #cad8c4; }

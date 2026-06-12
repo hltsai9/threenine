@@ -21,6 +21,9 @@ window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '
 window.CURRENT_WEEK = { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026', startsAt: '2026-06-07T00:00:00Z' };
 
 window.WEEKS = [
+  { id: 'W27-2026', label: 'W27 · June 28 – July 4, 2026', startsAt: '2026-06-28T00:00:00Z', endsAt: '2026-07-05T00:00:00Z', isFuture: true },
+  { id: 'W26-2026', label: 'W26 · June 21 – 27, 2026',    startsAt: '2026-06-21T00:00:00Z', endsAt: '2026-06-28T00:00:00Z', isFuture: true },
+  { id: 'W25-2026', label: 'W25 · June 14 – 20, 2026',    startsAt: '2026-06-14T00:00:00Z', endsAt: '2026-06-21T00:00:00Z', isFuture: true },
   { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026',     startsAt: '2026-06-07T00:00:00Z', endsAt: '2026-06-14T00:00:00Z', isCurrent: true },
   { id: 'W23-2026', label: 'W23 · May 31 – June 6, 2026', startsAt: '2026-05-31T00:00:00Z', endsAt: '2026-06-07T00:00:00Z' },
   { id: 'W22-2026', label: 'W22 · May 24 – 30, 2026',     startsAt: '2026-05-24T00:00:00Z', endsAt: '2026-05-31T00:00:00Z' },
