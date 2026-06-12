@@ -7,10 +7,10 @@ Today the SPA looks like a parallel case-management tool: operators can change s
 Reframing per the user:
 
 - **Archive** (`#/archive`) is the full Case Center overview, browsable by week — read-only, where operators go to **pick** new cases for follow-up.
-- **Kanban** (`#/cases`) stays the home route. Each shift's operator lands here first because they need to see what the previous shift handed over. It renders only **picked** cases.
-- **Every picked case carries two statuses: the *CC status* from Case Center and a *Track Status* set by the operator.** Track Status is a small fixed list (Weekend Case, HQ did not handle, Escalate to Core Team, Case Closed, Escalated to HQ please keep an eye on this, Need to contact user, Sanity Check). The first three have **scheduled handoff rules** telling the next shift's 1st-line operator when to reassign the case in Case Center (from the current assignee to a specific desired assignee). This is the platform's core value-add — it captures the operator's intent, which Case Center has no place to record.
-- A **Route Board** on each picked case visualises the next stop. Normally the case sits at *User*; when the track status is e.g. *Weekend Case*, an arrow goes to *HQ* with the scheduled time (e.g. *Sunday 17:30*).
-- **Existing action buttons stay** (assign to Core, escalate to HQ, chase owner, verify fix, return to requester, move to sanity check, etc.) — they are how the operator *sets and changes Track Status* on a picked case. They no longer mutate Case Center fields.
+- **Picked workspace** (`#/cases`) stays the home route. Each shift's operator lands here first because they need to see what the previous shift handed over. It renders only **picked** cases in a new two-zone layout: an aggregate **Route Board** strip across the top, and a **list + detail** split across the bottom.
+- **Every picked case carries two statuses: the *CC status* from Case Center and a *Track Status* set by the operator.** Track Status is a small fixed list (Weekend Case, HQ did not handle, Escalate to Core Team, Case Closed, Escalated to HQ — keep an eye, Need to contact user, Sanity Check). The first three have **scheduled handoff rules** telling the next shift's 1st-line operator when to reassign the case in Case Center (from the current assignee to a specific desired assignee). This is the platform's core value-add — it captures the operator's intent, which Case Center has no place to record.
+- A **three-station Route Board** (User · Core Team · HQ) visualises every picked case on its own row: a dot at the current station, an arrow + animated dot for cases with a scheduled handoff, an eyeball icon for cases the operator is watching.
+- **Track Status is set from a simple 7-item picker** on the case detail panel — the old CC-shaped action dropdown is dropped entirely. The picker shows all 7 names with a "Suggested for your shift" hint pill on the relevant ones.
 - **Analytics** live in the archive view, splitting picked vs unpicked + time-on-us/SLA trends.
 - **Keep** the operator-helper features that don't exist in Case Center: handover notes, reminders, shift/rota editor, owners editor (as a contact/TZ reference).
 - **`+ New case` stays** as the manual-import affordance for older Case Center cases that fall outside the look-back window (it pulls a single case by ID; it never creates a case in Case Center).
@@ -19,21 +19,27 @@ Read-only is already supported end-to-end: `local/serve.py`, `local/casecenter.p
 
 ## Recommended approach
 
-### 1. Reframe Archive and Kanban — kanban stays as home
+### 1. New Picked workspace layout
 
-- **`#/cases` (kanban) stays the default landing route.** Each shift's operator opens the app to see what was handed over; landing on the picked workspace is the right first view.
-- Kanban renders only `agentStatus === 'queued'` cases. Drop the bottom "backlog/unpicked" band entirely. **Columns are still driven by the CC `status` field** so the operator's mental map matches Case Center. Empty columns get a soft "no picked cases here" placeholder.
-- Cards display the Track Status as a coloured pill in the card header, and a tiny **Route Board** strip on the card footer showing *current assignee → next assignee · scheduled time* (see section 6). Cards whose scheduled handoff time is within the current shift (action due) or already past (action overdue) are visibly **highlighted** in place with **[Open in Case Center]** and **[Handover]** affordances. The Action-due watchlist counts these.
-- **`#/archive` becomes the full Case Center overview.** The week index (W21…current) and week-detail view stay — they already enumerate every case Case Center has surfaced. This is where the operator goes to find new cases to pick.
-- Sidebar nav surfaces both clearly: **Picked** (kanban) on top, **Overview** (archive) just below.
+`#/cases` (Picked) is the default landing route. It is rewritten from the existing kanban-by-CC-status into a **single-screen two-zone layout** rendering only `agentStatus === 'queued'` cases:
 
-Critical files: `prototype/app.js` (`renderCasesView`, `renderArchiveIndex`, `renderArchiveWeek`, the sidebar nav block).
+- **Top zone — Aggregate Route Board (1/3 height).** Three station columns: *User · Core Team · HQ*. One row per picked case (clickable; selecting a row loads it into the detail panel below). Each row shows a dot at the case's current station (derived from CC `assigneeDept` via the dept→role mapping in `owners.js`), an arrow + animated dot when the Track Status implies a scheduled move, and an eyeball icon for "watching" track statuses. Full visual rules in section 6.
+- **Bottom zone — List + Detail (2/3 height), split 1:2 width.**
+  - **Left 1/3 — Picked case list.** Flat list, one row per picked case (mirrors the top Route Board rows). Each row shows: subject, CC status badge, Track Status pill, due-time chip when relevant. Sort/filter chips above the list (CC status, Track Status, Due this shift, Overdue).
+  - **Right 2/3 — Case detail panel.** The existing detail panel content (CC-owned fields read-only, history, handover note, reminder, **Track Status picker**, ownership timeline, SLA / hold clocks). One row is always selected; defaults to the topmost picked case.
+- **Drop the CC status columns entirely.** The old kanban grouping is gone — CC status is just a badge on each row. The two-band (queued/unqueued) split is also gone since unpicked cases live in the Archive Overview.
+- **Empty state.** When no cases are picked, the bottom zone collapses to a single empty-state panel that points the operator at Overview ("Open Overview to pick cases — they'll show up here.")
+- Sidebar nav surfaces both routes: **Picked** (`#/cases`) on top, **Overview** (`#/archive`) just below.
+
+`#/archive` becomes the full Case Center overview. The week index (W21…current) and week-detail view stay — they already enumerate every case Case Center has surfaced. This is where the operator goes to find new cases to pick.
+
+Critical files: `prototype/app.js` (rewrite `renderCasesView` for the two-zone layout, new `renderRouteBoardStrip` / `renderPickedList` / reuse the existing detail panel), `renderArchiveIndex`, `renderArchiveWeek`, the sidebar nav block.
 
 ### 2. Make picking the central interaction
 
 - Reuse the existing `agentStatus: 'queued' | 'unqueued'` flag and `toggleQueue` (in `app.js`) as the pick mechanism — no new field. Rename UI affordances from "Queue / Queued" to **"Pick / Picked"** so the operator-facing language matches the user's mental model.
 - Add a `[Pick] / [Picked ✓]` button to every card in the archive week-detail table (`renderArchiveWeek`). Clicking pick is the *only* card-level mutation in archive view.
-- On the kanban, the toggle becomes "Unpick" (sends the case back to the archive overview).
+- On the Picked workspace, the toggle becomes "Unpick" (sends the case back to the archive overview).
 - Picked state persists via the existing operator layer (`agent-v1` localStorage key + `POST /api/save`). No backend schema change.
 
 Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive table renderer).
@@ -58,7 +64,7 @@ Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive tab
   - *HQ did not handle* — Night shift passes via handover; the next **Day shift** performs the reassignment at **17:30**, User → HQ.
   - *Escalate to Core Team* — Night shift passes via handover; the next **Day shift** performs the reassignment at **09:00**, User → Core Team.
   - Computed against the existing rota (`window.ROTA`) and `window.NOW`; reuse the shift-resolution helpers already in `app.js`.
-- Setting Track Status happens through the **existing action surface** — the status-transition dropdown and the per-status action buttons (assign to Core, escalate to HQ, verify fix, move to sanity check, etc.) all stay; they now write `trackStatus` instead of CC fields. The dropdown lists **all 7** Track Statuses to every shift in a single uniform list — no gating. Options the current shift typically uses (*Escalate to Core Team* and *HQ did not handle* on Night; *Weekend Case* on Fri/Sat shifts; the remaining four on Day) carry a small "Suggested for your shift" pill beside them as a hint; the operator can still pick any of the 7 with no extra click.
+- Setting Track Status happens through a **simple 7-item picker** on the case detail panel (right pane of the new bottom zone). The old CC-shaped status-transition dropdown and its per-status action buttons (assign to Core, escalate to HQ, chase owner, verify fix, return to requester, move to sanity check, close, cancel, reopen) are **removed**. The picker lists the 7 Track Status names in their canonical wording; the ones typically set by the current shift (*Escalate to Core Team* and *HQ did not handle* on Night; *Weekend Case* on Fri/Sat shifts; the remaining four on Day) carry a small "Suggested for your shift" hint pill — but every value is one click away regardless of shift.
 - **Track Status persists.** It never auto-clears — even after CC catches up to the desired routing or status. The operator must clear it manually via **Clear Track Status** on the detail panel. The clear action checks two pre-conditions and surfaces a soft confirmation if either is unmet (the operator can still proceed):
   - **Work is done** — interpretation depends on the Track Status:
     - *Weekend Case / HQ did not handle / Escalate to Core Team* → CC `assignee` (resolved via the dept→role mapping) now matches the Route Board's *To* chip.
@@ -70,28 +76,25 @@ Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive tab
   - **Action overdue (N)** — `dueAt` is in the past and CC still shows the old assignee.
 - This and the route-board (section 6) are the only new state shapes; everything else reuses existing operator-layer machinery.
 
-Critical files: `prototype/app.js` (the dropdown action handlers that now write `trackStatus`, the card renderer for the pill + highlight, the detail panel form, the watchlist banners, `agent-v1` (un)packing, the shift-aware scheduled-handoff computation).
+Critical files: `prototype/app.js` (the 7-item Track Status picker on the detail panel, the watchlist banners, `agent-v1` (un)packing for `trackStatus`, the shift-aware scheduled-handoff computation).
 
-### 4. Rewire existing actions to set *Track Status* (don't remove them)
+### 4. Remove CC-shaped actions; the only operator mutation is Track Status
 
-The action surface stays — those buttons and dropdowns are how the operator expresses intent. What changes is what they mutate:
+The existing CC-shaped action surface (status-transition dropdown, per-status buttons like *Assign to Core*, *Escalate to HQ*, *Chase owner*, *Verify fix*, *Return to requester*, *Move to sanity check*, *Close*, *Cancel*, *Reopen*) is **removed** — operators do all that work in Case Center. The only operator-driven mutation on a picked case is **Track Status** (via the 7-item picker, section 3).
 
-- **Status-transition dropdown** and **per-status action buttons** (assign to Core, escalate to HQ, chase owner, verify fix, return to requester, move to sanity check, close, cancel, reopen, etc.) now write `trackStatus` on the operator layer **only**. The dropdown surfaces all 7 Track Statuses to every shift, with the current-shift-relevant ones highlighted on top (see section 3); they no longer touch `status`, `coreId`, `hqId`, `currentOwner`, `holdMs`, `holdStartedAt`, `slaPaused`, `slaAccumulatedMs`, or push CC-shaped events into `history[]`. CC-owned fields are display-only.
-- **Routing is not rigid.** Drop any state-machine guard that restricts which statuses an operator can pick (e.g. "can only escalate from with_core to with_hq"). Every Track Status is selectable from anywhere. If `validTransitions` / similar helpers exist in `app.js`, replace their call sites with the full track-status enum.
-- **Drag-between-columns** on the kanban is removed — cards stay in their CC `status` column. The way to set Track Status is the dropdown / action button.
-- **History entries** for these actions are kept, but tagged as operator-intent events (e.g. `kind: 'track-status-set'`, with `from`, `to`, `who`, `at`). They live in the operator layer alongside handover/reminder and never get sent to Case Center.
-- **`+ New case` stays.** It's the manual-import affordance for older cases that aren't in the recent look-back window — the operator types a Case Center ID and the existing `addCaseById` flow pulls that single case (`fetch_raw` honours `CASE_ID` already, per `docs/SETUP.md`). After import, the case appears in the archive overview and can be picked.
+- **Drop** the kanban-by-CC-status grouping, the drag-between-columns handler, and any `validTransitions` / state-machine guards that gated those actions.
+- **Drop** the handlers that mutated `status`, `coreId`, `hqId`, `currentOwner`, `holdMs`, `holdStartedAt`, `slaPaused`, `slaAccumulatedMs`, or pushed CC-shaped events into `history[]`. CC-owned fields are display-only everywhere in the SPA.
+- **History entries** for operator-intent changes are kept, but only one shape now: `{ kind: 'track-status-set', from, to, who, at }`. They live in the operator layer alongside handover/reminder and never get sent to Case Center.
+- **`+ New case` stays.** It's the manual-import affordance for older cases that aren't in the recent look-back window — the operator types a Case Center ID and the existing `addCaseById` flow pulls that single case (`fetch_raw` honours `CASE_ID` already, per `docs/SETUP.md`). The imported case lands in the Archive Overview at the week of its `createdAt` and can be picked from there.
 - **Status flow** page (`#/flow`) and **Clock model** page (`#/clocks`) — keep as read-only reference docs.
 
-The case detail panel keeps the full read-only display of CC-owned fields (subject, priority, user/dept, CC status label, process timeline, wait-user detail, ownership timeline, SLA/hold clocks). Operators *see* CC state; they can't change it from here.
-
-Card actions on the kanban: existing action set, retargeted to Track Status, plus **Pick / Unpick**, **Handover note**, **Set reminder**, and an **[Open in Case Center]** affordance (existing `caseLink`) that becomes prominent on any action-due card.
+The case detail panel keeps the full read-only display of CC-owned fields (subject, priority, user/dept, CC status label, process timeline, wait-user detail, ownership timeline, SLA / hold clocks). Per-case affordances on the detail panel: **Track Status picker (7 options)**, **Clear Track Status** (with preconditions, section 3), **Pick / Unpick**, **Handover note**, **Set reminder**, **[Open in Case Center]** (the existing `caseLink`, prominent when the case is action-due / overdue).
 
 ### 5. Auto-refresh toggle for picked cases
 
 The operator needs the Case Center state on picked cases to stay reasonably fresh so the Route Board's "current assignee" and the action-due / overdue highlight track reality.
 
-- Add a small **Auto-refresh** control in the kanban toolbar (or the sidebar near the operator switcher) with:
+- Add a small **Auto-refresh** control in the Picked workspace toolbar (above the Route Board strip, or in the sidebar near the operator switcher) with:
   - On/Off toggle (default **Off**; remembered in localStorage as `case-tracker-autorefresh`).
   - Interval picker: **5 / 10 / 15 / 30 / 60 minutes** (remembered as `case-tracker-autorefresh-min`).
   - Inline state next to it: "Last refreshed Xm ago" + a manual **Refresh now** button.
@@ -102,25 +105,36 @@ The operator needs the Case Center state on picked cases to stay reasonably fres
 
 Critical files: `prototype/app.js` (toolbar control, interval loop, scoped refresh call), `local/serve.py` (accept `?ids=`), `backend/api.py` (accept `?ids=`).
 
-### 6. Route Board — visualise the next stop
+### 6. Aggregate Route Board — three stations, one row per picked case
 
-On every picked case, render a small **Route Board** that shows where the case currently sits and where (if anywhere) it is planned to go next.
+The top zone of the Picked workspace is a clean visualisation with minimal text: three station columns and one row per picked case.
 
-- **Default state (no Track Status, or a non-scheduled one):** a single chip — `User` — meaning the case is sitting with the requester and the operator has no pending hand-off. For non-scheduled track statuses (Case Closed, Escalated to HQ — keep an eye, Need to contact user, Sanity Check) the route board shows the current assignee chip plus a small tag of the track status; no arrow.
-- **Scheduled state (Weekend Case · HQ did not handle · Escalate to Core Team):** two chips joined by an arrow — `From → To` — with the scheduled time underneath the arrow.
-  - *Weekend Case* → `User ──▶ HQ` · *Sunday 17:30*
-  - *HQ did not handle* → `User ──▶ HQ` · *Day shift, 17:30*
-  - *Escalate to Core Team* → `User ──▶ Core Team` · *Day shift, 09:00*
-  - When the dueAt falls within the current shift → arrow turns amber ("action due").
-  - When `now > dueAt` and the CC `assignee` still equals the *From* chip → arrow turns red ("action overdue").
-- **Where it renders:**
-  - **Kanban card footer** — single-line compact form: chip → chip · time.
-  - **Case detail panel** — full-width version with the same chips but also a label above ("Next stop") and the *From / To / Time / Owning shift* spelled out.
-- **Chip derivation.** The **From** chip is derived from the live CC `assigneeDept` field via a dept→role mapping kept in `prototype/owners.js` (each Core Team desk and HQ Product Team row carries an explicit `route_role` of `Core Team` or `HQ`; anything else → `User`). The mapping is editable in the existing Owners editor (`#/owners`) — see section 8. The **To** chip is the abstract destination implied by Track Status (*User*, *Core Team*, or *HQ*). If the From chip can't be resolved (dept not in mapping), fall back to the literal CC assignee name and surface a small "unmapped" hint so the team adds it to `owners.js`.
-- **Computation:** pure function of `(trackStatus, assigneeDept, now, ROTA, OWNERS)`. No new persisted state — `scheduledHandoff` is derived on the fly each render. Reuse existing rota/shift helpers so the "next Day shift at 17:30" lookup honours the operator's actual schedule.
-- Zero-dependency: chips + CSS arrow, no SVG library needed.
+- **Stations (column headers):** *User · Core Team · HQ*. Always exactly three; no more, no fewer.
+- **Per-case row.** Each picked case is a horizontal lane spanning all three stations. The visual elements:
+  - **Dot at the current station** — derived from CC `assigneeDept` via the dept→role mapping in `owners.js`. Each Core Team desk and HQ Product Team row carries a `route_role` field (one of `Core Team` / `HQ` / `User`); anything unmapped falls back to *User* with a small "unmapped" hint so the team adds it.
+  - **Arrow + animated travelling dot** — drawn when Track Status implies a scheduled move (see table below). The small dot loops along the arrow at a slow pace (~2-second cycle) to signal "this case is in flight to its next stop".
+  - **Eyeball icon on a station** — drawn for the "watching" Track Statuses (see table below).
+  - **Right-edge label** — case ID + short subject + due-time chip (e.g. *Sun 17:30* or *09:00*, amber when due this shift, red when overdue).
+- **Track Status → visual rules:**
 
-Critical files: `prototype/app.js` (route-board renderer, scheduled-handoff computation, dept→role lookup), `prototype/owners.js` (per-dept `route_role` field), `prototype/styles.css` (chip + arrow styling).
+  | Track Status | Arrow | Eyeball | Notes |
+  | --- | --- | --- | --- |
+  | *Weekend Case* | User → HQ (with travelling dot) | — | Due Sunday Day shift, 17:30 |
+  | *HQ did not handle* | User → HQ (with travelling dot) | — | Due next Day shift, 17:30 |
+  | *Escalate to Core Team* | User → Core Team (with travelling dot) | — | Due next Day shift, 09:00 |
+  | *Escalated to HQ — keep an eye* | — | On HQ | Watching at HQ |
+  | *Need to contact user* | — | On User | Watching at User |
+  | *Case Closed* | — | — | Show a small "✓ closed" badge next to the dot |
+  | *Sanity Check* | — | — | Show a small "sanity check" tag next to the dot |
+  | *(none)* | — | — | Just the dot at the current station |
+
+- **Mismatch surfacing.** When the Track Status implies an arrow but the current dot is not at the *From* station (e.g. *Weekend Case* but CC `assigneeDept` resolves to HQ already), the lane shows a soft warning marker so the operator notices the picture doesn't match the intent. When the dot has reached the *To* station (arrow's destination), the arrow fades and a "✓ delivered" marker appears at the destination — the Track Status pill is still there, awaiting manual clear (section 3).
+- **Selection.** Clicking a lane selects that case (loads it into the detail panel below; highlights the matching row in the list). Selection is global to the page.
+- **Detail panel mirror.** The right pane (case detail) also renders a single-case version of this Route Board at the top of the detail content, with a "Next stop" label and the *From / To / Time / Owning shift* spelled out in words for clarity.
+- **Computation.** Pure function of `(trackStatus, assigneeDept, now, ROTA, OWNERS)`. No new persisted state — `scheduledHandoff = { from, to, dueAt, dueShift }` is derived on the fly each render. Reuse existing rota / shift helpers so the "next Day shift at 17:30" lookup honours the actual schedule.
+- **Zero-dependency.** Stations + dots + arrows + animation are CSS / SVG inline; no chart library.
+
+Critical files: `prototype/app.js` (`renderRouteBoardStrip` for the aggregate view, single-case version inside the detail panel, scheduled-handoff computation, dept→role lookup), `prototype/owners.js` (per-dept `route_role` field surfaced as a small dropdown in the Owners editor), `prototype/styles.css` (stations grid, dot, arrow, travelling-dot animation, eyeball, amber/red action-due treatment).
 
 ### 7. Analytics: split picked vs unpicked + time-on-us trend
 
@@ -152,10 +166,10 @@ Augment the existing `weekStats` function and its renderers in `prototype/app.js
 
 ## Files to modify (most of the work concentrates here)
 
-- `prototype/app.js` — card/board renderer (CC `status` columns with Track Status pill + Route Board + action-due highlight), archive renderers, `weekStats`, retarget existing action handlers to write `trackStatus` instead of CC fields, drop transition guards, remove the drag-between-columns handler, scheduled-handoff computation (uses `window.ROTA` + `window.NOW`), auto-refresh toolbar + interval loop, button rewording, `agent-v1` (un)packing for `trackStatus`. `+ New case` stays as the manual single-case import.
+- `prototype/app.js` — rewrite `renderCasesView` for the two-zone layout (aggregate Route Board strip on top, list + detail split 1:2 below). Add `renderRouteBoardStrip` (aggregate) and `renderRouteBoardSingle` (detail mirror). Add 7-item Track Status picker + Clear with preconditions. Delete the CC-shaped action handlers, drag-between-columns, two-band split, and validTransitions / state-machine guards. Add scheduled-handoff computation and dept→role lookup. Add archive renderers' picked-vs-unpicked split, `weekStats`. Auto-refresh toolbar + interval loop. `agent-v1` (un)packing for `trackStatus`. `+ New case` stays.
 - `local/serve.py`, `backend/api.py` — accept `?ids=` on `GET /api/cases` for scoped refresh of picked cases.
 - `prototype/index.html` — sidebar nav labels, page title.
-- `prototype/styles.css` — Track Status pill colours, Route Board chips + arrow + amber/red action-due treatment, histogram bars, picked-vs-unpicked split rows.
+- `prototype/styles.css` — Picked workspace two-zone grid (top strip / bottom 1:2 split). Three-station Route Board styling (stations, dot, arrow, travelling-dot keyframe animation, eyeball, amber / red action-due treatment, ✓ delivered marker). Track Status pill colours. Histogram bars, picked-vs-unpicked split rows.
 - `prototype/tour.js` — refresh the product tour steps so they describe the new flow ("browse Overview → Pick → analyze in Picked view").
 - `docs/RELEASE_NOTES.md` — one entry under today.
 - `prototype/standalone.html` — regenerated by `node prototype/bundle.mjs`.
@@ -168,17 +182,18 @@ No changes to `data.js`, `shifts.js`. The only backend tweak is the `?ids=` quer
 
 1. `node prototype/tests/run.cjs` — must pass (Stop hook also runs this). Update any tests that asserted on removed actions (status transitions, create case) to reflect the new behavior.
 2. `cd prototype && python3 -m http.server 8000` and walk through:
-   - Land on `#/cases` (Picked) by default; if you have no picks yet, the empty-state copy directs you to **Overview**.
+   - Land on `#/cases` (Picked) by default; if you have no picks yet, the empty-state copy directs you to **Overview**. No CC status columns appear anywhere — confirm the old kanban grid is gone.
    - Open `#/archive`; see the week index with picked-vs-unpicked split stats. Open a week; verify the table lists every CC case with a Pick button; pick 3 cases.
-   - Return to `#/cases`; see exactly those 3 cases, grouped by their **CC `status`** column with a neutral "on track" treatment.
-   - On one card, set Track Status = **Weekend Case** via the action dropdown. The card **stays in its CC `status` column**, gains a Track Status pill in the header, and the Route Board strip shows `User ──▶ HQ` · *Sunday 17:30*.
-   - Set another card to Track Status = **Escalate to Core Team**; Route Board shows `User ──▶ Core Team` · *Day shift 09:00*.
-   - Set a third card to Track Status = **Case Closed** (a non-scheduled one); Route Board collapses to a single `User` chip + Track Status tag, no arrow.
-   - Advance `window.NOW` (or wait into the relevant shift) so a scheduled handoff falls within the current shift — the Route Board arrow turns amber, the card highlights, and the **Action due this shift (N)** watchlist increments. With `window.NOW` past `dueAt` while CC `assignee` still equals the From chip, the arrow turns red and the card lands in **Action overdue (N)**.
-   - Confirm CC-owned fields on the detail panel render but are not editable. The `+ New case` button is still present; type an older Case Center ID and verify the manual-import flow brings that one case into the archive overview.
+   - Return to `#/cases`. The page is split into two zones: aggregate **Route Board** strip on top (1/3 height), and **list + detail** below (2/3 height, 1:2 width). Three station columns at the top: *User · Core Team · HQ*. Each picked case is one lane in the strip, with a dot at its current station (derived from CC `assigneeDept`).
+   - Select the first case (click its lane or its list row) — the detail panel on the right populates. On the detail panel, use the **7-item Track Status picker** to set Track Status = **Weekend Case**. The case's lane in the top strip gains an arrow from User to HQ with a slow-looping travelling dot; the right-edge label shows *Sun 17:30*.
+   - Set the second case's Track Status = **Escalate to Core Team**. Its lane shows User → Core Team with the travelling dot and right-edge label *Day shift 09:00*.
+   - Set the third case's Track Status = **Escalated to HQ — keep an eye**. Its lane shows the dot at HQ (assuming CC `assigneeDept` resolves there) with an **eyeball icon** on the HQ station; no arrow.
+   - Set a fourth case's Track Status = **Case Closed**. Lane shows the dot at its current station with a **✓ closed badge** next to it; no arrow.
+   - Advance `window.NOW` (or wait into the relevant shift) so a scheduled handoff falls within the current shift — the arrow turns amber, the lane's right-edge time chip turns amber, and the **Action due this shift (N)** watchlist increments. With `window.NOW` past `dueAt` while CC `assignee` still equals the *From* station, the arrow turns red and the case lands in **Action overdue (N)**.
+   - Confirm CC-owned fields on the detail panel render but are not editable. There is **no CC-shaped action dropdown / button** — only the Track Status picker and the operator-helper affordances. The `+ New case` button is still present; type an older Case Center ID and verify the manual-import flow brings that one case into the archive overview at the week of its `createdAt`.
    - Add a handover note and a reminder — both persist.
-   - Turn on the **Auto-refresh** toggle at 5 minutes; verify the picked-case scoped refresh fires (or trigger it via **Refresh now**), CC current-status / assignee updates if they changed in Case Center, and `trackStatus` / picks / handovers / reminders survive the merge. Track Status does **not** auto-clear when CC catches up — the Route Board updates the From chip (so the arrow now goes *To → To*, signalling "delivered"), but the Track Status pill stays until the operator clears it manually (see next step).
-   - Manually clear Track Status on a delivered case: open the case detail panel and choose **Clear Track Status**. The route board collapses back to a single chip. Per the team rule, only do this once the **work is done** *and* the relevant **handover note for the next shift** has been written. The Clear action surfaces a soft confirmation when either pre-condition isn't met — for *Case Closed* the check is "CC status is closed/cancelled"; for the scheduled types it is "CC assignee now matches the route's *To* chip"; for the others it's operator judgment.
+   - Turn on the **Auto-refresh** toggle at 5 minutes; verify the picked-case scoped refresh fires (or trigger it via **Refresh now**), CC current-assignee / status updates if they changed in Case Center, and `trackStatus` / picks / handovers / reminders survive the merge. When the CC `assignee` reaches the lane's *To* station, the arrow fades and a **✓ delivered** marker appears at the destination — the Track Status pill stays until manually cleared.
+   - Manually clear Track Status on a delivered case via **Clear Track Status** on the detail panel. The lane collapses back to a single dot at the current station. Per the team rule, only clear once the **work is done** *and* the **handover note for the next shift** is written; the Clear action surfaces a soft confirmation when either pre-condition isn't met (for *Case Closed*: CC status is closed/cancelled; for the scheduled types: CC assignee matches the route's *To* station; others: operator judgment).
    - Refresh the page; picks, handover, reminder survive (operator layer in localStorage).
    - Switch operator via the sidebar; confirm picked state behaves as expected for the chosen operator model (today picks are global per the existing implementation — call out in the release note if we keep that vs make picks per-operator).
 3. Reopen `prototype/standalone.html` via `file://` after `node prototype/bundle.mjs`; the same walkthrough should work without a server.
