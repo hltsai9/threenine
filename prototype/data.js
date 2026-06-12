@@ -87,7 +87,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T22:30:00Z',
     lastOwnerContact: { at: '2026-06-12T07:30:00Z', channel: 'Slack' },
-    handover: { note: 'Pinged FIT-APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
+    handover: { note: 'Pinged Core Team APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
     notes: 'User on macOS Sonoma; password works but session 401s within 60s.',
     createdAt: '2026-06-11T22:00:00Z',
     createdBy: 'op-na',
@@ -116,15 +116,15 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T13:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
-    handover: { note: 'FIT-EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
-    notes: 'FIT confirmed nothing client-side; suspect HQ Data Platform.',
+    handover: { note: 'Core Team EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
+    notes: 'Core Team confirmed nothing client-side; suspect HQ Data Platform.',
     fitCannotResolve: true,
     createdAt: '2026-06-11T13:00:00Z',
     createdBy: 'op-db',
     history: [
       { at: '2026-06-11T13:00:00Z', who: 'op-db', kind: 'created' },
       { at: '2026-06-11T13:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — EMEA desk' },
-      { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'FIT-EMEA: server-side, recommend escalate' },
+      { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'Core Team EMEA: server-side, recommend escalate' },
     ],
   },
   {
@@ -156,12 +156,12 @@ window.CASES = [
       { at: '2026-06-10T17:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-06-10T17:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
+      { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity Team' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
-      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
+      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
       { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
     ],
   },
@@ -192,15 +192,15 @@ window.CASES = [
     history: [
       { at: '2026-06-09T15:00:00Z', who: 'op-db', kind: 'created' },
       { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
+      { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Mobile App' },
       { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
-      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
+      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
       { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
-      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
+      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
     ],
   },
   {
@@ -241,7 +241,7 @@ window.CASES = [
       dueDateTime: '2026-06-12T10:00:00Z',
       transition: 'Returned to user',
       transitionDateTime: '2026-06-11T14:00:00Z',
-      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'FIT' },
+      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'Core Team' },
     },
   },
   {
@@ -295,7 +295,7 @@ window.CASES = [
     holdStartedAt: '2026-06-12T08:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'Exec visibility — keep close eye even though FIT is responding.',
+    notes: 'Exec visibility — keep close eye even though Core Team is responding.',
     createdAt: '2026-06-12T08:00:00Z',
     createdBy: 'op-da',
     history: [
@@ -324,7 +324,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T15:30:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'FIT looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
+    handover: { note: 'Core Team looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
     notes: 'Approaching SLA threshold.',
     createdAt: '2026-06-11T15:00:00Z',
     createdBy: 'op-db',
@@ -360,7 +360,7 @@ window.CASES = [
     history: [
       { at: '2026-06-11T18:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-06-11T18:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+      { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
     ],
   },
   {
@@ -412,7 +412,7 @@ window.CASES = [
     holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
-    notes: 'Logged via on-call rotation; needs FIT triage.',
+    notes: 'Logged via on-call rotation; needs Core Team triage.',
     createdAt: '2026-06-12T11:30:00Z',
     createdBy: 'op-da',
     history: [
@@ -439,7 +439,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-12T11:30:00Z',
     lastOwnerContact: { at: '2026-06-12T12:30:00Z', channel: 'Slack' },
-    handover: { note: 'FIT-EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
+    handover: { note: 'Core Team EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
     notes: 'Fresh contact; no prompt expected.',
     createdAt: '2026-06-12T08:00:00Z',
     createdBy: 'op-da',
@@ -476,7 +476,7 @@ window.CASES = [
       { at: '2026-06-10T20:00:00Z', who: 'op-na', kind: 'created' },
       { at: '2026-06-10T20:30:00Z', who: 'op-na', kind: 'flag', detail: 'Marked Escalated (watch)' },
       { at: '2026-06-10T21:00:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
       { at: '2026-06-12T11:00:00Z', who: 'op-da', kind: 'status', detail: 'HQ → Sanity Check' },
     ],
   },
@@ -495,7 +495,7 @@ window.CASES = [
     holdMs: { fit: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-02T18:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'FIT pushed certs via MDM. Closed.',
+    notes: 'Core Team pushed certs via MDM. Closed.',
     closedAt: '2026-06-02T19:00:00Z', resolutionCode: 'fixed_by_owner',
     createdAt: '2026-06-02T13:00:00Z', createdBy: 'op-da',
     history: [
@@ -521,7 +521,7 @@ window.CASES = [
     createdAt: '2026-06-03T15:00:00Z', createdBy: 'op-db',
     history: [
       { at: '2026-06-03T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-03T19:00:00Z', who: 'op-db', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+      { at: '2026-06-03T19:00:00Z', who: 'op-db', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
       { at: '2026-06-04T17:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
     ],
   },
@@ -581,7 +581,7 @@ window.CASES = [
     holdMs: { fit: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-26T17:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'FIT-EMEA reset client; closed.',
+    notes: 'Core Team EMEA reset client; closed.',
     closedAt: '2026-05-26T18:00:00Z', resolutionCode: 'fixed_by_owner',
     createdAt: '2026-05-26T09:00:00Z', createdBy: 'op-db',
     history: [
@@ -608,7 +608,7 @@ window.CASES = [
     history: [
       { at: '2026-05-27T14:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-05-27T14:30:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated' },
-      { at: '2026-05-27T19:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-05-27T19:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
       { at: '2026-05-28T12:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
     ],
   },
@@ -672,8 +672,8 @@ window.CASES = [
     slaAccumulatedMs: 0,
     holdMs: { fit: 0, hq: 0 }, holdStartedAt: '2026-06-04T11:00:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'Carried over from W23. FIT-AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
-    notes: 'Reproducible only intermittently; FIT collecting client logs.',
+    handover: { note: 'Carried over from W23. Core Team AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
+    notes: 'Reproducible only intermittently; Core Team collecting client logs.',
     createdAt: '2026-06-04T10:00:00Z', createdBy: 'op-db',
     history: [
       { at: '2026-06-04T10:00:00Z', who: 'op-db', kind: 'created' },

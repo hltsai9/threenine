@@ -504,7 +504,7 @@ function derivePromptsForCase(c) {
 }
 
 const PROMPT_DEFS = {
-  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
+  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
   chase_fit:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
   chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
@@ -720,7 +720,7 @@ function renderWatchlists(sla, escalated) {
         <span class="mono muted">${c.id}</span>
         <span class="watch-subject">${escapeHtml(c.subject)}</span>
         <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
-        <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
+        <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(Core Team|FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
       </a>
     `;
   };
@@ -939,7 +939,7 @@ function renderKanbanCard(c) {
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
       <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
       <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
+        <span>${owner ? escapeHtml(owner.name.replace(/^(Core Team|FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
@@ -1378,7 +1378,7 @@ function renderDetailActions(c) {
 
   // Non-status actions stay as buttons.
   if (c.status === 'with_fit') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to FIT</button>`);
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to Core Team</button>`);
   }
   if (c.status === 'with_hq') {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
@@ -2034,8 +2034,8 @@ function bindRosterEditor() {
 /* ---------- Owners editor (Owners page) ---------- */
 
 function makeOwnerId(pool, name, exceptIndex) {
-  // Drop boilerplate words so "FIT — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
-  const cleaned = String(name || '').toLowerCase().replace(/\b(fit|hq|desk|team|product|the)\b/g, ' ');
+  // Drop boilerplate words so "Core Team — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
+  const cleaned = String(name || '').toLowerCase().replace(/\b(core|fit|hq|desk|team|product|the)\b/g, ' ');
   const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || pool;
   const want = pool + '-' + base;
   const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
@@ -2085,7 +2085,7 @@ function renderOwnerRows(pool) {
     const refs = ownerRefCounts(pool, o.id);
     return `
     <tr data-pool="${pool}" data-oi="${i}">
-      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'FIT — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
       <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
       <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
       <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
@@ -2104,7 +2104,7 @@ function renderOwnersTable(pool, label, regionLabel) {
       <div class="re-scroll"><table class="re-table"><thead><tr>
         <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
       </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
-      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'FIT desk' : 'HQ team'}</button></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'Core Team desk' : 'HQ team'}</button></div>
     </div>`;
 }
 
@@ -2138,14 +2138,14 @@ function renderOwnersPage() {
   const warns = ownersWarnings();
   const warnHtml = warns.length
     ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
-    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} FIT desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
       <div class="subtitle">Core Team desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
     </div></div>
     <div class="card roster-editor" id="owners-editor">
-      <div class="card-header"><span>Edit FIT desks &amp; HQ teams</span></div>
+      <div class="card-header"><span>Edit Core Team desks &amp; HQ teams</span></div>
       <div class="card-body">
         ${renderOwnersTable('fit', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
@@ -2165,7 +2165,7 @@ function deleteOwner(pool, i) {
   const o = window.OWNERS[pool][i];
   if (!o) return;
   const field = pool === 'fit' ? 'fitId' : 'hqId';
-  const kind = pool === 'fit' ? 'FIT desk' : 'HQ team';
+  const kind = pool === 'fit' ? 'Core Team desk' : 'HQ team';
   const refs = ownerRefCounts(pool, o.id);
   const others = window.OWNERS[pool].filter((_, j) => j !== i);
   const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
@@ -2444,7 +2444,7 @@ function renderStatusFlow() {
           <path d="M760,100 L760,448" marker-end="url(#arr-forward)"/>
         </g>
         <g font-size="11" fill="#2563eb" font-weight="500">
-          <text x="189" y="34" text-anchor="middle">Assign FIT</text>
+          <text x="189" y="34" text-anchor="middle">Assign Core Team</text>
           <text x="409" y="34" text-anchor="middle">Escalate to HQ</text>
           <text x="649" y="34" text-anchor="middle">Move to Sanity</text>
           <text x="772" y="280" text-anchor="start">Verify &amp; close</text>
@@ -2495,14 +2495,14 @@ function renderStatusFlow() {
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>FIT hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
         <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
         <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>FIT / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
+        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>Core Team / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
         <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Close as resolved</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
         <tr><td>Any non-terminal</td><td>Cancel case</td><td><span class="pill pill-cancelled">Cancelled</span></td><td>All clocks stop · no resolution code</td></tr>
       </tbody>
@@ -2520,7 +2520,7 @@ function renderClockModel() {
     history: [
       { at: ago(10), who: 'op', kind: 'created', detail: 'Case opened (triage)' },
       { at: ago(8), who: 'op', kind: 'assigned', detail: 'Core Team — APAC desk' },
-      { at: ago(5), who: 'op', kind: 'escalated', detail: 'FIT → HQ Product Team' },
+      { at: ago(5), who: 'op', kind: 'escalated', detail: 'Core Team → HQ Product Team' },
       { at: ago(3), who: 'op', kind: 'status', detail: '→ Sanity Check' },
       { at: ago(1), who: 'op', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
     ],
@@ -2563,7 +2563,7 @@ function renderClockModel() {
             <td>${swatch('tl-triage')}<strong>First line</strong></td>
             <td>Time the first-line agent handled it directly — <strong>triage</strong> while the case is New.</td>
             <td>On creation (status New).</td>
-            <td>When assigned to FIT, or returned / cancelled from New.</td>
+            <td>When assigned to Core Team, or returned / cancelled from New.</td>
             <td>Summed from history segments.</td>
           </tr>
           <tr>
@@ -2670,8 +2670,8 @@ function handlePrompt(caseId, kind) {
     const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
       <h3>Assign to Core Team</h3>
-      <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
-      <label>FIT desk</label>
+      <div class="modal-sub">Pick the Core Team desk that should triage this case.</div>
+      <label>Core Team desk</label>
       <select data-field="fitId">${opts}</select>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
@@ -2697,11 +2697,11 @@ function handlePrompt(caseId, kind) {
     const opts = window.OWNERS.hq.map(h => `<option value="${h.id}"${h.id === c.hqId ? ' selected' : ''}>${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
     showModal(`
       <h3>Escalate to HQ Product Team</h3>
-      <div class="modal-sub">FIT can't resolve. Pick the HQ team that owns this area.</div>
+      <div class="modal-sub">Core Team can't resolve. Pick the HQ team that owns this area.</div>
       <label>HQ team</label>
       <select data-field="hqId">${opts}</select>
       <label>Reason (optional)</label>
-      <textarea data-field="reason" placeholder="What did FIT find?"></textarea>
+      <textarea data-field="reason" placeholder="What did the Core Team find?"></textarea>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn btn-primary" data-modal-submit>Escalate</button>
@@ -2720,8 +2720,8 @@ function handlePrompt(caseId, kind) {
       c.fitCannotResolve = false;
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
       const hqName = getOwner('hq', hqId).name;
-      logHistory(c, op, 'escalated', `FIT → ${hqName}${reason ? ' · ' + reason : ''}`);
-      showToast(`${c.id} escalated to ${hqName}. FIT clock stopped, HQ clock running.`, 'success');
+      logHistory(c, op, 'escalated', `Core Team → ${hqName}${reason ? ' · ' + reason : ''}`);
+      showToast(`${c.id} escalated to ${hqName}. Core Team clock stopped, HQ clock running.`, 'success');
       render();
       return true;
     });
@@ -2745,7 +2745,7 @@ function handlePrompt(caseId, kind) {
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       logHistory(c, op, 'reminder', `Reminder via ${channel}${msg ? ': ' + msg : ''}`);
       const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
-      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'FIT' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
+      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
       render();
       return true;
     });
@@ -2903,7 +2903,7 @@ function handlePrompt(caseId, kind) {
         c.fitId = null;
         c.hqId = null;
         c.fitCannotResolve = false;
-        detail = `Requester replied · resumed unassigned (FIT/HQ cleared)`;
+        detail = `Requester replied · resumed unassigned (Core Team/HQ cleared)`;
       }
       if (note) detail += ` · ${note}`;
       logHistory(c, op, 'resumed', detail);
@@ -3019,7 +3019,7 @@ function handlePrompt(caseId, kind) {
       <h3>${existing ? 'Update' : 'Set'} reminder on ${escapeHtml(c.id)}</h3>
       <div class="modal-sub">${existing
         ? 'Reminder is currently set for ' + fmtUntil(existing.fireAt) + '.'
-        : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC FIT come online before assigning).'}</div>
+        : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC Core Team come online before assigning).'}</div>
       <label>Remind me in…</label>
       <select data-field="when">${presets.map(p => `<option value="${p.value}">${escapeHtml(p.label)}</option>`).join('')}</select>
       <label>…or at a specific time <span class="muted tiny">(today, or tomorrow if it's already past)</span></label>

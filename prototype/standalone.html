@@ -1937,7 +1937,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T22:30:00Z',
     lastOwnerContact: { at: '2026-06-12T07:30:00Z', channel: 'Slack' },
-    handover: { note: 'Pinged FIT-APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
+    handover: { note: 'Pinged Core Team APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
     notes: 'User on macOS Sonoma; password works but session 401s within 60s.',
     createdAt: '2026-06-11T22:00:00Z',
     createdBy: 'op-na',
@@ -1966,15 +1966,15 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T13:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
-    handover: { note: 'FIT-EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
-    notes: 'FIT confirmed nothing client-side; suspect HQ Data Platform.',
+    handover: { note: 'Core Team EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
+    notes: 'Core Team confirmed nothing client-side; suspect HQ Data Platform.',
     fitCannotResolve: true,
     createdAt: '2026-06-11T13:00:00Z',
     createdBy: 'op-db',
     history: [
       { at: '2026-06-11T13:00:00Z', who: 'op-db', kind: 'created' },
       { at: '2026-06-11T13:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — EMEA desk' },
-      { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'FIT-EMEA: server-side, recommend escalate' },
+      { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'Core Team EMEA: server-side, recommend escalate' },
     ],
   },
   {
@@ -2006,12 +2006,12 @@ window.CASES = [
       { at: '2026-06-10T17:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-06-10T17:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
       { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity Team' },
+      { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity Team' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
-      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
+      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
       { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
     ],
   },
@@ -2042,15 +2042,15 @@ window.CASES = [
     history: [
       { at: '2026-06-09T15:00:00Z', who: 'op-db', kind: 'created' },
       { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Mobile App' },
+      { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Mobile App' },
       { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
     ],
     // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
     processTimeline: [
       { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
-      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
+      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
       { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
-      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'FIT — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
+      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
     ],
   },
   {
@@ -2091,7 +2091,7 @@ window.CASES = [
       dueDateTime: '2026-06-12T10:00:00Z',
       transition: 'Returned to user',
       transitionDateTime: '2026-06-11T14:00:00Z',
-      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'FIT' },
+      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'Core Team' },
     },
   },
   {
@@ -2145,7 +2145,7 @@ window.CASES = [
     holdStartedAt: '2026-06-12T08:30:00Z',
     lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'Exec visibility — keep close eye even though FIT is responding.',
+    notes: 'Exec visibility — keep close eye even though Core Team is responding.',
     createdAt: '2026-06-12T08:00:00Z',
     createdBy: 'op-da',
     history: [
@@ -2174,7 +2174,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-11T15:30:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'FIT looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
+    handover: { note: 'Core Team looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
     notes: 'Approaching SLA threshold.',
     createdAt: '2026-06-11T15:00:00Z',
     createdBy: 'op-db',
@@ -2210,7 +2210,7 @@ window.CASES = [
     history: [
       { at: '2026-06-11T18:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-06-11T18:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+      { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
     ],
   },
   {
@@ -2262,7 +2262,7 @@ window.CASES = [
     holdStartedAt: null,
     lastOwnerContact: null,
     handover: null,
-    notes: 'Logged via on-call rotation; needs FIT triage.',
+    notes: 'Logged via on-call rotation; needs Core Team triage.',
     createdAt: '2026-06-12T11:30:00Z',
     createdBy: 'op-da',
     history: [
@@ -2289,7 +2289,7 @@ window.CASES = [
     holdMs: { fit: 0, hq: 0 },
     holdStartedAt: '2026-06-12T11:30:00Z',
     lastOwnerContact: { at: '2026-06-12T12:30:00Z', channel: 'Slack' },
-    handover: { note: 'FIT-EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
+    handover: { note: 'Core Team EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
     notes: 'Fresh contact; no prompt expected.',
     createdAt: '2026-06-12T08:00:00Z',
     createdBy: 'op-da',
@@ -2326,7 +2326,7 @@ window.CASES = [
       { at: '2026-06-10T20:00:00Z', who: 'op-na', kind: 'created' },
       { at: '2026-06-10T20:30:00Z', who: 'op-na', kind: 'flag', detail: 'Marked Escalated (watch)' },
       { at: '2026-06-10T21:00:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
       { at: '2026-06-12T11:00:00Z', who: 'op-da', kind: 'status', detail: 'HQ → Sanity Check' },
     ],
   },
@@ -2345,7 +2345,7 @@ window.CASES = [
     holdMs: { fit: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-06-02T18:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'FIT pushed certs via MDM. Closed.',
+    notes: 'Core Team pushed certs via MDM. Closed.',
     closedAt: '2026-06-02T19:00:00Z', resolutionCode: 'fixed_by_owner',
     createdAt: '2026-06-02T13:00:00Z', createdBy: 'op-da',
     history: [
@@ -2371,7 +2371,7 @@ window.CASES = [
     createdAt: '2026-06-03T15:00:00Z', createdBy: 'op-db',
     history: [
       { at: '2026-06-03T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-03T19:00:00Z', who: 'op-db', kind: 'escalated', detail: 'FIT → HQ Data Platform' },
+      { at: '2026-06-03T19:00:00Z', who: 'op-db', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
       { at: '2026-06-04T17:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
     ],
   },
@@ -2431,7 +2431,7 @@ window.CASES = [
     holdMs: { fit: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: { at: '2026-05-26T17:00:00Z', channel: 'Slack' },
     handover: null,
-    notes: 'FIT-EMEA reset client; closed.',
+    notes: 'Core Team EMEA reset client; closed.',
     closedAt: '2026-05-26T18:00:00Z', resolutionCode: 'fixed_by_owner',
     createdAt: '2026-05-26T09:00:00Z', createdBy: 'op-db',
     history: [
@@ -2458,7 +2458,7 @@ window.CASES = [
     history: [
       { at: '2026-05-27T14:00:00Z', who: 'op-da', kind: 'created' },
       { at: '2026-05-27T14:30:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated' },
-      { at: '2026-05-27T19:00:00Z', who: 'op-da', kind: 'escalated', detail: 'FIT → HQ Identity' },
+      { at: '2026-05-27T19:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
       { at: '2026-05-28T12:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
     ],
   },
@@ -2522,8 +2522,8 @@ window.CASES = [
     slaAccumulatedMs: 0,
     holdMs: { fit: 0, hq: 0 }, holdStartedAt: '2026-06-04T11:00:00Z',
     lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'Carried over from W23. FIT-AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
-    notes: 'Reproducible only intermittently; FIT collecting client logs.',
+    handover: { note: 'Carried over from W23. Core Team AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
+    notes: 'Reproducible only intermittently; Core Team collecting client logs.',
     createdAt: '2026-06-04T10:00:00Z', createdBy: 'op-db',
     history: [
       { at: '2026-06-04T10:00:00Z', who: 'op-db', kind: 'created' },
@@ -2575,8 +2575,8 @@ window.CURRENT_OPERATOR_ID = 'op-da';
 window.OWNERS = {
   fit: [
     {
-      id: 'fit-apac', name: 'FIT — APAC desk', region: 'APAC',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-apac',
+      id: 'fit-apac', name: 'Core Team — APAC desk', region: 'APAC',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-apac',
       members: [
         { id: 'fit-apac-lead', name: 'Hana Park',   role: 'Lead' },
         { id: 'fit-apac-eng',  name: 'Kenji Sato',  role: 'Engineer' },
@@ -2584,8 +2584,8 @@ window.OWNERS = {
       ],
     },
     {
-      id: 'fit-emea', name: 'FIT — EMEA desk', region: 'EMEA',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-emea',
+      id: 'fit-emea', name: 'Core Team — EMEA desk', region: 'EMEA',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-emea',
       members: [
         { id: 'fit-emea-lead', name: 'Lukas Berg',  role: 'Lead' },
         { id: 'fit-emea-eng',  name: 'Sofia Ricci', role: 'Engineer' },
@@ -2593,8 +2593,8 @@ window.OWNERS = {
       ],
     },
     {
-      id: 'fit-amer', name: 'FIT — AMER desk', region: 'AMER',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-amer',
+      id: 'fit-amer', name: 'Core Team — AMER desk', region: 'AMER',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-amer',
       members: [
         { id: 'fit-amer-lead', name: 'Jordan Reed', role: 'Lead' },
         { id: 'fit-amer-eng',  name: 'Ava Nguyen',  role: 'Engineer' },
@@ -3116,7 +3116,7 @@ function derivePromptsForCase(c) {
 }
 
 const PROMPT_DEFS = {
-  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick FIT' },
+  assign_fit:           { label: 'Assign to Core Team',                  icon: 'A', cls: 'icon-assign',   action: 'Pick Core Team' },
   chase_fit:            { label: 'Chase Core Team — no response',        icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
   escalate_to_hq:       { label: 'Escalate to HQ Product Team',          icon: 'E', cls: 'icon-escalate', action: 'Pick HQ team' },
   chase_hq:             { label: 'Chase HQ Product Team — no response',  icon: 'C', cls: 'icon-chase',    action: 'Send reminder' },
@@ -3332,7 +3332,7 @@ function renderWatchlists(sla, escalated) {
         <span class="mono muted">${c.id}</span>
         <span class="watch-subject">${escapeHtml(c.subject)}</span>
         <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
-        <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
+        <span class="muted tiny">${owner ? escapeHtml(owner.name.replace(/^(Core Team|FIT|HQ) — /, '')) + ' · ' : ''}on us ${fmtDuration(caseSlaMs(c))}</span>
       </a>
     `;
   };
@@ -3551,7 +3551,7 @@ function renderKanbanCard(c) {
       ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
       <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
       <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
+        <span>${owner ? escapeHtml(owner.name.replace(/^(Core Team|FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
         <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
       </div>
       <div class="kanban-card-actions">
@@ -3990,7 +3990,7 @@ function renderDetailActions(c) {
 
   // Non-status actions stay as buttons.
   if (c.status === 'with_fit') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to FIT</button>`);
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_fit">Send reminder to Core Team</button>`);
   }
   if (c.status === 'with_hq') {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
@@ -4646,8 +4646,8 @@ function bindRosterEditor() {
 /* ---------- Owners editor (Owners page) ---------- */
 
 function makeOwnerId(pool, name, exceptIndex) {
-  // Drop boilerplate words so "FIT — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
-  const cleaned = String(name || '').toLowerCase().replace(/\b(fit|hq|desk|team|product|the)\b/g, ' ');
+  // Drop boilerplate words so "Core Team — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
+  const cleaned = String(name || '').toLowerCase().replace(/\b(core|fit|hq|desk|team|product|the)\b/g, ' ');
   const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || pool;
   const want = pool + '-' + base;
   const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
@@ -4697,7 +4697,7 @@ function renderOwnerRows(pool) {
     const refs = ownerRefCounts(pool, o.id);
     return `
     <tr data-pool="${pool}" data-oi="${i}">
-      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'FIT — … desk' : 'HQ … Team'}"></td>
+      <td><input data-of="name" value="${escapeHtml(o.name || '')}" placeholder="${pool === 'fit' ? 'Core Team — … desk' : 'HQ … Team'}"></td>
       <td><input data-of="${key}" value="${escapeHtml(o[key] || '')}" placeholder="${pool === 'fit' ? 'Region' : 'Area'}"></td>
       <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
       <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
@@ -4716,7 +4716,7 @@ function renderOwnersTable(pool, label, regionLabel) {
       <div class="re-scroll"><table class="re-table"><thead><tr>
         <th>Name</th><th>${escapeHtml(regionLabel)}</th><th>Time zone</th><th>Office</th><th>Channel</th><th>ID</th><th>Refs</th><th class="re-x"></th>
       </tr></thead><tbody>${renderOwnerRows(pool)}</tbody></table></div>
-      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'FIT desk' : 'HQ team'}</button></div>
+      <div class="re-actions"><button class="btn" data-add-owner="${pool}">+ Add ${pool === 'fit' ? 'Core Team desk' : 'HQ team'}</button></div>
     </div>`;
 }
 
@@ -4750,14 +4750,14 @@ function renderOwnersPage() {
   const warns = ownersWarnings();
   const warnHtml = warns.length
     ? `<ul class="re-warn">${warns.map(x => `<li class="${x.err ? 'err' : ''}">${x.err ? '✗' : '⚠'} ${escapeHtml(x.msg)}</li>`).join('')}</ul>`
-    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} FIT desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
+    : `<div class="re-ok">✓ ${window.OWNERS.fit.length} Core Team desk(s) · ${window.OWNERS.hq.length} HQ team(s).</div>`;
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
       <div class="subtitle">Core Team desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
     </div></div>
     <div class="card roster-editor" id="owners-editor">
-      <div class="card-header"><span>Edit FIT desks &amp; HQ teams</span></div>
+      <div class="card-header"><span>Edit Core Team desks &amp; HQ teams</span></div>
       <div class="card-body">
         ${renderOwnersTable('fit', 'Core Team desks', 'Region')}
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
@@ -4777,7 +4777,7 @@ function deleteOwner(pool, i) {
   const o = window.OWNERS[pool][i];
   if (!o) return;
   const field = pool === 'fit' ? 'fitId' : 'hqId';
-  const kind = pool === 'fit' ? 'FIT desk' : 'HQ team';
+  const kind = pool === 'fit' ? 'Core Team desk' : 'HQ team';
   const refs = ownerRefCounts(pool, o.id);
   const others = window.OWNERS[pool].filter((_, j) => j !== i);
   const opts = others.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name || x.id)}</option>`).join('');
@@ -5056,7 +5056,7 @@ function renderStatusFlow() {
           <path d="M760,100 L760,448" marker-end="url(#arr-forward)"/>
         </g>
         <g font-size="11" fill="#2563eb" font-weight="500">
-          <text x="189" y="34" text-anchor="middle">Assign FIT</text>
+          <text x="189" y="34" text-anchor="middle">Assign Core Team</text>
           <text x="409" y="34" text-anchor="middle">Escalate to HQ</text>
           <text x="649" y="34" text-anchor="middle">Move to Sanity</text>
           <text x="772" y="280" text-anchor="start">Verify &amp; close</text>
@@ -5107,14 +5107,14 @@ function renderStatusFlow() {
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>FIT hold-clock starts</td></tr>
+        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_fit">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
         <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>FIT clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · FIT clock stops</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
+        <tr><td><span class="pill pill-with_fit">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
         <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
         <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>FIT / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
+        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>Core Team / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
         <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Close as resolved</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
         <tr><td>Any non-terminal</td><td>Cancel case</td><td><span class="pill pill-cancelled">Cancelled</span></td><td>All clocks stop · no resolution code</td></tr>
       </tbody>
@@ -5132,7 +5132,7 @@ function renderClockModel() {
     history: [
       { at: ago(10), who: 'op', kind: 'created', detail: 'Case opened (triage)' },
       { at: ago(8), who: 'op', kind: 'assigned', detail: 'Core Team — APAC desk' },
-      { at: ago(5), who: 'op', kind: 'escalated', detail: 'FIT → HQ Product Team' },
+      { at: ago(5), who: 'op', kind: 'escalated', detail: 'Core Team → HQ Product Team' },
       { at: ago(3), who: 'op', kind: 'status', detail: '→ Sanity Check' },
       { at: ago(1), who: 'op', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
     ],
@@ -5175,7 +5175,7 @@ function renderClockModel() {
             <td>${swatch('tl-triage')}<strong>First line</strong></td>
             <td>Time the first-line agent handled it directly — <strong>triage</strong> while the case is New.</td>
             <td>On creation (status New).</td>
-            <td>When assigned to FIT, or returned / cancelled from New.</td>
+            <td>When assigned to Core Team, or returned / cancelled from New.</td>
             <td>Summed from history segments.</td>
           </tr>
           <tr>
@@ -5282,8 +5282,8 @@ function handlePrompt(caseId, kind) {
     const opts = window.OWNERS.fit.map(f => `<option value="${f.id}"${f.id === c.fitId ? ' selected' : ''}>${escapeHtml(f.name)} (${escapeHtml(f.region)})</option>`).join('');
     showModal(`
       <h3>Assign to Core Team</h3>
-      <div class="modal-sub">Pick the FIT desk that should triage this case.</div>
-      <label>FIT desk</label>
+      <div class="modal-sub">Pick the Core Team desk that should triage this case.</div>
+      <label>Core Team desk</label>
       <select data-field="fitId">${opts}</select>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
@@ -5309,11 +5309,11 @@ function handlePrompt(caseId, kind) {
     const opts = window.OWNERS.hq.map(h => `<option value="${h.id}"${h.id === c.hqId ? ' selected' : ''}>${escapeHtml(h.name)} (${escapeHtml(h.area)})</option>`).join('');
     showModal(`
       <h3>Escalate to HQ Product Team</h3>
-      <div class="modal-sub">FIT can't resolve. Pick the HQ team that owns this area.</div>
+      <div class="modal-sub">Core Team can't resolve. Pick the HQ team that owns this area.</div>
       <label>HQ team</label>
       <select data-field="hqId">${opts}</select>
       <label>Reason (optional)</label>
-      <textarea data-field="reason" placeholder="What did FIT find?"></textarea>
+      <textarea data-field="reason" placeholder="What did the Core Team find?"></textarea>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn btn-primary" data-modal-submit>Escalate</button>
@@ -5332,8 +5332,8 @@ function handlePrompt(caseId, kind) {
       c.fitCannotResolve = false;
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel: 'JIRA' };
       const hqName = getOwner('hq', hqId).name;
-      logHistory(c, op, 'escalated', `FIT → ${hqName}${reason ? ' · ' + reason : ''}`);
-      showToast(`${c.id} escalated to ${hqName}. FIT clock stopped, HQ clock running.`, 'success');
+      logHistory(c, op, 'escalated', `Core Team → ${hqName}${reason ? ' · ' + reason : ''}`);
+      showToast(`${c.id} escalated to ${hqName}. Core Team clock stopped, HQ clock running.`, 'success');
       render();
       return true;
     });
@@ -5357,7 +5357,7 @@ function handlePrompt(caseId, kind) {
       c.lastOwnerContact = { at: new Date(NOW).toISOString(), channel };
       logHistory(c, op, 'reminder', `Reminder via ${channel}${msg ? ': ' + msg : ''}`);
       const threshold = c.currentOwner === 'fit' ? window.THRESHOLDS.fitIdleHours : window.THRESHOLDS.hqIdleHours;
-      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'FIT' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
+      showToast(`Reminder sent to ${owner?.name || 'owner'} via ${channel}. ${c.id} stays with ${c.currentOwner === 'fit' ? 'Core Team' : 'HQ'}; it will re-prompt for a chase in ${threshold}h if there's no reply.`, 'success');
       render();
       return true;
     });
@@ -5515,7 +5515,7 @@ function handlePrompt(caseId, kind) {
         c.fitId = null;
         c.hqId = null;
         c.fitCannotResolve = false;
-        detail = `Requester replied · resumed unassigned (FIT/HQ cleared)`;
+        detail = `Requester replied · resumed unassigned (Core Team/HQ cleared)`;
       }
       if (note) detail += ` · ${note}`;
       logHistory(c, op, 'resumed', detail);
@@ -5631,7 +5631,7 @@ function handlePrompt(caseId, kind) {
       <h3>${existing ? 'Update' : 'Set'} reminder on ${escapeHtml(c.id)}</h3>
       <div class="modal-sub">${existing
         ? 'Reminder is currently set for ' + fmtUntil(existing.fireAt) + '.'
-        : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC FIT come online before assigning).'}</div>
+        : 'The app will surface this case at the chosen time. Useful for deferred work (e.g. wait until APAC Core Team come online before assigning).'}</div>
       <label>Remind me in…</label>
       <select data-field="when">${presets.map(p => `<option value="${p.value}">${escapeHtml(p.label)}</option>`).join('')}</select>
       <label>…or at a specific time <span class="muted tiny">(today, or tomorrow if it's already past)</span></label>
@@ -6318,7 +6318,7 @@ boot();
       selector: '.clock-grid',
       placement: 'bottom',
       title: 'Two clocks per case',
-      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by FIT vs HQ — so we can answer "how much time is each owner consuming?" This case escalated FIT → HQ, so both accumulators have value.',
+      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by Core Team vs HQ — so we can answer "how much time is each owner consuming?" This case escalated Core Team → HQ, so both accumulators have value.',
     },
     {
       kind: 'pointer',

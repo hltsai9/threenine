@@ -10,6 +10,26 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Changed
+
+- **Finish the "Core Team" rename — owner names, modals, toasts, snippets, seed
+  history.** Renamed `window.OWNERS.fit` entries from `"FIT — APAC/EMEA/AMER desk"` to
+  `"Core Team — APAC/EMEA/AMER desk"` (Slack channels followed: `#core-apac` etc.).
+  Updated the Owners page placeholder (`"Core Team — … desk"`), the editor card header
+  ("Edit Core Team desks & HQ teams"), the `+ Add Core Team desk` button, the delete-flow
+  `kind` label, and the warnings line. The owner-name prefix-stripping regex on the
+  board card now also matches `"Core Team — "` (in addition to legacy `FIT|HQ`).
+  `makeOwnerId()` strips `core` along with the other boilerplate so a new "Core Team — X
+  desk" still slugs cleanly. Assign / escalate / chase / resume strings now say
+  "Core Team" instead of "FIT" (assign modal subtitle + label, escalate modal subtitle +
+  reason placeholder, escalate history `'Core Team → …'`, escalation toast, chase toast,
+  resume "Core Team/HQ cleared", reminder modal hint, SVG flow node label, status-flow
+  table cells, Clocks legend row). Seed cases in `prototype/data.js` updated to match
+  (history `detail`, handover notes, process-timeline `processor`, `handlerType`,
+  free-text `notes`). `tour.js` updated likewise. Internal state — `with_fit` enum,
+  `pill-with_fit` CSS class, `currentOwner === 'fit'`, `fitId`, `holdMs.fit`,
+  test-internal `const FIT` — all unchanged.
+
 ### Added
 
 - **Three Core Teams seeded with three members each.** Each `window.OWNERS.fit` desk now

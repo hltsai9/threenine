@@ -13,8 +13,8 @@
 window.OWNERS = {
   fit: [
     {
-      id: 'fit-apac', name: 'FIT — APAC desk', region: 'APAC',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-apac',
+      id: 'fit-apac', name: 'Core Team — APAC desk', region: 'APAC',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-apac',
       members: [
         { id: 'fit-apac-lead', name: 'Hana Park',   role: 'Lead' },
         { id: 'fit-apac-eng',  name: 'Kenji Sato',  role: 'Engineer' },
@@ -22,8 +22,8 @@ window.OWNERS = {
       ],
     },
     {
-      id: 'fit-emea', name: 'FIT — EMEA desk', region: 'EMEA',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-emea',
+      id: 'fit-emea', name: 'Core Team — EMEA desk', region: 'EMEA',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-emea',
       members: [
         { id: 'fit-emea-lead', name: 'Lukas Berg',  role: 'Lead' },
         { id: 'fit-emea-eng',  name: 'Sofia Ricci', role: 'Engineer' },
@@ -31,8 +31,8 @@ window.OWNERS = {
       ],
     },
     {
-      id: 'fit-amer', name: 'FIT — AMER desk', region: 'AMER',
-      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #fit-amer',
+      id: 'fit-amer', name: 'Core Team — AMER desk', region: 'AMER',
+      tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-amer',
       members: [
         { id: 'fit-amer-lead', name: 'Jordan Reed', role: 'Lead' },
         { id: 'fit-amer-eng',  name: 'Ava Nguyen',  role: 'Engineer' },

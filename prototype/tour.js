@@ -58,7 +58,7 @@
       selector: '.clock-grid',
       placement: 'bottom',
       title: 'Two clocks per case',
-      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by FIT vs HQ — so we can answer "how much time is each owner consuming?" This case escalated FIT → HQ, so both accumulators have value.',
+      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by Core Team vs HQ — so we can answer "how much time is each owner consuming?" This case escalated Core Team → HQ, so both accumulators have value.',
     },
     {
       kind: 'pointer',
