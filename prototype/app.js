@@ -129,6 +129,7 @@ function saveState() {
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
+      rota: window.ROTA,                  // the in-session "This week's rota" assignments
     }));
   } catch (e) { /* SecurityError on some file:// origins, ignore */ }
 }
@@ -144,6 +145,7 @@ function loadState() {
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
       STATE.operatorId = parsed.operatorId;
     }
+    if (Array.isArray(parsed.rota)) window.ROTA = parsed.rota;
     return true;
   } catch (e) {
     return false;
@@ -163,6 +165,7 @@ function resetState() {
   window.OPERATORS = structuredClone(SEED_ROSTER.operators);
   window.SHIFTS = structuredClone(SEED_ROSTER.shifts);
   window.CURRENT_OPERATOR_ID = SEED_ROSTER.currentOperatorId;
+  window.ROTA = structuredClone(SEED_ROSTER.rota);
   window.OWNERS = structuredClone(SEED_OWNERS);
   STATE.operatorId = window.CURRENT_OPERATOR_ID;
   STATE.lastListRoute = '#/cases';
@@ -176,6 +179,7 @@ const SEED_ROSTER = {
   operators: structuredClone(window.OPERATORS),
   shifts: structuredClone(window.SHIFTS),
   currentOperatorId: window.CURRENT_OPERATOR_ID,
+  rota: structuredClone(window.ROTA || []),
 };
 // Pristine owner directory, so "Reset to seed" can undo in-session Owners-editor changes.
 const SEED_OWNERS = structuredClone(window.OWNERS);
@@ -1793,6 +1797,7 @@ function operatorRefCounts(id) {
 
 function rosterSnippet() {
   const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  const qOrNull = s => (s == null || s === '') ? 'null' : q(s);
   const ops = window.OPERATORS.map(o => `  { id: ${q(o.id)}, name: ${q(o.name)}, shift: ${q(o.shift)} },`).join('\n');
   const shifts = window.SHIFTS.map(s => {
     const roster = window.OPERATORS.filter(o => o.shift === s.name).map(o => q(o.id));
@@ -1800,7 +1805,9 @@ function rosterSnippet() {
   }).join('\n');
   const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
     ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
-  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};`;
+  const rota = (window.ROTA || []).map(r =>
+    `  { day: ${q(r.day)}, operatorId: ${qOrNull(r.operatorId)} },`).join('\n');
+  return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};\n\nwindow.ROTA = [\n${rota}\n];`;
 }
 
 function rosterWarnings() {
@@ -1970,6 +1977,81 @@ function deleteShift(i) {
     });
 }
 
+/* ---------- This week's rota — drag/drop & save wiring ---------- */
+function bindRotaEditor() {
+  const ed = document.getElementById('rota-editor');
+  if (!ed) return;
+  let dragOpId = null;
+  let dragFrom = -1;
+
+  // Start drag from either the palette or an already-assigned cell.
+  ed.querySelectorAll('[data-rota-drag]').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      dragOpId = el.dataset.rotaDrag;
+      dragFrom = el.dataset.rotaFrom !== undefined ? +el.dataset.rotaFrom : -1;
+      e.dataTransfer.effectAllowed = 'move';
+      // Carry the id in dataTransfer too so cross-window drag would still work.
+      try { e.dataTransfer.setData('text/plain', dragOpId); } catch (_) {}
+      el.classList.add('rota-dragging');
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('rota-dragging');
+      ed.querySelectorAll('.rota-cell.rota-over').forEach(c => c.classList.remove('rota-over'));
+      dragOpId = null; dragFrom = -1;
+    });
+  });
+
+  // Day cells accept drops. Dragging onto a cell adds the assignment; if the operator
+  // was being dragged out of another cell, that source cell is cleared too.
+  ed.querySelectorAll('.rota-cell').forEach(cell => {
+    cell.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      cell.classList.add('rota-over');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('rota-over'));
+    cell.addEventListener('drop', e => {
+      e.preventDefault();
+      cell.classList.remove('rota-over');
+      const target = +cell.dataset.rotaDrop;
+      const opId = dragOpId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+      if (!opId || isNaN(target) || !window.ROTA || !window.ROTA[target]) return;
+      // No-op if dropped onto its own cell.
+      if (dragFrom === target) return;
+      if (dragFrom >= 0 && window.ROTA[dragFrom]) window.ROTA[dragFrom].operatorId = null;
+      window.ROTA[target].operatorId = opId;
+      render();
+    });
+  });
+
+  // Click ✕ to clear a day.
+  ed.querySelectorAll('[data-rota-clear]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const i = +btn.dataset.rotaClear;
+      if (window.ROTA && window.ROTA[i]) { window.ROTA[i].operatorId = null; render(); }
+    });
+  });
+
+  document.getElementById('rota-save')?.addEventListener('click', () => {
+    // Snapshot the current rota as the new "seed" so the editor reports "Saved"; persist
+    // it via the shared saveState() (localStorage + server when running on http(s)).
+    SEED_ROSTER.rota = structuredClone(window.ROTA || []);
+    saveState();
+    // Refresh the shifts.js snippet so a copy/paste captures the rota too.
+    const ta = document.getElementById('roster-output');
+    if (ta) ta.value = rosterSnippet();
+    if (/^https?:$/.test(location.protocol)) saveJsFile('shifts', rosterSnippet(), 'shifts.js');
+    showToast('Rota saved.', 'success');
+    render();
+  });
+
+  document.getElementById('rota-reset')?.addEventListener('click', () => {
+    window.ROTA = structuredClone(SEED_ROSTER.rota || []);
+    render();
+  });
+}
+
 function bindRosterEditor() {
   const ed = document.getElementById('roster-editor');
   if (!ed) return;
@@ -2034,10 +2116,12 @@ function bindRosterEditor() {
 /* ---------- Owners editor (Owners page) ---------- */
 
 function makeOwnerId(pool, name, exceptIndex) {
-  // Drop boilerplate words so "Core Team — LATAM desk" -> fit-latam, "HQ Identity Team" -> hq-identity.
+  // Drop boilerplate words so "Core Team — LATAM desk" -> core-latam, "HQ Identity Team" -> hq-identity.
   const cleaned = String(name || '').toLowerCase().replace(/\b(core|fit|hq|desk|team|product|the)\b/g, ' ');
-  const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || pool;
-  const want = pool + '-' + base;
+  // Core Team desks (pool 'fit') slug under the 'core-' prefix; HQ teams stay 'hq-'.
+  const prefix = pool === 'fit' ? 'core' : pool;
+  const base = cleaned.replace(/[^a-z0-9]+/g, '').slice(0, 14) || prefix;
+  const want = prefix + '-' + base;
   const taken = new Set(window.OWNERS[pool].filter((_, i) => i !== exceptIndex).map(o => o.id));
   if (!taken.has(want)) return want;
   let n = 2; while (taken.has(want + n)) n++;
@@ -2090,7 +2174,7 @@ function renderOwnerRows(pool) {
       <td><input data-of="tz" value="${escapeHtml(o.tz || '')}" placeholder="America/Phoenix"></td>
       <td><input data-of="office" value="${escapeHtml(o.office || '')}" placeholder="08:00–17:00"></td>
       <td><input data-of="channel" value="${escapeHtml(o.channel || '')}" placeholder="Slack / JIRA"></td>
-      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool}-…"></td>
+      <td><input class="re-mono" data-of="id" value="${escapeHtml(o.id || '')}" placeholder="${pool === 'fit' ? 'core' : pool}-…"></td>
       <td class="re-refs tiny ${refs ? '' : 'muted'}" title="cases routed to this owner">${refs ? refs + ' ref' + (refs === 1 ? '' : 's') : '—'}</td>
       <td class="re-x"><button class="btn-ghost re-del-owner" data-pool="${pool}" data-oi="${i}" title="Remove">✕</button></td>
     </tr>`;
@@ -2236,6 +2320,90 @@ function bindOwnersEditor() {
   });
 }
 
+/* ---------- This week's rota (drag-to-assign) ---------- */
+
+// Initials for an operator: take the leading uppercase letters from each word in
+// their name, falling back to the first two letters. "Mia (DA)" -> "M", "Alex Lee" -> "AL".
+function operatorInitials(op) {
+  if (!op) return '–';
+  const name = String(op.name || op.id || '').trim();
+  // Drop parenthetical suffixes like "(DA)" so they don't dominate the initials.
+  const cleaned = name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (!parts.length) return name.slice(0, 2).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Stable per-operator color for the avatar chip — a forest-palette ramp.
+const _ROTA_COLORS = ['#3e7050', '#2f6147', '#4a8270', '#5a8f6b', '#4e8063', '#6f9b84', '#357a52'];
+function operatorColor(op) {
+  if (!op) return '#8a958d';
+  const idx = (op.id || op.name || '').split('').reduce((s, ch) => s + ch.charCodeAt(0), 0) % _ROTA_COLORS.length;
+  return _ROTA_COLORS[idx];
+}
+
+function rotaDirty() {
+  const a = JSON.stringify(window.ROTA || []);
+  const b = JSON.stringify(SEED_ROSTER.rota || []);
+  return a !== b;
+}
+
+function renderRotaEditor() {
+  const rota = window.ROTA || [];
+  const palette = window.OPERATORS.map(op => {
+    const init = operatorInitials(op);
+    const color = operatorColor(op);
+    return `
+      <div class="rota-chip" draggable="true" data-rota-drag="${escapeHtml(op.id)}" title="Drag onto a day below — release to assign ${escapeHtml(op.name)}">
+        <span class="rota-avatar" style="background:${color}">${escapeHtml(init)}</span>
+        <span class="rota-chip-name">${escapeHtml(op.name)}</span>
+        <span class="rota-chip-shift muted">${escapeHtml(op.shift)}</span>
+      </div>`;
+  }).join('');
+
+  const days = rota.map((r, i) => {
+    const op = r.operatorId ? getOperator(r.operatorId) : null;
+    const cell = op ? `
+      <div class="rota-assigned" draggable="true" data-rota-drag="${escapeHtml(op.id)}" data-rota-from="${i}" title="${escapeHtml(op.name)} · drag away or click ✕ to clear">
+        <span class="rota-avatar rota-avatar-lg" style="background:${operatorColor(op)}">${escapeHtml(operatorInitials(op))}</span>
+        <div class="rota-assigned-name">${escapeHtml(op.name.replace(/\s*\([^)]*\)\s*/g, '').trim() || op.name)}</div>
+        <button class="rota-clear" data-rota-clear="${i}" title="Clear ${escapeHtml(r.day)}">✕</button>
+      </div>
+    ` : `<div class="rota-empty muted">drop here</div>`;
+    return `
+      <div class="rota-day">
+        <div class="rota-day-label">${escapeHtml(r.day)}</div>
+        <div class="rota-cell" data-rota-drop="${i}">
+          ${cell}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card rota-editor" id="rota-editor">
+      <div class="card-header">
+        <span>This week's rota</span>
+        <span class="muted tiny">Drag an operator onto a day to assign — click ✕ to clear · Save to persist</span>
+      </div>
+      <div class="card-body">
+        <div class="detail-section">
+          <h3>Operators</h3>
+          <div class="rota-palette">${palette || '<span class="muted">No operators defined yet.</span>'}</div>
+        </div>
+        <div class="detail-section">
+          <h3>Schedule</h3>
+          <div class="rota-grid">${days}</div>
+        </div>
+        <div class="re-actions">
+          <button class="btn btn-primary" id="rota-save" ${rotaDirty() ? '' : 'disabled'}>Save rota</button>
+          <button class="btn" id="rota-reset">Reset to seed</button>
+          <span class="muted tiny" id="rota-status">${rotaDirty() ? 'Unsaved changes' : 'Saved'}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderShiftsIndex() {
   const cards = window.SHIFTS.map(sh => {
     const s = shiftStats(sh.name);
@@ -2266,6 +2434,7 @@ function renderShiftsIndex() {
       </div>
     </div>
     <div class="shift-grid">${cards}</div>
+    ${renderRotaEditor()}
     ${renderRosterEditor()}
   `;
 }
@@ -3333,6 +3502,7 @@ function bindHandlers() {
       render();
     });
   });
+  bindRotaEditor();
   bindRosterEditor();
   bindOwnersEditor();
   const lookbackLoad = document.getElementById('lookback-load');

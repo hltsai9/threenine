@@ -22,3 +22,17 @@ window.SHIFTS = [
 ];
 
 window.CURRENT_OPERATOR_ID = 'op-da';
+
+// This week's rota — one operator id per day (or null = empty).
+// Days follow the Sunday-first week convention used by window.WEEKS.
+// Edit via the Shifts page (drag an operator chip onto a day, then "Save rota"); paste
+// the generated block back here to persist between sessions or for everyone.
+window.ROTA = [
+  { day: 'Sun', operatorId: null },
+  { day: 'Mon', operatorId: 'op-da' },
+  { day: 'Tue', operatorId: 'op-db' },
+  { day: 'Wed', operatorId: 'op-da' },
+  { day: 'Thu', operatorId: 'op-db' },
+  { day: 'Fri', operatorId: 'op-da' },
+  { day: 'Sat', operatorId: null },
+];

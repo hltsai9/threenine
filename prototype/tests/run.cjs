@@ -77,7 +77,7 @@ const kinds = c => derivePromptsForCase(c).map(p => p.kind);
 test('derive: closed → none', () => eq(kinds({ status: 'closed' }), []));
 test('derive: resolved → none', () => eq(kinds({ status: 'resolved' }), []));
 test('derive: new + unassigned → assign_fit', () => eq(kinds({ id: 'X', status: 'new', fitId: null }), ['assign_fit']));
-test('derive: new + already assigned → none', () => eq(kinds({ id: 'X', status: 'new', fitId: 'fit-apac' }), []));
+test('derive: new + already assigned → none', () => eq(kinds({ id: 'X', status: 'new', fitId: 'core-apac' }), []));
 test('derive: with_fit + cannot resolve → escalate', () =>
   eq(kinds({ id: 'X', status: 'with_fit', fitCannotResolve: true, lastOwnerContact: { at: iso(0) } }), ['escalate_to_hq']));
 test('derive: with_fit + idle past threshold → chase_fit', () =>
@@ -367,7 +367,7 @@ test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves oper
   // Simulate operator work on the case: assigned to FIT, notes, history, clocks, queue, handover.
   const c0 = app.caseById('C-MERGE-NEW');
   Object.assign(c0, {
-    status: 'with_fit', fitId: 'fit-apac', currentOwner: 'fit', agentStatus: 'queued',
+    status: 'with_fit', fitId: 'core-apac', currentOwner: 'fit', agentStatus: 'queued',
     notes: 'operator notes', slaAccumulatedMs: 3 * HOUR, holdMs: { fit: HOUR, hq: 0 },
     history: [{ at: iso(2 * HOUR), who: 'op', kind: 'assigned', detail: 'Core Team — APAC' }],
     handover: { note: 'keep me', author: 'op', from: 'Day', to: 'Night', at: iso(0), staleForCurrentShift: false },
@@ -381,7 +381,7 @@ test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves oper
   eq([c.subject, c.priority, c.ccStatusLabel, c.status], ['Updated subject', 'high', 'In-Progress', 'new']);
   // Operator's local layer preserved (routing, notes, clocks, queue, history, handover):
   eq([c.fitId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.fit, c.history.length, c.handover.note],
-     ['fit-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
+     ['core-apac', 'fit', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
 });
 test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
   app.location.protocol = 'https:'; app.__LIVE__ = true;

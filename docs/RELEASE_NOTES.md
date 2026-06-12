@@ -10,8 +10,34 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Added
+
+- **"This week's rota" editor on the Shifts page (drag-to-assign + save).** New card
+  above the existing roster editor with two sections: a horizontal "Operators" palette of
+  draggable chips (one per `window.OPERATORS` entry, showing initials + name + shift) and
+  a seven-day "Schedule" grid (Sun → Sat, matching the new week-start convention). Drag
+  an operator onto a day to assign; drag an assigned cell to a different day to move it;
+  hover an assigned cell and click ✕ to clear it. The current rota is held in `window.ROTA`
+  (an array of `{ day, operatorId }`); the **Save rota** button snapshots the current
+  state, persists it to `localStorage` via the shared `saveState()`, regenerates the
+  `shifts.js` snippet so it captures the rota, and (when running on http(s)) calls the
+  same `saveJsFile` path the roster editor uses. **Reset to seed** restores the rota to
+  the data.js values. Wired through `bindRotaEditor()` using HTML5 drag-and-drop with
+  drag-over styling on the target cell. Helpers added: `operatorInitials(op)`,
+  `operatorColor(op)`, `rotaDirty()`. CSS: `.rota-editor`, `.rota-palette`, `.rota-chip`,
+  `.rota-grid`, `.rota-day`, `.rota-cell`, `.rota-assigned`, `.rota-avatar`. Default seed
+  has Mon/Wed/Fri = Mia, Tue/Thu = Kai, Sat/Sun empty.
+
 ### Changed
 
+- **`fit-` id prefixes renamed to `core-` across owners.js and seed data.** Desk ids in
+  `prototype/owners.js` are now `core-apac` / `core-emea` / `core-amer` (and member ids
+  follow: `core-apac-lead`, `core-apac-eng`, etc.). All `fitId: 'fit-…'` references in
+  `prototype/data.js` and the test fixture in `prototype/tests/run.cjs` rewritten to
+  match. `makeOwnerId(pool, name, …)` in `prototype/app.js` now slugs Core Team desks
+  under a `core-` prefix (HQ teams stay `hq-`); the id input placeholder follows. The
+  `window.OWNERS.fit` pool key, `c.fitId` field name, `holdMs.fit`, and
+  `currentOwner === 'fit'` are state-shape and stay as-is.
 - **Finish the "Core Team" rename — owner names, modals, toasts, snippets, seed
   history.** Renamed `window.OWNERS.fit` entries from `"FIT — APAC/EMEA/AMER desk"` to
   `"Core Team — APAC/EMEA/AMER desk"` (Slack channels followed: `#core-apac` etc.).

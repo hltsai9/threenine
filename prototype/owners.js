@@ -13,30 +13,30 @@
 window.OWNERS = {
   fit: [
     {
-      id: 'fit-apac', name: 'Core Team — APAC desk', region: 'APAC',
+      id: 'core-apac', name: 'Core Team — APAC desk', region: 'APAC',
       tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-apac',
       members: [
-        { id: 'fit-apac-lead', name: 'Hana Park',   role: 'Lead' },
-        { id: 'fit-apac-eng',  name: 'Kenji Sato',  role: 'Engineer' },
-        { id: 'fit-apac-eng2', name: 'Mei Lin',     role: 'Engineer' },
+        { id: 'core-apac-lead', name: 'Hana Park',   role: 'Lead' },
+        { id: 'core-apac-eng',  name: 'Kenji Sato',  role: 'Engineer' },
+        { id: 'core-apac-eng2', name: 'Mei Lin',     role: 'Engineer' },
       ],
     },
     {
-      id: 'fit-emea', name: 'Core Team — EMEA desk', region: 'EMEA',
+      id: 'core-emea', name: 'Core Team — EMEA desk', region: 'EMEA',
       tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-emea',
       members: [
-        { id: 'fit-emea-lead', name: 'Lukas Berg',  role: 'Lead' },
-        { id: 'fit-emea-eng',  name: 'Sofia Ricci', role: 'Engineer' },
-        { id: 'fit-emea-eng2', name: 'Omar Haddad', role: 'Engineer' },
+        { id: 'core-emea-lead', name: 'Lukas Berg',  role: 'Lead' },
+        { id: 'core-emea-eng',  name: 'Sofia Ricci', role: 'Engineer' },
+        { id: 'core-emea-eng2', name: 'Omar Haddad', role: 'Engineer' },
       ],
     },
     {
-      id: 'fit-amer', name: 'Core Team — AMER desk', region: 'AMER',
+      id: 'core-amer', name: 'Core Team — AMER desk', region: 'AMER',
       tz: 'America/Phoenix', office: '08:00–17:00', channel: 'Slack #core-amer',
       members: [
-        { id: 'fit-amer-lead', name: 'Jordan Reed', role: 'Lead' },
-        { id: 'fit-amer-eng',  name: 'Ava Nguyen',  role: 'Engineer' },
-        { id: 'fit-amer-eng2', name: 'Diego Alvarez', role: 'Engineer' },
+        { id: 'core-amer-lead', name: 'Jordan Reed', role: 'Lead' },
+        { id: 'core-amer-eng',  name: 'Ava Nguyen',  role: 'Engineer' },
+        { id: 'core-amer-eng2', name: 'Diego Alvarez', role: 'Engineer' },
       ],
     },
   ],
