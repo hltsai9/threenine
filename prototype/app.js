@@ -2640,11 +2640,32 @@ function renderShiftDetail(shiftName) {
 /* ---------- Status Flow ---------- */
 
 function renderStatusFlow() {
+  // Lookup tables that mirror local/casecenter.py — kept in sync by hand. If the Python
+  // source changes, update both. The page renders the three tiers map_status() consults,
+  // in lookup order, so an operator can predict which column a live refresh will land in.
+  const pairMap = [
+    { cs: 'In-Progress', sub: 'Return',    to: 'new',                   note: 'Requester returned the case to IT' },
+    { cs: 'In-Progress', sub: 'Wait User', to: 'returned_to_requester', note: 'Waiting on the user — SLA paused' },
+  ];
+  const processTypeMap = [
+    { pt: '1st  Line',    to: 'new',       note: 'Triage stage — first-line agent still owns it' },
+    { pt: 'Service Team', to: 'with_core', note: 'Routed to the Core Team' },
+  ];
+  const statusOnlyMap = [
+    { cs: 'Open',            to: 'new',       note: 'Just opened in Case Center' },
+    { cs: 'In-Progress',     to: 'new',       note: 'No sub-transition, no processType match → default to triage' },
+    { cs: 'Wait Resolution', to: 'with_hq',   note: 'Routed to the HQ Product Team' },
+    { cs: 'Close',           to: 'closed',    note: 'Terminal' },
+    { cs: 'Drop',            to: 'cancelled', note: 'Terminal · no resolution code' },
+  ];
+  const pill = (s) => `<span class="pill pill-${s}">${escapeHtml(statusLabel(s))}</span>`;
+  const mono = (s) => `<code class="mono">${escapeHtml(s)}</code>`;
+
   return `
     <div class="page-header">
       <div>
         <h1>Status Flow</h1>
-        <div class="subtitle">How a case moves through the lifecycle. Each arrow corresponds to a single option in the Change status… dropdown.</div>
+        <div class="subtitle">How a case moves through the lifecycle (operator actions) and how Case Center statuses map onto the board (live refresh).</div>
       </div>
     </div>
 
@@ -2748,24 +2769,73 @@ function renderStatusFlow() {
       </div>
     </div>
 
-    <h2 style="margin-top:24px;">Transitions reference</h2>
+    <h2 style="margin-top:24px;">Operator transitions</h2>
+    <p class="muted tiny" style="margin:-6px 0 12px;">Triggered by the in-app actions (the Change status… dropdown / Assign / Return-to-requester modal). These run locally and do not touch Case Center.</p>
     <table class="transition-table">
       <thead>
         <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="pill pill-new">New</span></td><td>Assign to Core Team</td><td><span class="pill pill-with_core">With Core Team</span></td><td>Core Team hold-clock starts</td></tr>
-        <tr><td><span class="pill pill-new">New</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Escalate to HQ Product Team</td><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Core Team clock stops · HQ clock starts</td></tr>
-        <tr><td><span class="pill pill-with_core">With Core Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · Core Team clock stops</td></tr>
-        <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Move to Sanity Check</td><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>HQ clock stops</td></tr>
-        <tr><td><span class="pill pill-with_hq">With HQ Product Team</span></td><td>Return to requester</td><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>SLA pauses · HQ clock stops</td></tr>
-        <tr><td><span class="pill pill-sanity_check">Sanity Check</span></td><td>Verify &amp; close</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Requester replied — resume</td><td>Core Team / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
-        <tr><td><span class="pill pill-returned_to_requester">Returned to Requester</span></td><td>Close as resolved</td><td><span class="pill pill-closed">Closed</span></td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td>Any non-terminal</td><td>Cancel case</td><td><span class="pill pill-cancelled">Cancelled</span></td><td>All clocks stop · no resolution code</td></tr>
+        <tr><td>${pill('new')}</td><td>Assign to Core Team</td><td>${pill('with_core')}</td><td>Core Team hold-clock starts</td></tr>
+        <tr><td>${pill('new')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses (first line bounces it back)</td></tr>
+        <tr><td>${pill('with_core')}</td><td>Escalate to HQ Product Team</td><td>${pill('with_hq')}</td><td>Core Team clock stops · HQ clock starts</td></tr>
+        <tr><td>${pill('with_core')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses · Core Team clock stops</td></tr>
+        <tr><td>${pill('with_hq')}</td><td>Move to Sanity Check</td><td>${pill('sanity_check')}</td><td>HQ clock stops</td></tr>
+        <tr><td>${pill('with_hq')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses · HQ clock stops</td></tr>
+        <tr><td>${pill('sanity_check')}</td><td>Verify &amp; close</td><td>${pill('closed')}</td><td>All clocks stop · resolution recorded</td></tr>
+        <tr><td>${pill('returned_to_requester')}</td><td>Requester replied — resume</td><td>Core Team / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
+        <tr><td>${pill('returned_to_requester')}</td><td>Close as resolved</td><td>${pill('closed')}</td><td>All clocks stop · resolution recorded</td></tr>
+        <tr><td>Any non-terminal</td><td>Cancel case</td><td>${pill('cancelled')}</td><td>All clocks stop · no resolution code</td></tr>
       </tbody>
     </table>
+
+    <h2 style="margin-top:32px;">Case Center → board mapping</h2>
+    <p class="muted tiny" style="margin:-6px 0 12px;">Used by every live refresh: <code class="mono">local/casecenter.py</code> reads a raw Case Center record and assigns the board column via <code class="mono">map_status(caseStatus, subStatus.transition, lastProcessType)</code>. The three lookup tiers are tried in order — the first hit wins.</p>
+
+    <div class="card"><div class="card-body">
+      <div class="detail-section">
+        <h3>1. <code class="mono">(caseStatus, subStatus.transition)</code> pair</h3>
+        <p class="muted tiny" style="margin:0 0 8px;">Most specific. Checked first; an exact match short-circuits the other tiers.</p>
+        <table class="transition-table">
+          <thead><tr><th>caseStatus</th><th>subStatus.transition</th><th>Board status</th><th>Why</th></tr></thead>
+          <tbody>
+            ${pairMap.map(r => `<tr><td>${mono(r.cs)}</td><td>${mono(r.sub)}</td><td>${pill(r.to)}</td><td class="muted tiny">${escapeHtml(r.note)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="detail-section">
+        <h3>2. Last <code class="mono">processTimeline[*].processType</code> refinement</h3>
+        <p class="muted tiny" style="margin:0 0 8px;">Disambiguates an otherwise-ambiguous caseStatus (typically <code class="mono">In-Progress</code>) using the latest item in the case's process timeline.</p>
+        <table class="transition-table">
+          <thead><tr><th>Last processType</th><th>Board status</th><th>Why</th></tr></thead>
+          <tbody>
+            ${processTypeMap.map(r => `<tr><td>${mono(r.pt)}</td><td>${pill(r.to)}</td><td class="muted tiny">${escapeHtml(r.note)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="detail-section">
+        <h3>3. <code class="mono">caseStatus</code> alone (fallback)</h3>
+        <p class="muted tiny" style="margin:0 0 8px;">Coarse default when neither of the above matches; any unmapped value falls through to <strong>New</strong>.</p>
+        <table class="transition-table">
+          <thead><tr><th>caseStatus</th><th>Board status</th><th>Why</th></tr></thead>
+          <tbody>
+            ${statusOnlyMap.map(r => `<tr><td>${mono(r.cs)}</td><td>${pill(r.to)}</td><td class="muted tiny">${escapeHtml(r.note)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="detail-section" style="margin-bottom:0">
+        <h3>Notes</h3>
+        <ul class="muted tiny" style="margin:0; padding-left:18px; line-height:1.6;">
+          <li><code class="mono">subStatus</code> is the new shape — the prior format's <code class="mono">caseSubstatus</code> field is gone. <code class="mono">sub_transition(r)</code> tolerates the object being missing, null, or the wrong type and returns <code class="mono">null</code> in that case.</li>
+          <li><code class="mono">"1st&nbsp;&nbsp;Line"</code> in the processType key has <strong>two</strong> spaces — that's the literal Case Center value.</li>
+          <li>On every live refresh, <code class="mono">status</code> is one of the CC-owned fields — the board column follows Case Center automatically. Operator-local layer (routing, notes, clocks, queue, handover, reminders) is preserved.</li>
+          <li>Operator transitions (above) and Case Center mappings (here) are independent: an operator can move a card to a different column locally, and a later refresh will only override it if Case Center itself has moved.</li>
+        </ul>
+      </div>
+    </div></div>
   `;
 }
 

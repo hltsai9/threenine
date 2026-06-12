@@ -10,6 +10,24 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Changed
+
+- **Status Flow page now documents the updated Case Center mapping.** Added a new
+  "Case Center → board mapping" section below the existing operator-transitions table
+  that surfaces the three lookup tiers `map_status()` consults — in lookup order, with
+  pills for the resulting board column and a one-line "why" per row:
+  1. `(caseStatus, subStatus.transition)` exact pair (most specific; short-circuits).
+  2. Last `processTimeline[*].processType` refinement
+     (`"1st  Line"` → New, `"Service Team"` → With Core Team).
+  3. `caseStatus` alone as the coarse fallback.
+  Renamed the existing "Transitions reference" to "Operator transitions" and added a
+  short blurb clarifying it's the in-app actions (Change status… / Assign / Return-to-
+  requester) vs. the Case Center mapping which runs on every live refresh. The page
+  also calls out that `subStatus` is the new shape (the old `caseSubstatus` field is
+  gone), that `"1st  Line"` literally has two spaces, and that `status` is now a CC-
+  owned field so the column follows Case Center automatically across refreshes.
+  Tables kept in sync with `local/casecenter.py` by hand.
+
 ### Fixed
 
 - **Selecting a kanban card no longer scrolls each column back to the top.** The
