@@ -90,6 +90,26 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Fixed (Route Board polish)
+
+- **Arrow line and arrowhead no longer separated by an empty gap.** The line
+  rendered as three tiled per-cell segments (start = right half of From cell,
+  middle = full cell, end = left half of To cell) and the arrowhead is anchored
+  at the To station's centre (the same point the dot would occupy), so the line
+  and head visually attach.
+- **Route due time now displays in MST** (the shift timezone, `SHIFT_TZ_LABEL`),
+  matching the rest of the shift-time UI. Was previously rendering as the
+  viewer's local time. `scheduledHandoff()` likewise interprets the rule's
+  `hh:mm` in MST and walks MST-days when picking the next occurrence, so e.g.
+  "Sunday Day 17:30" lands on Sunday in MST regardless of the viewer's locale.
+- **Dot for cases whose CC `assigneeDept` resolves to an HQ Product Team or Core
+  Team desk now correctly lands at the HQ or Core Team station.** The fix was
+  the storage version bump (`v6` → `v7`) — operators with a `v6` snapshot in
+  `localStorage` were reading back the pre-refactor seed (no `assigneeDept`),
+  so every dot defaulted to *User*. v7 forces a one-time re-seed; from then on
+  the snapshot carries `assigneeDept` and the dept→role lookup in `owners.js`
+  resolves correctly.
+
 ---
 
 ## 2026-06-11

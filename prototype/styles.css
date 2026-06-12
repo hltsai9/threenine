@@ -2057,15 +2057,26 @@ table.case-table {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Arrow segments tile across the row so the line and the head meet at the dot:
+ *   start  = right half of From cell  (50% → 100%)
+ *   middle = full cell                (0%  → 100%)
+ *   end    = left half of To cell     (0%  → 50%)
+ * Arrowhead sits at the To cell's center (50%) — same position the destination
+ * dot would occupy — so the head visually attaches to the end of the line. */
 .route-arrow-line {
   position: absolute;
-  top: 50%; left: -50%;
-  width: 100%; height: 2px;
+  top: 50%; height: 2px;
   background: linear-gradient(90deg, rgba(62, 112, 80, 0.45), rgba(62, 112, 80, 0.7));
   transform: translateY(-50%);
   pointer-events: none;
   overflow: hidden;
 }
+.route-arrow-line.route-arrow-start.route-arrow-fwd   { left: 50%; width: 50%; }
+.route-arrow-line.route-arrow-middle.route-arrow-fwd  { left: 0;   width: 100%; }
+.route-arrow-line.route-arrow-end.route-arrow-fwd     { left: 0;   width: 50%; }
+.route-arrow-line.route-arrow-start.route-arrow-back  { left: 0;   width: 50%; }
+.route-arrow-line.route-arrow-middle.route-arrow-back { left: 0;   width: 100%; }
+.route-arrow-line.route-arrow-end.route-arrow-back    { left: 50%; width: 50%; }
 .route-arrow-pulse {
   position: absolute;
   top: -3px; left: 0;
@@ -2082,10 +2093,12 @@ table.case-table {
 }
 .route-arrowhead {
   position: absolute;
-  top: 50%; right: 8px;
-  transform: translateY(-50%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   color: var(--accent, #3e7050);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1;
+  background: transparent;
 }
 
 .route-lane {
@@ -2105,13 +2118,13 @@ table.case-table {
 .route-lane.lane-due .route-arrow-line {
   background: linear-gradient(90deg, rgba(220, 162, 24, 0.55), rgba(220, 162, 24, 0.8));
 }
-.route-lane.lane-due .route-arrow-pulse,
-.route-lane.lane-due .route-arrowhead { color: #b07a07; background: #b07a07; }
+.route-lane.lane-due .route-arrow-pulse { background: #b07a07; }
+.route-lane.lane-due .route-arrowhead   { color: #b07a07; }
 .route-lane.lane-overdue .route-arrow-line {
   background: linear-gradient(90deg, rgba(196, 64, 64, 0.55), rgba(196, 64, 64, 0.85));
 }
-.route-lane.lane-overdue .route-arrow-pulse,
-.route-lane.lane-overdue .route-arrowhead { color: #b03434; background: #b03434; }
+.route-lane.lane-overdue .route-arrow-pulse { background: #b03434; }
+.route-lane.lane-overdue .route-arrowhead   { color: #b03434; }
 .route-lane.lane-delivered {
   background: #f0f6ee;
 }

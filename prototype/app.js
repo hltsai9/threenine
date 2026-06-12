@@ -66,7 +66,7 @@ function windowError(from, to) {
   return null;
 }
 
-const STORAGE_KEY = 'case-tracker-state-v6';
+const STORAGE_KEY = 'case-tracker-state-v7';
 // In live mode (served by local/serve.py; cases come from Case Center on demand via
 // "Load New" / "Refresh Existing", not on page refresh) we persist ONLY the local agent layer —
 // agentStatus, handover, reminder — keyed by case id, so a data pull never clobbers the
@@ -131,7 +131,7 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 6,
+      v: 7,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
@@ -145,7 +145,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 6 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 7 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
@@ -722,23 +722,34 @@ function caseStation(c) {
   return role || 'User';
 }
 
-// Find the next dueAt for a scheduled-handoff Track Status. Walks forward up to 14 days
-// from NOW to the first occurrence of the rule (e.g. "next Sunday 17:30 UTC" or
-// "next Day-shift day at 09:00 UTC"). Returns null for non-scheduled statuses.
+// Find the next dueAt for a scheduled-handoff Track Status. The scheduled hh:mm is
+// interpreted in the shift timezone (SHIFT_TZ, MST, UTC-7 no DST), and the dueDay name
+// is the MST weekday — so e.g. "next Sunday 17:30 MST" lands at 00:30 UTC Monday but
+// is still labelled "Sun". Walks forward up to 14 MST-days. Returns null for non-
+// scheduled statuses.
+const MST_OFFSET_HOURS = 7;
 function scheduledHandoff(c) {
   const ts = caseTrackStatus(c);
   const def = TRACK_STATUS_BY_ID[ts];
   if (!def?.scheduled) return null;
   const { to, day: targetDay, shift: targetShift, hh, mm } = def.scheduled;
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const base = NOW;
+  const nowMs = NOW.getTime();
+  // Today's MST date (treat MST as UTC minus 7 hours, no DST).
+  const mstAnchor = new Date(nowMs - MST_OFFSET_HOURS * 3600 * 1000);
+  const y = mstAnchor.getUTCFullYear();
+  const m = mstAnchor.getUTCMonth();
+  const day0 = mstAnchor.getUTCDate();
   for (let i = 0; i < 14; i++) {
-    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate() + i, hh, mm, 0));
-    if (d.getTime() <= base.getTime()) continue;
-    const dayName = DAYS[d.getUTCDay()];
+    // The MST date being considered.
+    const mstDate = new Date(Date.UTC(y, m, day0 + i));
+    const dayName = DAYS[mstDate.getUTCDay()];
+    // The UTC instant for hh:mm MST on this MST date.
+    const dueUtcMs = Date.UTC(y, m, day0 + i, hh + MST_OFFSET_HOURS, mm, 0);
+    if (dueUtcMs <= nowMs) continue;
     if (targetDay && targetDay !== dayName) continue;
     if (!targetDay) {
-      // Need a "Day shift" to exist on that day per the rota.
+      // Need the target shift to exist on that day per the rota.
       const rotaDay = (window.ROTA || []).find(r => r.day === dayName);
       const onShift = rotaDay && rotaDay.shifts?.[targetShift] && rotaDay.shifts[targetShift].length > 0;
       if (!onShift) continue;
@@ -746,7 +757,7 @@ function scheduledHandoff(c) {
     return {
       from: caseStation(c),
       to,
-      dueAt: d.toISOString(),
+      dueAt: new Date(dueUtcMs).toISOString(),
       dueDay: dayName,
       dueShift: targetShift,
     };
@@ -924,13 +935,19 @@ function renderRouteLane(c, opts = {}) {
                      lane.delivered ? ' lane-delivered' : '';
 
   // Three station cells. Each may carry: the dot, the eyeball icon, the closed badge,
-  // and the head/tail of an arrow that joins two adjacent station cells.
+  // and a segment of the arrow that originates at the From-station's center and ends at
+  // the To-station's center. The arrow segments are sized so they tile end-to-end across
+  // the row (start = right half of From cell, middle = full cell, end = left half of To
+  // cell with the arrowhead at the To center).
+  const showArrow = !!lane.arrowTo && !lane.delivered;
+  const fromIdx = ROUTE_STATIONS.indexOf(lane.station);
+  const toIdx   = ROUTE_STATIONS.indexOf(lane.arrowTo);
+  const forward = fromIdx < toIdx;
+
   const cells = ROUTE_STATIONS.map((st, idx) => {
     const hasDot = st === lane.station;
     const hasEye = lane.watch === st;
-    const arrowOriginates = lane.arrowTo && st === lane.station;
     const arrowLandsHere = lane.arrowTo === st;
-    const showArrow = !!lane.arrowTo && !lane.delivered;
     let body = '';
     if (hasDot) {
       body += `<span class="route-dot" aria-label="at ${escapeHtml(st)}"></span>`;
@@ -949,16 +966,17 @@ function renderRouteLane(c, opts = {}) {
     } else if (lane.trackDef && hasDot && !lane.subjectTag && !lane.closedBadge && !lane.arrowTo) {
       body += `<span class="route-tag">${escapeHtml(lane.trackDef.short)}</span>`;
     }
-    // Arrow segment: when an arrow originates here, draw it across all following stations
-    // up to (and including) the destination cell.
+    // Arrow role for this cell.
     let arrowSeg = '';
     if (showArrow) {
-      const fromIdx = ROUTE_STATIONS.indexOf(lane.station);
-      const toIdx   = ROUTE_STATIONS.indexOf(lane.arrowTo);
-      const inSpan  = (fromIdx < toIdx) ? (idx > fromIdx && idx <= toIdx) : (idx < fromIdx && idx >= toIdx);
-      if (inSpan) {
-        const head = (idx === toIdx) ? '<span class="route-arrowhead">▶</span>' : '';
-        arrowSeg = `<span class="route-arrow-line"><span class="route-arrow-pulse"></span></span>${head}`;
+      let role = null;
+      if (idx === fromIdx) role = 'start';
+      else if (idx === toIdx) role = 'end';
+      else if ((forward && idx > fromIdx && idx < toIdx) || (!forward && idx < fromIdx && idx > toIdx)) role = 'middle';
+      if (role) {
+        const head = role === 'end' ? `<span class="route-arrowhead">▶</span>` : '';
+        const dir = forward ? 'fwd' : 'back';
+        arrowSeg = `<span class="route-arrow-line route-arrow-${role} route-arrow-${dir}"><span class="route-arrow-pulse"></span></span>${head}`;
       }
     }
     return `<div class="route-cell" data-station="${escapeHtml(st)}">${arrowSeg}${body}</div>`;
@@ -966,11 +984,11 @@ function renderRouteLane(c, opts = {}) {
 
   const dueChip = lane.handoff ? (() => {
     const due = lane.handoff.dueAt;
-    const dueLabel = `${lane.handoff.dueDay} ${String(lane.handoff.dueShift)} · ${fmtClockShort(due)}`;
-    const phaseLabel = lane.phase === 'overdue' ? 'Overdue' :
-                       lane.phase === 'due-this-shift' ? 'Due this shift' :
+    const dueLabel = `${lane.handoff.dueDay} ${String(lane.handoff.dueShift)} · ${fmtLocalTime(due)}`;
+    const phaseLabel = lane.phase === 'overdue' ? `Overdue · ${fmtLocalTime(due)}` :
+                       lane.phase === 'due-this-shift' ? `Due this shift · ${fmtLocalTime(due)}` :
                        lane.delivered ? '✓ Delivered' : dueLabel;
-    return `<span class="route-due">${escapeHtml(phaseLabel)}</span>`;
+    return `<span class="route-due" title="${escapeHtml(fmtLocalTime(due))}">${escapeHtml(phaseLabel)}</span>`;
   })() : '';
 
   return `
