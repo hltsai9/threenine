@@ -6387,12 +6387,22 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="kanban-select"]').forEach(card => {
     card.addEventListener('click', e => {
       if (e.target.closest('button, a')) return;
-      // Preserve the viewport scroll position across the re-render so the page doesn't
-      // jump to the top when selecting a card further down the kanban.
+      // Preserve scroll across the re-render: the window AND each kanban column's
+      // own internal scroll (the columns have overflow-y: auto / max-height: 70vh,
+      // so a plain innerHTML reset would snap every column back to the top).
       const sx = window.scrollX, sy = window.scrollY;
+      const colScrolls = {};
+      document.querySelectorAll('.kanban-column').forEach(col => {
+        const body = col.querySelector('.kanban-col-body');
+        if (col.dataset.colId && body) colScrolls[col.dataset.colId] = body.scrollTop;
+      });
       STATE.kanbanSelected = card.dataset.caseId;
       render();
       window.scrollTo(sx, sy);
+      document.querySelectorAll('.kanban-column').forEach(col => {
+        const body = col.querySelector('.kanban-col-body');
+        if (body && colScrolls[col.dataset.colId] != null) body.scrollTop = colScrolls[col.dataset.colId];
+      });
     });
   });
   const resetLink = document.getElementById('reset-state');

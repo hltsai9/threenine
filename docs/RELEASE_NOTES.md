@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Fixed
+
+- **Selecting a kanban card no longer scrolls each column back to the top.** The
+  previous fix preserved the window scroll across the re-render, but `.kanban-col-body`
+  has its own `overflow-y: auto / max-height: 70vh` — replacing `main.innerHTML` rebuilt
+  every column from scratch, so any column the user had scrolled down inside snapped
+  back. The click handler now also snapshots each `.kanban-column`'s body `scrollTop`
+  before render and restores it after.
+
 ### Added
 
 - **Editable team members on the Owners page (Core Team + HQ).** The read-only roster
