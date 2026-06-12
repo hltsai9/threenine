@@ -1800,7 +1800,6 @@ function operatorRefCounts(id) {
 
 function rosterSnippet() {
   const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-  const qOrNull = s => (s == null || s === '') ? 'null' : q(s);
   const ops = window.OPERATORS.map(o => `  { id: ${q(o.id)}, name: ${q(o.name)}, shift: ${q(o.shift)} },`).join('\n');
   const shifts = window.SHIFTS.map(s => {
     const roster = window.OPERATORS.filter(o => o.shift === s.name).map(o => q(o.id));
@@ -1808,8 +1807,12 @@ function rosterSnippet() {
   }).join('\n');
   const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
     ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
-  const rota = (window.ROTA || []).map(r =>
-    `  { day: ${q(r.day)}, operatorId: ${qOrNull(r.operatorId)} },`).join('\n');
+  const rota = normalizeRota().map(r => {
+    const inner = Object.entries(r.shifts)
+      .map(([name, ids]) => `${q(name)}: [${ids.map(q).join(', ')}]`)
+      .join(', ');
+    return `  { day: ${q(r.day)}, shifts: { ${inner} } },`;
+  }).join('\n');
   return `window.OPERATORS = [\n${ops}\n];\n\nwindow.SHIFTS = [\n${shifts}\n];\n\nwindow.CURRENT_OPERATOR_ID = ${q(cur)};\n\nwindow.ROTA = [\n${rota}\n];`;
 }
 
@@ -1985,27 +1988,28 @@ function bindRotaEditor() {
   const ed = document.getElementById('rota-editor');
   if (!ed) return;
   let dragOpId = null;
-  let dragFrom = -1;
+  let dragFromDay = -1;
+  let dragFromShift = null;
 
-  // Start drag from either the palette or an already-assigned cell.
+  // Start drag from either the palette or an already-assigned chip in a cell.
   ed.querySelectorAll('[data-rota-drag]').forEach(el => {
     el.addEventListener('dragstart', e => {
       dragOpId = el.dataset.rotaDrag;
-      dragFrom = el.dataset.rotaFrom !== undefined ? +el.dataset.rotaFrom : -1;
+      dragFromDay = el.dataset.rotaFromDay !== undefined ? +el.dataset.rotaFromDay : -1;
+      dragFromShift = el.dataset.rotaFromShift || null;
       e.dataTransfer.effectAllowed = 'move';
-      // Carry the id in dataTransfer too so cross-window drag would still work.
       try { e.dataTransfer.setData('text/plain', dragOpId); } catch (_) {}
       el.classList.add('rota-dragging');
     });
     el.addEventListener('dragend', () => {
       el.classList.remove('rota-dragging');
       ed.querySelectorAll('.rota-cell.rota-over').forEach(c => c.classList.remove('rota-over'));
-      dragOpId = null; dragFrom = -1;
+      dragOpId = null; dragFromDay = -1; dragFromShift = null;
     });
   });
 
-  // Day cells accept drops. Dragging onto a cell adds the assignment; if the operator
-  // was being dragged out of another cell, that source cell is cleared too.
+  // Cells accept drops. The dropped operator is added to the target (no duplicates);
+  // if it came from another cell, it's removed from the source.
   ed.querySelectorAll('.rota-cell').forEach(cell => {
     cell.addEventListener('dragover', e => {
       e.preventDefault();
@@ -2016,23 +2020,37 @@ function bindRotaEditor() {
     cell.addEventListener('drop', e => {
       e.preventDefault();
       cell.classList.remove('rota-over');
-      const target = +cell.dataset.rotaDrop;
+      const dayIdx = +cell.dataset.rotaDropDay;
+      const shiftName = cell.dataset.rotaDropShift;
       const opId = dragOpId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
-      if (!opId || isNaN(target) || !window.ROTA || !window.ROTA[target]) return;
-      // No-op if dropped onto its own cell.
-      if (dragFrom === target) return;
-      if (dragFrom >= 0 && window.ROTA[dragFrom]) window.ROTA[dragFrom].operatorId = null;
-      window.ROTA[target].operatorId = opId;
+      if (!opId || isNaN(dayIdx) || !shiftName) return;
+      const rota = window.ROTA;
+      if (!rota[dayIdx] || !rota[dayIdx].shifts[shiftName]) return;
+      // Same cell → no-op.
+      if (dragFromDay === dayIdx && dragFromShift === shiftName) return;
+      // Remove from source (if any).
+      if (dragFromDay >= 0 && dragFromShift && rota[dragFromDay] && rota[dragFromDay].shifts[dragFromShift]) {
+        rota[dragFromDay].shifts[dragFromShift] =
+          rota[dragFromDay].shifts[dragFromShift].filter(id => id !== opId);
+      }
+      // Add to target (skip duplicates).
+      const arr = rota[dayIdx].shifts[shiftName];
+      if (!arr.includes(opId)) arr.push(opId);
       render();
     });
   });
 
-  // Click ✕ to clear a day.
-  ed.querySelectorAll('[data-rota-clear]').forEach(btn => {
+  // Per-chip remove (✕) button.
+  ed.querySelectorAll('[data-rota-remove-op]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const i = +btn.dataset.rotaClear;
-      if (window.ROTA && window.ROTA[i]) { window.ROTA[i].operatorId = null; render(); }
+      const dayIdx = +btn.dataset.rotaRemoveDay;
+      const shiftName = btn.dataset.rotaRemoveShift;
+      const opId = btn.dataset.rotaRemoveOp;
+      const cell = window.ROTA[dayIdx] && window.ROTA[dayIdx].shifts[shiftName];
+      if (!cell) return;
+      window.ROTA[dayIdx].shifts[shiftName] = cell.filter(id => id !== opId);
+      render();
     });
   });
 
@@ -2352,51 +2370,95 @@ function rotaDirty() {
   return a !== b;
 }
 
+// One-off migration for the older single-operator rota format (`{ day, operatorId }`).
+// Returns the rota in the new shape (`{ day, shifts: { [shiftName]: [opId, …] } }`).
+function normalizeRota() {
+  const rota = Array.isArray(window.ROTA) ? window.ROTA : [];
+  const shifts = (window.SHIFTS || []).map(s => s.name);
+  return rota.map(r => {
+    const out = { day: r.day, shifts: {} };
+    for (const name of shifts) out.shifts[name] = [];
+    if (r.shifts && typeof r.shifts === 'object') {
+      for (const [k, v] of Object.entries(r.shifts)) {
+        if (!shifts.includes(k)) continue;
+        out.shifts[k] = Array.isArray(v) ? v.slice() : [];
+      }
+    } else if (r.operatorId) {
+      // Old single-operator format — drop the operator onto the shift they're assigned to.
+      const op = getOperator(r.operatorId);
+      const target = op && shifts.includes(op.shift) ? op.shift : shifts[0];
+      if (target) out.shifts[target] = [r.operatorId];
+    }
+    return out;
+  });
+}
+
 function renderRotaEditor() {
-  const rota = window.ROTA || [];
-  const palette = window.OPERATORS.map(op => {
-    const init = operatorInitials(op);
-    const color = operatorColor(op);
-    return `
-      <div class="rota-chip" draggable="true" data-rota-drag="${escapeHtml(op.id)}" title="Drag onto a day below — release to assign ${escapeHtml(op.name)}">
-        <span class="rota-avatar" style="background:${color}">${escapeHtml(init)}</span>
+  // Always work against the normalized shape so the renderer can stay simple.
+  window.ROTA = normalizeRota();
+  const rota = window.ROTA;
+  const shiftNames = (window.SHIFTS || []).map(s => s.name);
+
+  const renderChip = (op) => `
+      <div class="rota-chip" draggable="true" data-rota-drag="${escapeHtml(op.id)}" title="Drag onto a cell below — release to assign ${escapeHtml(op.name)}">
+        <span class="rota-avatar" style="background:${operatorColor(op)}">${escapeHtml(operatorInitials(op))}</span>
         <span class="rota-chip-name">${escapeHtml(op.name)}</span>
         <span class="rota-chip-shift muted">${escapeHtml(op.shift)}</span>
       </div>`;
-  }).join('');
 
-  const days = rota.map((r, i) => {
-    const op = r.operatorId ? getOperator(r.operatorId) : null;
-    const cell = op ? `
-      <div class="rota-assigned" draggable="true" data-rota-drag="${escapeHtml(op.id)}" data-rota-from="${i}" title="${escapeHtml(op.name)} · drag away or click ✕ to clear">
-        <span class="rota-avatar rota-avatar-lg" style="background:${operatorColor(op)}">${escapeHtml(operatorInitials(op))}</span>
-        <div class="rota-assigned-name">${escapeHtml(op.name.replace(/\s*\([^)]*\)\s*/g, '').trim() || op.name)}</div>
-        <button class="rota-clear" data-rota-clear="${i}" title="Clear ${escapeHtml(r.day)}">✕</button>
-      </div>
-    ` : `<div class="rota-empty muted">drop here</div>`;
+  const palette = window.OPERATORS.map(renderChip).join('')
+    || '<span class="muted">No operators defined yet.</span>';
+
+  // Header row: an empty label cell, then 7 day labels.
+  const headerRow = `
+      <div class="rota-corner"></div>
+      ${rota.map(r => `<div class="rota-head">${escapeHtml(r.day)}</div>`).join('')}`;
+
+  const renderCell = (dayIdx, shiftName, opIds) => {
+    const chips = (opIds || []).map(opId => {
+      const op = getOperator(opId);
+      if (!op) return '';
+      return `
+        <div class="rota-assigned" draggable="true"
+             data-rota-drag="${escapeHtml(op.id)}"
+             data-rota-from-day="${dayIdx}"
+             data-rota-from-shift="${escapeHtml(shiftName)}"
+             title="${escapeHtml(op.name)} — drag to another cell to move, drag out to remove">
+          <span class="rota-avatar" style="background:${operatorColor(op)}">${escapeHtml(operatorInitials(op))}</span>
+          <span class="rota-mini-name">${escapeHtml(op.name.replace(/\s*\([^)]*\)\s*/g, '').trim() || op.name)}</span>
+          <button class="rota-remove" data-rota-remove-day="${dayIdx}" data-rota-remove-shift="${escapeHtml(shiftName)}" data-rota-remove-op="${escapeHtml(op.id)}" title="Remove">✕</button>
+        </div>`;
+    }).join('');
     return `
-      <div class="rota-day">
-        <div class="rota-day-label">${escapeHtml(r.day)}</div>
-        <div class="rota-cell" data-rota-drop="${i}">
-          ${cell}
-        </div>
+      <div class="rota-cell" data-rota-drop-day="${dayIdx}" data-rota-drop-shift="${escapeHtml(shiftName)}">
+        ${chips || '<span class="rota-empty muted">drop here</span>'}
       </div>`;
+  };
+
+  const shiftRows = shiftNames.map(shiftName => {
+    const cells = rota.map((r, dayIdx) => renderCell(dayIdx, shiftName, r.shifts[shiftName])).join('');
+    return `
+      <div class="rota-row-label">${escapeHtml(shiftName)}</div>
+      ${cells}`;
   }).join('');
 
   return `
     <div class="card rota-editor" id="rota-editor">
       <div class="card-header">
         <span>This week's rota</span>
-        <span class="muted tiny">Drag an operator onto a day to assign — click ✕ to clear · Save to persist</span>
+        <span class="muted tiny">Drag operators onto a Day or Night cell · drag a chip away to remove · Save to persist</span>
       </div>
       <div class="card-body">
         <div class="detail-section">
           <h3>Operators</h3>
-          <div class="rota-palette">${palette || '<span class="muted">No operators defined yet.</span>'}</div>
+          <div class="rota-palette">${palette}</div>
         </div>
         <div class="detail-section">
           <h3>Schedule</h3>
-          <div class="rota-grid">${days}</div>
+          <div class="rota-grid" style="grid-template-columns: 84px repeat(${rota.length}, 1fr);">
+            ${headerRow}
+            ${shiftRows}
+          </div>
         </div>
         <div class="re-actions">
           <button class="btn btn-primary" id="rota-save" ${rotaDirty() ? '' : 'disabled'}>Save rota</button>
@@ -2506,44 +2568,36 @@ function renderShiftDetail(shiftName) {
       <a class="btn" href="#/shifts">← Shifts</a>
     </div>
 
-    <div class="tabs">${tabs}</div>
+    <div class="card"><div class="card-body">
+      <div class="tabs" style="margin-top:-4px">${tabs}</div>
 
-    <div class="summary-bar">
-      <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Cases handed to ${escapeHtml(sh.name)}</div></div>
-      <div class="stat"><div class="v">${s.handedFrom.length}</div><div class="k">Cases handed from ${escapeHtml(sh.name)}</div></div>
-      <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes authored by shift</div></div>
-      <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Open cases missing a note for ${escapeHtml(sh.name)}</div></div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-block-header"><span>Roster</span></div>
-      <div style="padding: 8px 16px;">${ops}</div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-block-header">
-        <span>Cases handed to ${escapeHtml(sh.name)} shift</span>
-        <span class="muted tiny">${s.handedTo.length} case${s.handedTo.length === 1 ? '' : 's'}</span>
+      <div class="summary-bar">
+        <div class="stat"><div class="v">${s.handedTo.length}</div><div class="k">Cases handed to ${escapeHtml(sh.name)}</div></div>
+        <div class="stat"><div class="v">${s.handedFrom.length}</div><div class="k">Cases handed from ${escapeHtml(sh.name)}</div></div>
+        <div class="stat"><div class="v">${s.writtenByShift.length}</div><div class="k">Notes authored by shift</div></div>
+        <div class="stat"><div class="v">${s.missingForShift.length}</div><div class="k">Open cases missing a note for ${escapeHtml(sh.name)}</div></div>
       </div>
-      <div class="section-block-body">
-        ${s.handedTo.length === 0 ? '<div class="section-block-empty">No fresh handover notes addressed to this shift.</div>' : s.handedTo.map(renderCaseRow).join('')}
-      </div>
-    </div>
 
-    <div class="section-block">
-      <div class="section-block-header">
-        <span>Open cases missing a note for ${escapeHtml(sh.name)} shift</span>
-        <span class="muted tiny">${s.missingForShift.length} case${s.missingForShift.length === 1 ? '' : 's'}</span>
+      <div class="detail-section">
+        <h3>Roster</h3>
+        <div>${ops || '<div class="muted">No operators on this shift.</div>'}</div>
       </div>
-      <div class="section-block-body">
-        ${s.missingForShift.length === 0 ? '<div class="section-block-empty">All open cases have a current note for this shift.</div>' : s.missingForShift.map(renderCaseRow).join('')}
-      </div>
-    </div>
 
-    <div class="section-block">
-      <div class="section-block-header"><span>Recent handover activity by this shift</span></div>
-      <ul class="activity-list">${activityHtml}</ul>
-    </div>
+      <div class="detail-section">
+        <h3>Cases handed to ${escapeHtml(sh.name)} shift <span class="muted tiny">· ${s.handedTo.length} case${s.handedTo.length === 1 ? '' : 's'}</span></h3>
+        <div>${s.handedTo.length === 0 ? '<div class="muted">No fresh handover notes addressed to this shift.</div>' : s.handedTo.map(renderCaseRow).join('')}</div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Open cases missing a note for ${escapeHtml(sh.name)} shift <span class="muted tiny">· ${s.missingForShift.length} case${s.missingForShift.length === 1 ? '' : 's'}</span></h3>
+        <div>${s.missingForShift.length === 0 ? '<div class="muted">All open cases have a current note for this shift.</div>' : s.missingForShift.map(renderCaseRow).join('')}</div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Recent handover activity</h3>
+        <ul class="activity-list" style="padding:0">${activityHtml}</ul>
+      </div>
+    </div></div>
   `;
 }
 

@@ -10,15 +10,32 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-11
 
+### Changed
+
+- **"This week's rota" now has a Day cell and a Night cell per day, each holding any
+  number of operators.** Replaced the single-operator-per-day grid with a `92px +
+  repeat(N,1fr)` matrix: a header row of day labels and one row per shift in
+  `window.SHIFTS` (defaults Day, Night). `window.ROTA` reshaped to
+  `[{ day, shifts: { Day: [opId, …], Night: [opId, …] } }, …]`; a new `normalizeRota()`
+  migrates older snapshots / the prior single-operator format on load. Drag drops onto a
+  cell append (no duplicates); dragging a chip onto another cell moves it; a per-chip ✕
+  removes one. `rosterSnippet()` emits the new shape; **Save rota** still snapshots into
+  `SEED_ROSTER.rota`, writes localStorage, and (on http(s)) calls `saveJsFile('shifts',
+  …)`. CSS updated: `.rota-cell` is now a flex column of pill-shaped `.rota-assigned`
+  chips, with `.rota-corner`, `.rota-head`, and `.rota-row-label` for the matrix's
+  outer cells.
+
 ### Fixed
 
-- **Shift-detail page now matches the rest of the app.** The page-header used to stack
-  a back-link row above an h1 inside a single column, which broke the standard
-  title-left / action-right layout the `.page-header` flex container expects. Rebuilt
-  the header as title + subtitle on the left and a `← Shifts` back button on the right.
-  The "On now" / "Off shift" badge inlined next to the h1. Promoted `.badge-current`
-  from `.archive-card .badge-current` to a top-level class so it actually applies on the
-  Shifts index and detail too (it was unstyled there before).
+- **Shift detail page no longer reads as "a stack of unstyled blocks".** Everything
+  below the page-header (tabs, summary stats, roster, cases-handed-to, missing notes,
+  recent handover activity) is now wrapped in a single `.card` + `.card-body` with
+  `.detail-section` regions — same pattern as the case detail page — instead of four
+  free-floating `.section-block` panels. The page-header gets a clean title-left,
+  `← Shifts` button-right layout (with the "On now"/"Off shift" badge inline). Also
+  promoted `.badge-current` from `.archive-card .badge-current` to a top-level rule so
+  it actually styles the badge on the Shifts index card and the detail header (it had
+  no style before outside the archive view).
 - **Clicking a kanban card no longer jumps the page to the top.** The select handler
   now captures `window.scrollX/Y` before `render()` and restores it after, so picking
   a card further down the board keeps the viewport where it was. Affects every column

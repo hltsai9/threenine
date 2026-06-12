@@ -878,90 +878,94 @@ table.case-table {
 
 .rota-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
+  /* Inline grid-template-columns is set by renderRotaEditor based on the day count. */
+  gap: 8px;
+  align-items: stretch;
 }
-.rota-day {
-  background: var(--chip-soft-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 110px;
-}
-.rota-day-label {
+.rota-corner { /* empty top-left cell */ }
+.rota-head {
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .05em;
   color: var(--text-faint-2);
   text-align: center;
+  padding: 4px 0 6px;
 }
-.rota-cell {
-  flex: 1;
-  border-radius: var(--r-md);
+.rota-row-label {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-deep);
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: white;
-  border: 1px dashed transparent;
-  position: relative;
+  justify-content: flex-end;
+  padding-right: 8px;
+}
+.rota-cell {
+  min-height: 78px;
+  background: var(--chip-soft-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
   padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 .rota-cell.rota-over {
   background: var(--accent-bg);
+  border-style: solid;
   border-color: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
 .rota-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-faint-2);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-md);
-  padding: 12px 8px;
-  width: 100%;
+  color: var(--text-faint-3);
   text-align: center;
 }
 .rota-assigned {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px 3px 3px;
   cursor: grab;
-  padding: 4px 0;
-  width: 100%;
   position: relative;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-deep);
 }
 .rota-assigned:active { cursor: grabbing; }
 .rota-assigned.rota-dragging { opacity: .35; }
-.rota-assigned-name {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-deep);
-  text-align: center;
-  line-height: 1.2;
+.rota-mini-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.rota-clear {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: white;
+.rota-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-faint-3);
   font-size: 10px;
   font-weight: 700;
-  color: var(--text-muted);
   cursor: pointer;
+  padding: 0 2px;
   line-height: 1;
-  display: none;
+  visibility: hidden;
 }
-.rota-assigned:hover .rota-clear { display: block; }
-.rota-clear:hover { color: var(--danger); border-color: var(--danger); }
+.rota-assigned:hover .rota-remove { visibility: visible; }
+.rota-remove:hover { color: var(--danger); }
 
 #rota-status { margin-left: auto; }
 
