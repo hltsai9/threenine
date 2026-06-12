@@ -74,6 +74,22 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 - `docs/case-center-overview-plan.md` — the agreed plan that drives this change.
 
+### Added (follow-up)
+
+- **More demo Track Status seeds** so the Picked workspace populates every variant
+  out of the box: `weekend_case` (C-1041), `escalate_to_core` (C-1043),
+  `escalated_to_hq` (C-1044), `sanity_check` (C-1045, C-1050, C-1053, C-1054),
+  `need_to_contact_user` (C-1046), `hq_did_not_handle` (C-1048), `case_closed`
+  (C-1049). Each seed also gains an explicit `assigneeDept` so the Route Board's
+  From-station derivation (via the new `route_role` field in `owners.js`) has
+  something concrete to look up. The Sanity Check collapsible group now has
+  four members so its collapse/expand behaviour is visible.
+
+### Internal
+
+- `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
+  the deploy triggers so the GitHub Pages site picks up this branch's bundle.
+
 ---
 
 ## 2026-06-11

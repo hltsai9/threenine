@@ -9,6 +9,7 @@ on:
       - claude/busy-heisenberg-26Sh8
       - claude/charming-cray-ti71j0
       - claude/intelligent-goldberg-c5lpt8
+      - claude/vigilant-knuth-slap60
     paths:
       - 'prototype/**'
       - '.github/workflows/pages.yml'
