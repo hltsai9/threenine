@@ -77,7 +77,12 @@ const AGENT_KEY = 'case-tracker-agent-v1';
 function agentLayerFromState() {
   const map = {};
   for (const c of STATE.cases) {
-    map[c.id] = { agentStatus: c.agentStatus, handover: c.handover, reminder: c.reminder };
+    map[c.id] = {
+      agentStatus: c.agentStatus,
+      handover: c.handover,
+      reminder: c.reminder,
+      trackStatus: c.trackStatus || null,
+    };
   }
   return map;
 }
@@ -89,6 +94,7 @@ function applyAgentLayer(map) {
     if (a.agentStatus != null) c.agentStatus = a.agentStatus;
     if (a.handover !== undefined) c.handover = a.handover;
     if (a.reminder !== undefined) c.reminder = a.reminder;
+    if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
   }
 }
 
@@ -546,11 +552,11 @@ window.addEventListener('hashchange', render);
 
 function labelForRoute(route) {
   switch (route.name) {
-    case 'cases': return 'Cases';
+    case 'cases': return 'Picked';
     case 'shifts': return 'Shifts';
     case 'owners': return 'Owners';
     case 'shiftDetail': return `${route.shift} shift`;
-    case 'archive': return 'Weekly Archive';
+    case 'archive': return 'Overview';
     case 'recycleBin': return 'Recycle bin';
     case 'archiveWeek': {
       const w = window.WEEKS.find(w => w.id === route.id);
@@ -642,11 +648,127 @@ function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
   const inQ = isQueued(c);
   const label = size === 'tiny'
-    ? (inQ ? '✓ Queued' : '+ Queue')
-    : (inQ ? '✓ Remove from queue' : '+ Add to queue');
-  const title = inQ ? 'Remove from your queue (move to bottom band)' : 'Add to your queue (move to top band)';
+    ? (inQ ? '✓ Picked' : '+ Pick')
+    : (inQ ? '✓ Unpick' : '+ Pick for follow-up');
+  const title = inQ ? 'Remove from your Picked workspace' : 'Pick for follow-up — adds to your Picked workspace';
   return `<button class="${cls} queue-toggle${inQ ? ' in-queue' : ''}" data-action="prompt" data-case-id="${c.id}" data-kind="toggle_queue" title="${escapeHtml(title)}" onclick="event.stopPropagation()">${escapeHtml(label)}</button>`;
 }
+
+/* ---------- Track Status (operator's intent on each picked case) ----------
+ * See docs/case-center-overview-plan.md §3 & §6.
+ *   - 7-value enum, set/cleared by the operator. Never sent to Case Center.
+ *   - The first three statuses carry a scheduled handoff rule that drives the
+ *     animated Route Board arrows; the next two are "watching" (eyeball icon).
+ *   - Case Closed and Sanity Check pin the dot to *User* regardless of CC dept.
+ */
+const TRACK_STATUSES = [
+  { id: 'weekend_case',         label: 'Weekend Case',                       short: 'Weekend',     scheduled: { to: 'HQ',        day: 'Sun', shift: 'Day', hh: 17, mm: 30 } },
+  { id: 'hq_did_not_handle',    label: 'HQ did not handle',                  short: 'HQ retry',    scheduled: { to: 'HQ',        day: null,  shift: 'Day', hh: 17, mm: 30 } },
+  { id: 'escalate_to_core',     label: 'Escalate to Core Team',              short: 'To Core',     scheduled: { to: 'Core Team', day: null,  shift: 'Day', hh:  9, mm:  0 } },
+  { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ',    watch: 'HQ' },
+  { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User',  watch: 'User' },
+  { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed',      pinTo: 'User' },
+  { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      pinTo: 'User', useSubjectTag: true, collapsible: true },
+];
+const TRACK_STATUS_BY_ID = Object.fromEntries(TRACK_STATUSES.map(t => [t.id, t]));
+const TRACK_GROUP_ORDER = [
+  'weekend_case', 'hq_did_not_handle', 'escalate_to_core',
+  'escalated_to_hq', 'need_to_contact_user', 'case_closed',
+  null, // untracked picked cases
+  'sanity_check', // last — collapsible bottom group
+];
+
+// Heuristic suggestion: which Track Statuses make sense to set on the current shift.
+// Not gating — every value is one click away regardless of the operator's shift.
+const SUGGESTED_TRACK_STATUS_BY_SHIFT = {
+  Day:   ['hq_did_not_handle', 'escalate_to_core', 'escalated_to_hq', 'need_to_contact_user', 'case_closed', 'sanity_check'],
+  Night: ['hq_did_not_handle', 'escalate_to_core'],
+};
+function suggestedTrackStatuses() {
+  const op = getOperator(STATE.operatorId);
+  const base = SUGGESTED_TRACK_STATUS_BY_SHIFT[op?.shift] || [];
+  // Weekend Case is always suggested on Fri/Sat regardless of which shift.
+  const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][NOW.getUTCDay()];
+  if (dow === 'Fri' || dow === 'Sat') return Array.from(new Set([...base, 'weekend_case']));
+  return base;
+}
+
+function caseTrackStatus(c) { return c?.trackStatus || null; }
+function isPicked(c) { return isQueued(c) && !['closed', 'cancelled'].includes(c.status); }
+function pickedCases() { return STATE.cases.filter(c => !c.deletedAt && isPicked(c)); }
+
+// Resolve CC's `assigneeDept` (or fallback fields) to one of the three Route Board
+// stations via the `route_role` field on `owners.js`. Anything we can't resolve →
+// `User` (the case is considered to be sitting with the requester).
+function deptToRoleRaw(dept) {
+  if (!dept) return null;
+  const owners = window.OWNERS || { core: [], hq: [] };
+  const all = [...(owners.core || []), ...(owners.hq || [])];
+  const match = all.find(o => {
+    const fields = [o.name, o.area, o.region].filter(Boolean);
+    return fields.some(f => String(f).toLowerCase() === String(dept).toLowerCase());
+  });
+  if (match && match.route_role) return match.route_role;
+  // Fallback: look for partial inclusion of dept inside the team name.
+  const partial = all.find(o => String(o.name || '').toLowerCase().includes(String(dept).toLowerCase()));
+  return partial ? (partial.route_role || null) : null;
+}
+function caseStation(c) {
+  const ts = caseTrackStatus(c);
+  // Case Closed and Sanity Check pin the dot to User regardless of CC dept.
+  const def = TRACK_STATUS_BY_ID[ts];
+  if (def?.pinTo) return def.pinTo;
+  const role = deptToRoleRaw(c.assigneeDept) || deptToRoleRaw(c.assignee);
+  return role || 'User';
+}
+
+// Find the next dueAt for a scheduled-handoff Track Status. Walks forward up to 14 days
+// from NOW to the first occurrence of the rule (e.g. "next Sunday 17:30 UTC" or
+// "next Day-shift day at 09:00 UTC"). Returns null for non-scheduled statuses.
+function scheduledHandoff(c) {
+  const ts = caseTrackStatus(c);
+  const def = TRACK_STATUS_BY_ID[ts];
+  if (!def?.scheduled) return null;
+  const { to, day: targetDay, shift: targetShift, hh, mm } = def.scheduled;
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const base = NOW;
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate() + i, hh, mm, 0));
+    if (d.getTime() <= base.getTime()) continue;
+    const dayName = DAYS[d.getUTCDay()];
+    if (targetDay && targetDay !== dayName) continue;
+    if (!targetDay) {
+      // Need a "Day shift" to exist on that day per the rota.
+      const rotaDay = (window.ROTA || []).find(r => r.day === dayName);
+      const onShift = rotaDay && rotaDay.shifts?.[targetShift] && rotaDay.shifts[targetShift].length > 0;
+      if (!onShift) continue;
+    }
+    return {
+      from: caseStation(c),
+      to,
+      dueAt: d.toISOString(),
+      dueDay: dayName,
+      dueShift: targetShift,
+    };
+  }
+  return null;
+}
+
+function trackStatusPhase(c) {
+  const h = scheduledHandoff(c);
+  if (!h) return 'idle';
+  const dueMs = Date.parse(h.dueAt) - NOW.getTime();
+  // Action overdue: past dueAt and the dot hasn't reached the destination yet.
+  if (dueMs < 0 && caseStation(c) !== h.to) return 'overdue';
+  if (caseStation(c) === h.to) return 'delivered';
+  // Action due this shift: dueAt within the current shift window.
+  const shiftEndMs = Date.parse(window.CURRENT_SHIFT?.endsAtUtc || NOW.toISOString()) - NOW.getTime();
+  if (dueMs <= Math.max(shiftEndMs, 0)) return 'due-this-shift';
+  return 'upcoming';
+}
+
+function actionDueCases()      { return pickedCases().filter(c => trackStatusPhase(c) === 'due-this-shift'); }
+function actionOverdueCases()  { return pickedCases().filter(c => trackStatusPhase(c) === 'overdue'); }
 
 function renderBellButton(c, ctx) {
   if (['closed', 'cancelled'].includes(c.status)) return '';
@@ -676,11 +798,9 @@ function approachingSlaCases() {
 }
 
 function escalatedCases() {
-  return STATE.cases.filter(c => {
-    if (c.deletedAt) return false;
-    if (['closed', 'cancelled', 'resolved'].includes(c.status)) return false;
-    return c.flags?.includes('escalated');
-  });
+  // Replaced by `actionDueCases()` / `actionOverdueCases()` in the new model; kept as a
+  // shim returning an empty list so existing callers don't break during transition.
+  return [];
 }
 
 // True when an open case lacks a fresh handover note authored during the current shift.
@@ -752,80 +872,233 @@ function renderTzHint(owner) {
   return `<span class="tz-hint ${cls}" title="${escapeHtml(owner.tz)} · office ${escapeHtml(owner.office)}">${escapeHtml(local)} ${escapeHtml(owner.tz.split('/').pop())}</span>`;
 }
 
-/* ---------- Case List view ---------- */
+/* ---------- Picked workspace view ----------
+ * Replaces the old kanban-by-CC-status board. Layout (per
+ * docs/case-center-overview-plan.md §1 / §6):
+ *
+ *    +-----------------------------------------------------+
+ *    |   Aggregate Route Board strip (User · Core · HQ)    |   1/3 height
+ *    +----------+------------------------------------------+
+ *    |  Picked  |           Case detail                    |   2/3 height
+ *    |  list    |                                          |   1:2 width
+ *    +----------+------------------------------------------+
+ *
+ *  CC status no longer drives any columns. The only operator-set field on
+ *  a picked case is `trackStatus` (see TRACK_STATUSES). Cases land here by
+ *  being "picked" from #/archive (Overview).
+ */
 
-function renderCaseList() {
-  const allCases = STATE.cases
-    .filter(c => !c.deletedAt && c.weekId === window.CURRENT_WEEK.id && !['closed', 'cancelled'].includes(c.status));
-  const closedCount = STATE.cases
-    .filter(c => !c.deletedAt && c.weekId === window.CURRENT_WEEK.id && ['closed', 'cancelled'].includes(c.status)).length;
+const ROUTE_STATIONS = ['User', 'Core Team', 'HQ'];
 
-  // Columns = Case Center status (the real external status). Each column splits into a
-  // top band (cases the first-line agent has queued / is actively working) and a bottom
-  // band (everything else in that status) — the row dimension is the agent status.
-  const columns = [
-    { id: 'new',    label: 'New',                              statuses: ['new'] },
-    { id: 'core',    label: 'With Core Team',                   statuses: ['with_core'] },
-    { id: 'hq',     label: 'With HQ Product Team',             statuses: ['with_hq'] },
-    { id: 'review', label: 'Sanity Check / With Requester',    statuses: ['sanity_check', 'returned_to_requester'] },
-  ];
+function caseRouteLane(c) {
+  const station = caseStation(c);
+  const ts = caseTrackStatus(c);
+  const def = ts ? TRACK_STATUS_BY_ID[ts] : null;
+  const handoff = scheduledHandoff(c);
+  const phase = trackStatusPhase(c);
 
-  const sortCases = (a, b) => {
-    // Cases assigned to the current operator float to the top of their column / band.
-    const m = (isAssignedToMe(b) ? 1 : 0) - (isAssignedToMe(a) ? 1 : 0);
-    if (m !== 0) return m;
-    const pri = { high: 0, medium: 1, low: 2 };
-    const p = pri[a.priority] - pri[b.priority];
-    if (p !== 0) return p;
-    return new Date(b.createdAt) - new Date(a.createdAt);
+  // Arrow target. For scheduled statuses: the handoff's `to`. For the two watching
+  // statuses: the watched station, but only if the dot isn't already there.
+  let arrowTo = null;
+  if (handoff && handoff.to !== station) arrowTo = handoff.to;
+  if (def?.watch && def.watch !== station) arrowTo = def.watch;
+
+  return {
+    station,
+    arrowTo,
+    watch: def?.watch || null,
+    handoff,
+    phase,
+    delivered: !!handoff && station === handoff.to,
+    trackDef: def,
+    subjectTag: def?.useSubjectTag ? c.subject : null,
+    closedBadge: ts === 'case_closed',
   };
+}
 
-  const band = (cases, cls, header, emptyText) => `
-    <div class="kanban-band ${cls}">
-      <div class="kanban-band-header">
-        <span>${escapeHtml(header)}</span>
-        <span class="kanban-band-count">${cases.length}</span>
+function renderRouteLane(c, opts = {}) {
+  const lane = caseRouteLane(c);
+  const isSelected = STATE.kanbanSelected === c.id;
+  const phaseClass = lane.phase === 'overdue' ? ' lane-overdue' :
+                     lane.phase === 'due-this-shift' ? ' lane-due' :
+                     lane.delivered ? ' lane-delivered' : '';
+
+  // Three station cells. Each may carry: the dot, the eyeball icon, the closed badge,
+  // and the head/tail of an arrow that joins two adjacent station cells.
+  const cells = ROUTE_STATIONS.map((st, idx) => {
+    const hasDot = st === lane.station;
+    const hasEye = lane.watch === st;
+    const arrowOriginates = lane.arrowTo && st === lane.station;
+    const arrowLandsHere = lane.arrowTo === st;
+    const showArrow = !!lane.arrowTo && !lane.delivered;
+    let body = '';
+    if (hasDot) {
+      body += `<span class="route-dot" aria-label="at ${escapeHtml(st)}"></span>`;
+    }
+    if (hasEye) {
+      body += `<span class="route-eye" title="Watching at ${escapeHtml(st)}" aria-label="watching">👁</span>`;
+    }
+    if (lane.closedBadge && hasDot) {
+      body += `<span class="route-closed-badge" title="Case Closed">✓</span>`;
+    }
+    if (lane.delivered && arrowLandsHere) {
+      body += `<span class="route-delivered" title="Delivered">✓ delivered</span>`;
+    }
+    if (lane.subjectTag && hasDot) {
+      body += `<span class="route-tag" title="${escapeHtml(c.subject)}">${escapeHtml(c.subject)}</span>`;
+    } else if (lane.trackDef && hasDot && !lane.subjectTag && !lane.closedBadge && !lane.arrowTo) {
+      body += `<span class="route-tag">${escapeHtml(lane.trackDef.short)}</span>`;
+    }
+    // Arrow segment: when an arrow originates here, draw it across all following stations
+    // up to (and including) the destination cell.
+    let arrowSeg = '';
+    if (showArrow) {
+      const fromIdx = ROUTE_STATIONS.indexOf(lane.station);
+      const toIdx   = ROUTE_STATIONS.indexOf(lane.arrowTo);
+      const inSpan  = (fromIdx < toIdx) ? (idx > fromIdx && idx <= toIdx) : (idx < fromIdx && idx >= toIdx);
+      if (inSpan) {
+        const head = (idx === toIdx) ? '<span class="route-arrowhead">▶</span>' : '';
+        arrowSeg = `<span class="route-arrow-line"><span class="route-arrow-pulse"></span></span>${head}`;
+      }
+    }
+    return `<div class="route-cell" data-station="${escapeHtml(st)}">${arrowSeg}${body}</div>`;
+  }).join('');
+
+  const dueChip = lane.handoff ? (() => {
+    const due = lane.handoff.dueAt;
+    const dueLabel = `${lane.handoff.dueDay} ${String(lane.handoff.dueShift)} · ${fmtClockShort(due)}`;
+    const phaseLabel = lane.phase === 'overdue' ? 'Overdue' :
+                       lane.phase === 'due-this-shift' ? 'Due this shift' :
+                       lane.delivered ? '✓ Delivered' : dueLabel;
+    return `<span class="route-due">${escapeHtml(phaseLabel)}</span>`;
+  })() : '';
+
+  return `
+    <div class="route-lane${isSelected ? ' lane-selected' : ''}${phaseClass}" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="route-lane-id"><span class="mono muted">${c.id}</span></div>
+      <div class="route-lane-cells">${cells}</div>
+      <div class="route-lane-meta">
+        <span class="route-subject">${escapeHtml(c.subject)}</span>
+        ${dueChip}
       </div>
-      ${cases.length === 0
-        ? `<div class="kanban-empty">${escapeHtml(emptyText)}</div>`
-        : cases.map(renderKanbanCard).join('')}
+    </div>
+  `;
+}
+
+function renderRouteBoardStrip() {
+  const all = pickedCases();
+  if (all.length === 0) {
+    return `<div class="route-board route-board-empty">No cases picked yet. Open <a href="#/archive">Overview</a> to find cases to pick.</div>`;
+  }
+
+  // Group order: scheduled → watching → closed → untracked → sanity-check (collapsible bottom).
+  const groups = TRACK_GROUP_ORDER.map(id => ({
+    id,
+    cases: all.filter(c => caseTrackStatus(c) === id),
+  })).filter(g => g.cases.length > 0);
+
+  const groupLabel = id => id === null ? 'Untracked' : (TRACK_STATUS_BY_ID[id]?.label || id);
+
+  const sanityExpanded = !!STATE.sanityExpanded;
+  const rows = groups.map(g => {
+    const def = g.id ? TRACK_STATUS_BY_ID[g.id] : null;
+    const collapsible = def?.collapsible;
+    if (collapsible) {
+      const tog = sanityExpanded ? '▾' : '▸';
+      const body = sanityExpanded
+        ? g.cases.map(c => renderRouteLane(c)).join('')
+        : '';
+      return `
+        <div class="route-group route-group-sanity">
+          <div class="route-group-header" data-action="toggle-sanity">
+            <span class="route-group-toggle">${tog}</span>
+            <span>${escapeHtml(groupLabel(g.id))}</span>
+            <span class="route-group-count">${g.cases.length}</span>
+          </div>
+          ${body}
+        </div>
+      `;
+    }
+    return g.cases.map(c => renderRouteLane(c)).join('');
+  }).join('');
+
+  const stationHeader = `
+    <div class="route-stations">
+      <div class="route-lane-id"></div>
+      <div class="route-lane-cells">
+        ${ROUTE_STATIONS.map(st => `<div class="route-cell route-station-head">${escapeHtml(st)}</div>`).join('')}
+      </div>
+      <div class="route-lane-meta"></div>
     </div>
   `;
 
-  const kanban = columns.map(col => {
-    const colCases = allCases.filter(c => col.statuses.includes(c.status)).sort(sortCases);
-    const top = colCases.filter(isQueued);
-    const bottom = colCases.filter(c => !isQueued(c));
-    return `
-      <div class="kanban-column" data-col-id="${col.id}">
-        <div class="kanban-col-header">
-          <span>${escapeHtml(col.label)}</span>
-          <span class="kanban-count">${colCases.length}</span>
-        </div>
-        <div class="kanban-col-body">
-          ${band(top, 'kanban-band-top', 'My queue', 'Nothing queued.')}
-          ${band(bottom, 'kanban-band-bottom', 'Backlog', 'No cases.')}
-        </div>
+  return `<div class="route-board">${stationHeader}<div class="route-lanes">${rows}</div></div>`;
+}
+
+function trackStatusPill(c) {
+  const ts = caseTrackStatus(c);
+  if (!ts) return `<span class="ts-pill ts-none">Untracked</span>`;
+  const def = TRACK_STATUS_BY_ID[ts];
+  return `<span class="ts-pill ts-${ts}" title="${escapeHtml(def.label)}">${escapeHtml(def.short)}</span>`;
+}
+
+function renderPickedListRow(c) {
+  const isSelected = STATE.kanbanSelected === c.id;
+  return `
+    <div class="picked-row${isSelected ? ' picked-row-selected' : ''}" data-case-id="${c.id}" data-action="select-case">
+      <div class="picked-row-head">
+        <span class="mono muted">${c.id}</span>
+        ${trackStatusPill(c)}
+        <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
       </div>
-    `;
-  }).join('');
+      <div class="picked-row-subject">${escapeHtml(c.subject)}</div>
+    </div>
+  `;
+}
 
+function renderPickedList() {
+  const all = pickedCases();
+  // Sort: by Track Status group order, then due time within each group.
+  const rank = id => {
+    const i = TRACK_GROUP_ORDER.indexOf(id);
+    return i === -1 ? TRACK_GROUP_ORDER.length : i;
+  };
+  const sorted = all.slice().sort((a, b) => {
+    const ra = rank(caseTrackStatus(a));
+    const rb = rank(caseTrackStatus(b));
+    if (ra !== rb) return ra - rb;
+    const ha = scheduledHandoff(a);
+    const hb = scheduledHandoff(b);
+    if (ha && hb) return Date.parse(ha.dueAt) - Date.parse(hb.dueAt);
+    if (ha) return -1;
+    if (hb) return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+  if (sorted.length === 0) {
+    return `<div class="picked-list-empty">No picked cases.<br><a href="#/archive">Open Overview</a></div>`;
+  }
+  return `<div class="picked-list">${sorted.map(renderPickedListRow).join('')}</div>`;
+}
+
+function renderCaseList() {
+  const all = pickedCases();
   const selected = STATE.kanbanSelected ? caseById(STATE.kanbanSelected) : null;
-  // Auto-clear if selected case no longer exists or moved out of this week.
-  const validSelection = selected && selected.weekId === window.CURRENT_WEEK.id;
-  const readingPanel = renderReadingPanel(validSelection ? selected : null);
+  const validSelection = selected && all.includes(selected);
+  // Default selection: the topmost picked case (matches the sorted list above).
+  let activeCase = validSelection ? selected : null;
+  if (!activeCase && all.length > 0) {
+    const sorted = all.slice().sort((a, b) => {
+      const rank = id => { const i = TRACK_GROUP_ORDER.indexOf(id); return i === -1 ? 99 : i; };
+      return rank(caseTrackStatus(a)) - rank(caseTrackStatus(b));
+    });
+    activeCase = sorted[0];
+    STATE.kanbanSelected = activeCase.id;
+  }
 
-  const queuedCount = allCases.filter(isQueued).length;
-
-  // Handover awareness — replaces the old standalone Shift Handover page. When the shift
-  // is ending, surface how many open cases still need a fresh note; the agent writes them
-  // straight from the cards / reading panel below.
   const handoverPending = handoverPendingCases();
   const handoverBanner = handoverPending.length > 0 ? `
     <div class="kanban-handover-banner">
-      <div>
-        <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note. Write each from its card or the reading panel.
-      </div>
+      <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note.
     </div>
   ` : '';
 
@@ -855,50 +1128,47 @@ function renderCaseList() {
     </div>
   ` : '';
 
-  const watchlist = renderWatchlists(approachingSlaCases(), escalatedCases());
+  const watchlist = renderWatchlists(approachingSlaCases(), actionDueCases().concat(actionOverdueCases()));
 
-  // Live-mode banner so the board is never silently empty when running on Case Center data.
   const liveBanner = window.__LIVE__ ? (() => {
     const total = STATE.cases.length;
-    const shown = allCases.length;
-    const hidden = total - shown;
-    let msg;
-    if (total === 0) {
-      msg = 'Live · Case Center returned <strong>0 cases</strong>. Check your <span class="mono">fetch_raw()</span> query / filters.';
-    } else if (shown === 0) {
-      msg = `Live · loaded <strong>${total}</strong> case${total === 1 ? '' : 's'} from Case Center, but ${total === 1 ? 'it is' : 'all are'} closed/cancelled — the board only shows active cases.`;
-    } else {
-      msg = `Live · <strong>${shown}</strong> active case${shown === 1 ? '' : 's'} from Case Center${hidden ? ` · ${hidden} closed/cancelled hidden` : ''}.`;
-    }
-    return `<div class="kanban-live-banner">${msg}</div>`;
+    return `<div class="kanban-live-banner">Live · ${total} case${total === 1 ? '' : 's'} from Case Center · ${all.length} picked.</div>`;
   })() : '';
 
   return `
-    <div class="page-header">
-      <div>
-        <h1>Board · ${escapeHtml(window.CURRENT_WEEK.label)}</h1>
-        <div class="subtitle">${allCases.length} open · ${queuedCount} in your queue · ${closedCount} closed/cancelled this week. Columns are the Case Center status; <span class="mono">+ Queue</span> lifts a card into your top band.</div>
+    <div class="picked-page">
+      <div class="page-header picked-page-header">
+        <div>
+          <h1>Picked workspace</h1>
+          <div class="subtitle">${all.length} picked · ${actionDueCases().length} due this shift · ${actionOverdueCases().length} overdue. Pick more from <a href="#/archive">Overview</a>.</div>
+        </div>
+        <div class="toolbar">
+          ${/^https?:$/.test(location.protocol) ? `
+          <label class="lookback-ctl">Created between
+            <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}">
+            and
+            <input type="number" id="lookback-to-input" min="0" step="1" value="${STATE.lookbackToHours}">
+            h ago
+            <button class="btn" id="lookback-load">Load New</button>
+          </label>` : ''}
+          <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>
+          <button class="btn" data-action="prompt" data-kind="new_case" title="Manually import a single case by Case Center ID (for older cases outside the look-back window)">+ Import case by ID</button>
+        </div>
       </div>
-      <div class="toolbar">
-        ${/^https?:$/.test(location.protocol) ? `
-        <label class="lookback-ctl" title="Pull Case Center cases CREATED in this window. Leave the newer bound at 0 for 'within N hours'; set it (e.g. 72 and 60) to pull a band created between those hours ago.">Created between
-          <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}" title="older bound — hours ago">
-          and
-          <input type="number" id="lookback-to-input" min="0" step="1" value="${STATE.lookbackToHours}" title="newer bound — hours ago (0 = now)">
-          h ago
-          <button class="btn" id="lookback-load">Load New</button>
-        </label>` : ''}
-        <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>
-        <input type="search" placeholder="Filter by subject, ID…" id="case-filter">
-        <button class="btn btn-primary" data-action="prompt" data-kind="new_case">+ New case</button>
+      ${liveBanner}
+      ${remindersBanner}
+      ${handoverBanner}
+      <div class="picked-workspace">
+        <div class="picked-workspace-top">
+          ${renderRouteBoardStrip()}
+        </div>
+        <div class="picked-workspace-bottom">
+          <div class="picked-workspace-list">${renderPickedList()}</div>
+          <div class="picked-workspace-detail">${renderReadingPanel(activeCase)}</div>
+        </div>
       </div>
+      ${watchlist}
     </div>
-    ${liveBanner}
-    ${remindersBanner}
-    ${handoverBanner}
-    <div class="kanban">${kanban}</div>
-    <div class="reading-panel">${readingPanel}</div>
-    ${watchlist}
   `;
 }
 
@@ -909,8 +1179,14 @@ function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
   return `<button class="${cls} refresh-case-btn" data-action="refresh-case" data-case-id="${c.id}" title="Re-fetch this case from Case Center" onclick="event.stopPropagation()">⟳</button>`;
 }
 
-function renderKanbanCard(c) {
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
+// Legacy kanban card renderer — preserved as a no-op shim because the kanban-by-CC-status
+// grouping was removed (see plan §1). The new Picked workspace uses route lanes instead
+// of cards. Nothing in the active render path calls this anymore.
+function renderKanbanCard(_c) { return ''; }
+
+// Dead code below intentionally kept for now but unreachable; safe to delete in a follow-up.
+function _legacyRenderKanbanCard(c) {
+  const flags = '';
   const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
   const isSel = STATE.kanbanSelected === c.id;
   const bellState = c.reminder
@@ -961,9 +1237,8 @@ function renderKanbanCard(c) {
 
 function renderReadingPanel(c) {
   if (!c) {
-    return `<div class="reading-empty">Click a case above to read its full detail here.</div>`;
+    return `<div class="reading-empty">Select a case from the list or the Route Board above to read its full detail here.</div>`;
   }
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
   const actions = renderDetailActions(c);
 
   return `
@@ -973,7 +1248,7 @@ function renderReadingPanel(c) {
           <a class="mono muted" href="#/cases/${c.id}">${c.id}</a>
           <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
-          ${flags}
+          ${trackStatusPill(c)}
         </div>
         <h2 style="margin-top:6px;">${escapeHtml(c.subject)}</h2>
         <div class="muted tiny"><a href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer">${escapeHtml(caseHref(c))}</a></div>
@@ -1343,7 +1618,6 @@ function renderCaseDetail(id) {
     return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
       <a class="btn" href="${escapeHtml(STATE.lastListRoute)}">← Back to ${escapeHtml(STATE.lastListLabel)}</a>`;
   }
-  const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
   const actions = renderDetailActions(c);
 
   return `
@@ -1354,7 +1628,7 @@ function renderCaseDetail(id) {
           <span class="mono muted">${c.id}</span>
           <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
           <span class="priority-${c.priority}">${escapeHtml(c.priority)} priority</span>
-          ${flags}
+          ${trackStatusPill(c)}
         </div>
         <h1 style="margin-top:8px">${escapeHtml(c.subject)}</h1>
         <div class="subtitle"><a href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer">${escapeHtml(caseHref(c))}</a></div>
@@ -1367,33 +1641,34 @@ function renderCaseDetail(id) {
 }
 
 function renderDetailActions(c) {
+  // The CC-shaped action surface (Assign to Core, Escalate to HQ, Chase owner, Verify fix,
+  // Return to requester, Move to sanity check, Close, Cancel, Reopen) has been removed —
+  // operators do all that work in Case Center. The only operator-driven mutation here is
+  // **Track Status** (see TRACK_STATUSES). The picker shows all 7 values to every shift,
+  // with a "Suggested for your shift" pill on the relevant ones.
   const items = [];
+  const ts = caseTrackStatus(c);
+  const suggested = new Set(suggestedTrackStatuses());
 
-  // Status transitions consolidated into a dropdown — primary CTA, listed first.
-  const transitions = statusTransitions(c);
-  if (transitions.length > 0) {
-    const opts = transitions.map(t =>
-      `<option value="${t.kind}"${t.danger ? ' class="danger"' : ''}>${escapeHtml(t.label)}</option>`
-    ).join('');
-    items.push(`
-      <select class="status-dropdown" data-action="status-select" data-case-id="${c.id}">
-        <option value="" disabled selected>Change status…</option>
-        ${opts}
-      </select>
-    `);
+  const opts = TRACK_STATUSES.map(t => {
+    const sel = ts === t.id ? ' selected' : '';
+    const hint = suggested.has(t.id) ? ' ★' : '';
+    return `<option value="${t.id}"${sel}>${escapeHtml(t.label)}${hint}</option>`;
+  }).join('');
+  items.push(`
+    <select class="ts-picker" data-action="track-status-select" data-case-id="${c.id}" title="Set Track Status (★ = suggested for your shift)">
+      <option value=""${ts ? '' : ' selected'}>— Track Status —</option>
+      ${opts}
+    </select>
+  `);
+  if (ts) {
+    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="clear_track_status" title="Clear Track Status (after work is done and handover written)">Clear</button>`);
   }
-
-  // Non-status actions stay as buttons.
-  if (c.status === 'with_core') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_core">Send reminder to Core Team</button>`);
-  }
-  if (c.status === 'with_hq') {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="chase_hq">Send reminder to HQ</button>`);
-  }
-  if (!['closed', 'cancelled'].includes(c.status)) {
-    items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
+  if (c.caseLink) {
+    items.push(`<a class="btn" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" title="Open this case in Case Center">↗ Case Center</a>`);
   }
 
+  items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
   items.push(renderBellButton(c, 'detail'));
   items.push(renderQueueToggleButton(c, 'normal'));
   items.push(renderRefreshButton(c, 'normal'));
@@ -1401,34 +1676,9 @@ function renderDetailActions(c) {
   return items.join(' ');
 }
 
-function statusTransitions(c) {
-  const t = [];
-  switch (c.status) {
-    case 'new':
-      t.push({ kind: 'assign_core', label: 'Assign to Core Team' });
-      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
-      break;
-    case 'with_core':
-      t.push({ kind: 'escalate_to_hq', label: 'Escalate to HQ Product Team' });
-      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
-      break;
-    case 'with_hq':
-      t.push({ kind: 'move_to_sanity_check', label: 'Move to Sanity Check' });
-      t.push({ kind: 'approaching_sla', label: 'Return to requester' });
-      break;
-    case 'sanity_check':
-      t.push({ kind: 'verify_fix', label: 'Verify & close' });
-      break;
-    case 'returned_to_requester':
-      t.push({ kind: 'resume', label: 'Requester replied — resume' });
-      t.push({ kind: 'close_resolved', label: 'Close as resolved' });
-      break;
-  }
-  if (!['closed', 'cancelled'].includes(c.status)) {
-    t.push({ kind: 'cancel', label: 'Cancel case', danger: true });
-  }
-  return t;
-}
+// Kept as a no-op shim; the old CC-shaped status transitions are gone. Anything
+// that still calls this gets an empty list.
+function statusTransitions(_c) { return []; }
 
 /* ---------- Weekly Archive ---------- */
 
@@ -1552,7 +1802,6 @@ function renderArchiveWeek(weekId) {
   const rows = cases.length === 0 ? '' : cases.map(c => {
     const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
-    const flags = (c.flags || []).map(f => `<span class="flag flag-${f}">${escapeHtml(f.replace(/_/g, ' '))}</span>`).join(' ');
     const carry = c.carriedFrom ? ` <span class="flag" title="Carried from ${escapeHtml(c.carriedFrom)}">↩ ${escapeHtml(c.carriedFrom)}</span>` : '';
     return `
       <tr data-href="#/cases/${c.id}">
@@ -1564,10 +1813,13 @@ function renderArchiveWeek(weekId) {
         <td>${escapeHtml(c.user)}</td>
         <td>${core ? escapeHtml(core.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
-        <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${flags}${carry}</td>
+        <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${trackStatusPill(c)}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
-        <td class="col-actions"><button class="btn-tiny bin-btn" data-action="bin-case" data-case-id="${c.id}" title="Move to recycle bin" onclick="event.stopPropagation()">🗑</button></td>
+        <td class="col-actions">
+          ${renderQueueToggleButton(c, 'tiny')}
+          <button class="btn-tiny bin-btn" data-action="bin-case" data-case-id="${c.id}" title="Move to recycle bin" onclick="event.stopPropagation()">🗑</button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -3327,9 +3579,35 @@ function handlePrompt(caseId, kind) {
   if (kind === 'toggle_queue') {
     const nowQueued = !isQueued(c);
     c.agentStatus = nowQueued ? 'queued' : 'unqueued';
-    logHistory(c, op, nowQueued ? 'queue_added' : 'queue_removed',
-      nowQueued ? 'Added to agent queue (top band)' : 'Removed from agent queue (back to backlog)');
-    showToast(nowQueued ? `${c.id} added to your queue.` : `${c.id} removed from your queue.`, 'info');
+    // Picking a fresh case auto-selects it in the workspace so the detail panel populates.
+    if (nowQueued) STATE.kanbanSelected = c.id;
+    logHistory(c, op, nowQueued ? 'picked' : 'unpicked',
+      nowQueued ? 'Picked for follow-up' : 'Removed from Picked workspace');
+    showToast(nowQueued ? `${c.id} picked for follow-up.` : `${c.id} unpicked.`, 'info');
+    render();
+    return;
+  }
+
+  if (kind === 'clear_track_status') {
+    // Manual-clear preconditions per plan §3. We soft-warn the operator but never block.
+    const ts = caseTrackStatus(c);
+    if (!ts) return;
+    const def = TRACK_STATUS_BY_ID[ts];
+    const reasons = [];
+    if (def?.scheduled) {
+      if (caseStation(c) !== def.scheduled.to) reasons.push(`CC assignee hasn't reached ${def.scheduled.to} yet.`);
+    } else if (ts === 'case_closed') {
+      if (!['closed', 'cancelled'].includes(c.status)) reasons.push(`CC status is "${displayStatus(c)}", not Closed/Cancelled.`);
+    }
+    const needsHandover = !c.handover || c.handover.staleForCurrentShift;
+    if (needsHandover) reasons.push('No fresh handover note for the incoming shift.');
+    if (reasons.length > 0) {
+      const proceed = confirm(`Clear Track Status anyway?\n\n${reasons.map(r => '• ' + r).join('\n')}`);
+      if (!proceed) return;
+    }
+    c.trackStatus = null;
+    logHistory(c, op, 'track-status-cleared', `${ts} → cleared`);
+    showToast(`${c.id} Track Status cleared.`, 'info');
     render();
     return;
   }
@@ -3629,10 +3907,41 @@ function bindHandlers() {
       if (kind) handlePrompt(caseId, kind);
     });
   });
+  document.querySelectorAll('[data-action="track-status-select"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const value = el.value;
+      const caseId = el.dataset.caseId;
+      const c = caseById(caseId);
+      if (!c) return;
+      const op = getOperator(STATE.operatorId);
+      const prev = caseTrackStatus(c);
+      if (value === prev) return;
+      if (!value) {
+        c.trackStatus = null;
+      } else {
+        c.trackStatus = value;
+      }
+      logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
+      render();
+    });
+  });
   document.querySelectorAll('[data-action="reassign"]').forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();
       handleReassign(el.dataset.caseId, el.dataset.type);
+    });
+  });
+  document.querySelectorAll('[data-action="select-case"]').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('button, a, select, input, textarea')) return;
+      STATE.kanbanSelected = el.dataset.caseId;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-sanity"]').forEach(el => {
+    el.addEventListener('click', () => {
+      STATE.sanityExpanded = !STATE.sanityExpanded;
+      render();
     });
   });
   document.querySelectorAll('table.case-table tbody tr').forEach(tr => {

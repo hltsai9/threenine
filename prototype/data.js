@@ -41,6 +41,8 @@ window.CASES = [
   {
     id: 'C-1041',
     agentStatus: 'queued',
+    trackStatus: 'weekend_case',
+    assigneeDept: 'IT Service Desk',
     caseLink: 'https://case-center.example/CC-58821',
     subject: 'APAC users locked out after MFA reset',
     user: 'Hana Park',
@@ -99,6 +101,8 @@ window.CASES = [
   {
     id: 'C-1043',
     agentStatus: 'queued',
+    trackStatus: 'escalate_to_core',
+    assigneeDept: 'Core Team — EMEA desk',
     caseLink: 'https://case-center.example/CC-58805',
     subject: 'Bulk export from Reports stalls at 80%',
     user: 'Marcus O’Donnell',
@@ -130,6 +134,8 @@ window.CASES = [
   {
     id: 'C-1044',
     agentStatus: 'queued',
+    trackStatus: 'escalated_to_hq',
+    assigneeDept: 'HQ Identity Team',
     caseLink: 'https://case-center.example/CC-58750',
     subject: 'SAML SSO loop after IdP cert rotation',
     user: 'Priya Sharma',
@@ -168,6 +174,8 @@ window.CASES = [
   {
     id: 'C-1045',
     agentStatus: 'queued',
+    trackStatus: 'sanity_check',
+    assigneeDept: 'Core Team — AMER desk',
     caseLink: 'https://case-center.example/CC-58702',
     subject: 'Mobile push notifications missing for iOS 18.4',
     user: 'Ana Souza',

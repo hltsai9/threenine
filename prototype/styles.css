@@ -1930,3 +1930,305 @@ table.case-table {
   transform: translateY(-50%);
   border-left-color: white;
 }
+
+/* ============================================================================
+ *  Picked workspace + Route Board
+ *  See docs/case-center-overview-plan.md §1 & §6.
+ * ========================================================================== */
+
+.picked-page {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.picked-page-header { margin-bottom: 0; }
+
+.picked-workspace {
+  display: grid;
+  grid-template-rows: 1fr 2fr;     /* 1:2 height — top strip vs bottom list+detail */
+  gap: 14px;
+  min-height: 78vh;
+}
+.picked-workspace-top {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  min-height: 220px;
+}
+.picked-workspace-bottom {
+  display: grid;
+  grid-template-columns: 1fr 2fr;  /* 1:2 width — list vs detail */
+  gap: 14px;
+  min-height: 0;
+}
+.picked-workspace-list {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.picked-workspace-detail {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* --- Aggregate Route Board strip --- */
+
+.route-board {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.route-board-empty {
+  color: var(--text-faint-2);
+  padding: 28px 16px;
+  text-align: center;
+}
+.route-stations,
+.route-lane {
+  display: grid;
+  grid-template-columns: 80px 1fr 220px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.route-stations .route-cell.route-station-head {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint-2);
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  position: static;
+  height: auto;
+}
+.route-lane-cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  position: relative;
+  height: 30px;
+}
+.route-cell {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  height: 100%;
+  gap: 4px;
+}
+.route-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent, #3e7050);
+  box-shadow: 0 0 0 3px rgba(62, 112, 80, 0.18);
+  flex-shrink: 0;
+}
+.route-eye {
+  font-size: 16px;
+  line-height: 1;
+}
+.route-closed-badge {
+  display: inline-block;
+  background: #ddead0;
+  color: #3a6243;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.route-delivered {
+  font-size: 11px;
+  color: #3a6243;
+  background: #ddead0;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.route-tag {
+  font-size: 11px;
+  color: var(--text-faint-2);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.route-arrow-line {
+  position: absolute;
+  top: 50%; left: -50%;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, rgba(62, 112, 80, 0.45), rgba(62, 112, 80, 0.7));
+  transform: translateY(-50%);
+  pointer-events: none;
+  overflow: hidden;
+}
+.route-arrow-pulse {
+  position: absolute;
+  top: -3px; left: 0;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #3e7050);
+  animation: route-pulse 2s linear infinite;
+}
+@keyframes route-pulse {
+  0%   { left: 0;    opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.route-arrowhead {
+  position: absolute;
+  top: 50%; right: 8px;
+  transform: translateY(-50%);
+  color: var(--accent, #3e7050);
+  font-size: 12px;
+}
+
+.route-lane {
+  background: #f7faf6;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.route-lane:hover { background: #eef5ec; }
+.route-lane.lane-selected {
+  background: white;
+  border-color: var(--accent, #3e7050);
+  box-shadow: 0 1px 6px rgba(62, 112, 80, 0.18);
+}
+.route-lane.lane-due .route-arrow-line {
+  background: linear-gradient(90deg, rgba(220, 162, 24, 0.55), rgba(220, 162, 24, 0.8));
+}
+.route-lane.lane-due .route-arrow-pulse,
+.route-lane.lane-due .route-arrowhead { color: #b07a07; background: #b07a07; }
+.route-lane.lane-overdue .route-arrow-line {
+  background: linear-gradient(90deg, rgba(196, 64, 64, 0.55), rgba(196, 64, 64, 0.85));
+}
+.route-lane.lane-overdue .route-arrow-pulse,
+.route-lane.lane-overdue .route-arrowhead { color: #b03434; background: #b03434; }
+.route-lane.lane-delivered {
+  background: #f0f6ee;
+}
+.route-lane-id { font-size: 12px; }
+.route-lane-meta {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  font-size: 12px;
+}
+.route-subject {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+}
+.route-due {
+  font-size: 11px;
+  background: #e8efe5;
+  color: #486656;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.route-lane.lane-due .route-due { background: #fce7c1; color: #6a4a08; }
+.route-lane.lane-overdue .route-due { background: #f6cfcf; color: #6a1c1c; }
+
+.route-group { margin-top: 6px; }
+.route-group-sanity {
+  margin-top: auto;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+.route-group-header {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 4px 6px;
+  border-radius: 6px;
+  user-select: none;
+}
+.route-group-header:hover { background: #eef5ec; }
+.route-group-toggle { font-family: monospace; }
+.route-group-count {
+  margin-left: auto;
+  background: #ddead0;
+  color: #3a6243;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Picked case list (left pane) --- */
+
+.picked-list { display: flex; flex-direction: column; gap: 6px; }
+.picked-list-empty {
+  color: var(--text-faint-2);
+  text-align: center;
+  padding: 28px 12px;
+}
+.picked-row {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #f7faf6;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.picked-row:hover { background: #eef5ec; }
+.picked-row-selected {
+  background: white;
+  border-color: var(--accent, #3e7050);
+}
+.picked-row-head {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 12px;
+}
+.picked-row-subject {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+/* --- Track Status pill --- */
+
+.ts-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 12px;
+  padding: 2px 9px;
+  background: #ddead0;
+  color: #3a6243;
+}
+.ts-pill.ts-none {
+  background: #eef0ec;
+  color: var(--text-faint-2);
+  font-weight: 500;
+}
+.ts-pill.ts-weekend_case        { background: #fbe1ab; color: #6a4a08; }
+.ts-pill.ts-hq_did_not_handle   { background: #f9d2b3; color: #6a3a13; }
+.ts-pill.ts-escalate_to_core    { background: #f6cfcf; color: #6a1c1c; }
+.ts-pill.ts-escalated_to_hq     { background: #d8e8f8; color: #1d4a73; }
+.ts-pill.ts-need_to_contact_user{ background: #e3d6f0; color: #4a2a73; }
+.ts-pill.ts-case_closed         { background: #c8e1cf; color: #1e4a2c; }
+.ts-pill.ts-sanity_check        { background: #e1efe2; color: #3a6243; }
+
+/* --- Track Status picker dropdown --- */
+
+.ts-picker {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  font-size: 13px;
+  min-width: 220px;
+}
+.ts-picker:focus { outline: 2px solid var(--accent, #3e7050); outline-offset: 1px; }

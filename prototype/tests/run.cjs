@@ -311,9 +311,11 @@ test('approaching_sla: first line can return a New case to the requester (4.9)',
   eq([ret, c.status, c.slaPaused, c.slaAccumulatedMs, lastKind(c)],
      [true, 'returned_to_requester', true, 2 * HOUR, 'returned']);
 });
-test('statusTransitions: New offers assign + return-to-requester (4.9)', () => {
-  const kinds = app.statusTransitions({ status: 'new' }).map(t => t.kind);
-  ok(kinds.includes('assign_core') && kinds.includes('approaching_sla'), 'New has both');
+test('statusTransitions: returns empty after CC-shaped action surface removal', () => {
+  // The kanban-by-CC-status board and its status-transition dropdown are gone (see
+  // docs/case-center-overview-plan.md §4); the only operator-set field on a picked
+  // case is now `trackStatus`. statusTransitions() survives as a no-op shim.
+  eq(app.statusTransitions({ status: 'new' }), []);
 });
 
 test('resume: restarts the SLA clock and routes back to FIT', () => {
@@ -331,12 +333,12 @@ test('cancel: marks cancelled, banks clocks, warns', () => {
   eq(toasts[0].t, 'warn');
 });
 
-test('toggle_queue: flips agent status both ways with history', () => {
+test('toggle_queue: picks/unpicks the case with history', () => {
   const c = scratch({ status: 'with_core', agentStatus: 'unqueued' });
   directPrompt(SCRATCH_ID, 'toggle_queue');
-  eq([c.agentStatus, lastKind(c)], ['queued', 'queue_added']);
+  eq([c.agentStatus, lastKind(c)], ['queued', 'picked']);
   directPrompt(SCRATCH_ID, 'toggle_queue');
-  eq([c.agentStatus, lastKind(c)], ['unqueued', 'queue_removed']);
+  eq([c.agentStatus, lastKind(c)], ['unqueued', 'unpicked']);
 });
 
 test('move_to_sanity_check: direct status change', () => {
@@ -408,8 +410,13 @@ test('isBinned / binExpired / binMsRemaining', () => {
   ok(app.binMsRemaining(fresh) > 0 && app.binMsRemaining(old) === 0);
 });
 test('binned case is hidden from board, archive stats and week table', () => {
-  const id = app.CASES.find(c => !['closed', 'cancelled'].includes(c.status)).id;
+  // Board now renders only PICKED (queued) cases — pick the first non-closed case
+  // that's actually queued so we can verify it appears, then deletes hide it.
+  const id = app.CASES.find(c =>
+    !['closed', 'cancelled'].includes(c.status) && c.agentStatus === 'queued'
+  ).id;
   const c = app.caseById(id);
+  c.agentStatus = 'queued';
   const wk = c.weekId;
   const before = app.weekStats(wk).total;
   const boardBefore = app.renderCaseList().includes(`data-case-id="${id}"`);

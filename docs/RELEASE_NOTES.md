@@ -8,6 +8,74 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-12
+
+### Changed
+
+- **Picked workspace replaces the kanban-by-CC-status board.** `#/cases` is now a
+  two-zone layout (per `docs/case-center-overview-plan.md` §1/§6): an aggregate
+  **Route Board** strip across the top (three stations: User · Core Team · HQ, one
+  lane per picked case with a dot at the current station, animated arrow to the
+  next stop, eyeball icon for the two "watching" track statuses, ✓ closed/delivered
+  badges, and a collapsible Sanity Check group pinned to the bottom) and a 1:2
+  list+detail split below. The old kanban grouping, two-band (queued/backlog)
+  split, drag-between-columns handler, and CC status columns are gone — `#/archive`
+  (renamed **Overview** in the sidebar) is the full Case Center library, and cases
+  reach the Picked workspace via the Pick button on every Overview row.
+- **Track Status is the only operator-set field on a picked case.** New 7-value
+  enum on the case detail panel picker (Weekend Case · HQ did not handle · Escalate
+  to Core Team · Escalated to HQ — keep an eye · Need to contact user · Case Closed
+  · Sanity Check). It is stored in the agent layer (`agent-v1` localStorage and
+  `POST /api/save`), never sent to Case Center. The picker shows all seven to every
+  shift; suggested-for-your-shift options carry a ★ hint. The first three carry
+  scheduled handoff rules driving the Route Board arrows (Weekend Case → Sun Day
+  17:30, HQ did not handle → next Day 17:30, Escalate to Core Team → next Day
+  09:00). Case Closed and Sanity Check pin the lane's dot to *User* regardless of
+  CC `assigneeDept`; Sanity Check uses the case subject as the dot tag.
+- **CC-shaped action surface removed.** The status-transition dropdown and per-
+  status buttons (Assign to Core, Escalate to HQ, Chase owner, Verify fix, Return
+  to requester, Move to sanity check, Close, Cancel, Reopen) are gone from the
+  detail panel — operators do all that work in Case Center. The detail panel now
+  exposes the Track Status picker, **Clear Track Status** (with a soft-warning
+  precondition check: CC `assignee` should match the route's To station for
+  scheduled types, CC status should be `closed`/`cancelled` for *Case Closed*, and
+  a fresh handover note should exist), **Open in Case Center** (existing
+  `caseLink`), **Write handover**, **Set reminder**, and **Pick/Unpick**.
+- **`flags[]` field dropped from the rendered UI** (kanban card, archive table,
+  case detail header). The Track Status pill replaces it.
+- **Sidebar renames:** *Board → Picked*, *Weekly Archive → Overview*, with Picked
+  on top and Overview directly below.
+- **Owner directory (`owners.js`) gains a `route_role` field** on each Core Team
+  desk and HQ Product Team row (one of *Core Team* / *HQ* / *User*). The Route
+  Board looks up CC's `assigneeDept` against these rows to decide which station
+  the dot sits at; unmapped depts fall back to *User*.
+- **"+ New case" renamed "+ Import case by ID"** to reflect that it pulls one
+  existing Case Center case by id (never creates a new case there).
+
+### Internal
+
+- New helpers: `TRACK_STATUSES`, `TRACK_STATUS_BY_ID`, `TRACK_GROUP_ORDER`,
+  `caseTrackStatus`, `isPicked`, `pickedCases`, `deptToRoleRaw`, `caseStation`,
+  `scheduledHandoff`, `trackStatusPhase`, `actionDueCases`, `actionOverdueCases`,
+  `caseRouteLane`, `renderRouteLane`, `renderRouteBoardStrip`, `trackStatusPill`,
+  `renderPickedListRow`, `renderPickedList`. `agentLayerFromState` /
+  `applyAgentLayer` now carry `trackStatus`. `statusTransitions` kept as a no-op
+  shim so any external caller doesn't break. `renderKanbanCard` is now an empty
+  shim; the dead body remains as `_legacyRenderKanbanCard` for a follow-up sweep.
+- New CSS block at the end of `styles.css` for the Picked workspace grid, the
+  three-station Route Board with `route-pulse` keyframe, Track Status pills,
+  picked-list rows, and Sanity Check collapsible group.
+- Tests updated to match the new history kinds (`picked` / `unpicked` instead of
+  `queue_added` / `queue_removed`) and the empty `statusTransitions()` shim. Test
+  that asserts a case appears on the board now selects a queued seed case
+  explicitly. All 77 tests pass.
+
+### Docs
+
+- `docs/case-center-overview-plan.md` — the agreed plan that drives this change.
+
+---
+
 ## 2026-06-11
 
 ### Changed
