@@ -2500,13 +2500,10 @@ function renderShiftDetail(shiftName) {
   return `
     <div class="page-header">
       <div>
-        <div class="row-flex">
-          <a class="btn-link mono" href="#/shifts">← shifts</a>
-          ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}
-        </div>
-        <h1 style="margin-top:8px">${escapeHtml(sh.name)} shift</h1>
+        <h1>${escapeHtml(sh.name)} shift ${isCurrent ? '<span class="badge-current">On now</span>' : '<span class="flag">Off shift</span>'}</h1>
         <div class="subtitle" title="${escapeHtml(sh.hoursUtc)}">${escapeHtml(fmtShiftHoursLocal(sh.hoursUtc))} · handover boundary with ${escapeHtml(otherShift)} shift</div>
       </div>
+      <a class="btn" href="#/shifts">← Shifts</a>
     </div>
 
     <div class="tabs">${tabs}</div>

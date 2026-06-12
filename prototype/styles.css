@@ -1460,7 +1460,7 @@ table.case-table {
 }
 .archive-card .stat .v { font-family: var(--font-serif); font-weight: 700; font-size: 20px; color: var(--text); }
 .archive-card .stat .k { color: var(--text-faint-2); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
-.archive-card .badge-current {
+.badge-current {
   display: inline-block;
   background: var(--accent-soft);
   color: white;

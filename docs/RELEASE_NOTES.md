@@ -12,6 +12,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Fixed
 
+- **Shift-detail page now matches the rest of the app.** The page-header used to stack
+  a back-link row above an h1 inside a single column, which broke the standard
+  title-left / action-right layout the `.page-header` flex container expects. Rebuilt
+  the header as title + subtitle on the left and a `← Shifts` back button on the right.
+  The "On now" / "Off shift" badge inlined next to the h1. Promoted `.badge-current`
+  from `.archive-card .badge-current` to a top-level class so it actually applies on the
+  Shifts index and detail too (it was unstyled there before).
 - **Clicking a kanban card no longer jumps the page to the top.** The select handler
   now captures `window.scrollX/Y` before `render()` and restores it after, so picking
   a card further down the board keeps the viewport where it was. Affects every column
