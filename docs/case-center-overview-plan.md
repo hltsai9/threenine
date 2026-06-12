@@ -112,7 +112,7 @@ The top zone of the Picked workspace is a clean visualisation with minimal text:
 
 - **Stations (column headers):** *User · Core Team · HQ*. Always exactly three; no more, no fewer.
 - **Per-case row.** Each picked case is a horizontal lane spanning all three stations. The visual elements:
-  - **Dot at the current station** — derived from CC `assigneeDept` via the dept→role mapping in `owners.js`. Each Core Team desk and HQ Product Team row carries a `route_role` field (one of `Core Team` / `HQ` / `User`); anything unmapped falls back to *User* with a small "unmapped" hint so the team adds it.
+  - **Dot at the current station** — derived from CC `assigneeDept` via the dept→role mapping in `owners.js`. Each Core Team desk and HQ Product Team row carries a `route_role` field (one of `Core Team` / `HQ` / `User`); anything unmapped falls back to *User* with a small "unmapped" hint so the team adds it. *Exception:* Track Statuses **Case Closed** and **Sanity Check** pin the dot to *User* regardless of `assigneeDept` (the operator's intent for these is "back at the user, awaiting closure / sanity-check sign-off").
   - **Arrow + animated travelling dot** — drawn when Track Status implies a scheduled move (see table below). The small dot loops along the arrow at a slow pace (~2-second cycle) to signal "this case is in flight to its next stop".
   - **Eyeball icon on a station** — drawn for the "watching" Track Statuses (see table below).
   - **Right-edge label** — case ID + short subject + due-time chip (e.g. *Sun 17:30* or *09:00*, amber when due this shift, red when overdue).
@@ -125,8 +125,8 @@ The top zone of the Picked workspace is a clean visualisation with minimal text:
   | *Escalate to Core Team* | User → Core Team (with travelling dot) | — | Due next Day shift, 09:00 |
   | *Escalated to HQ — keep an eye* | Current → HQ (animated, only if dot not already at HQ) | On HQ | Watching at HQ; arrow disappears once the dot lands at HQ |
   | *Need to contact user* | Current → User (animated, only if dot not already at User) | On User | Watching at User; arrow disappears once the dot lands at User |
-  | *Case Closed* | — | — | Show a small "✓ closed" badge next to the dot |
-  | *Sanity Check* | — | — | Show a small "sanity check" tag next to the dot |
+  | *Case Closed* | — | — | Dot pinned to **User** (regardless of CC `assigneeDept`); small "✓ closed" badge next to the dot |
+  | *Sanity Check* | — | — | Dot pinned to **User** (yet to be closed); case subject rendered as the tag next to the dot |
   | *(none)* | — | — | Just the dot at the current station |
 
 - **Mismatch surfacing.** When the Track Status implies an arrow but the current dot is not at the *From* station (e.g. *Weekend Case* but CC `assigneeDept` resolves to HQ already), the lane shows a soft warning marker so the operator notices the picture doesn't match the intent. When the dot has reached the *To* station (arrow's destination), the arrow fades and a "✓ delivered" marker appears at the destination — the Track Status pill is still there, awaiting manual clear (section 3).
@@ -191,8 +191,8 @@ No changes to `data.js`, `shifts.js`. The only backend tweak is the `?ids=` quer
    - Select the first case (click its lane or its list row) — the detail panel on the right populates. On the detail panel, use the **7-item Track Status picker** to set Track Status = **Weekend Case**. The case's lane in the top strip gains an arrow from User to HQ with a slow-looping travelling dot; the right-edge label shows *Sun 17:30*.
    - Set the second case's Track Status = **Escalate to Core Team**. Its lane shows User → Core Team with the travelling dot and right-edge label *Day shift 09:00*.
    - Set the third case's Track Status = **Escalated to HQ — keep an eye**. If the dot is already at HQ, only the **eyeball icon** appears on the HQ station, no arrow. If the dot is at User or Core Team, an animated arrow points from the current station to HQ, plus the eyeball at HQ.
-   - Set a fourth case's Track Status = **Case Closed**. Lane shows the dot at its current station with a **✓ closed badge** next to it; no arrow.
-   - Pick several more cases and set their Track Status to **Sanity Check**. Confirm they collapse into a single *"Sanity Check (N) ▸"* row pinned to the bottom of the strip (collapsed by default). Click the toggle to expand and confirm each individual lane renders; collapse again.
+   - Set a fourth case's Track Status = **Case Closed**. Lane shows the dot pinned to **User** (even if CC `assigneeDept` maps to HQ or Core Team) with a **✓ closed badge** next to it; no arrow.
+   - Pick several more cases and set their Track Status to **Sanity Check**. Each lane has the dot pinned to **User** with the **case subject** rendered as the tag next to the dot. Confirm they collapse into a single *"Sanity Check (N) ▸"* row pinned to the bottom of the strip (collapsed by default). Click the toggle to expand and confirm each individual lane renders; collapse again.
    - Advance `window.NOW` (or wait into the relevant shift) so a scheduled handoff falls within the current shift — the arrow turns amber, the lane's right-edge time chip turns amber, and the **Action due this shift (N)** watchlist increments. With `window.NOW` past `dueAt` while CC `assignee` still equals the *From* station, the arrow turns red and the case lands in **Action overdue (N)**.
    - Confirm CC-owned fields on the detail panel render but are not editable. There is **no CC-shaped action dropdown / button** — only the Track Status picker and the operator-helper affordances. The `+ New case` button is still present; type an older Case Center ID and verify the manual-import flow brings that one case into the archive overview at the week of its `createdAt`.
    - Add a handover note and a reminder — both persist.
