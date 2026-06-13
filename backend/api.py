@@ -7,6 +7,8 @@ Ingress) and never configure an API key or cookie.
     uvicorn backend.api:app --host 0.0.0.0 --port 8000
 
 Endpoints (same contract the SPA already expects):
+    GET  /healthz              -> {"ok": true}   (unauthenticated liveness probe)
+    GET  /api/auth/check       -> 200 if the token is accepted (or API open), else 401
     GET  /api/cases            -> {"cases": [...], "operatorLayer": "server"}
     GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
@@ -90,6 +92,21 @@ if _origins:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
+
+
+@app.get("/healthz")
+def healthz():
+    """Unauthenticated liveness probe (for Render/K8s health checks)."""
+    return {"ok": True}
+
+
+@app.get("/api/auth/check")
+def auth_check(request: Request):
+    """Cheap login probe for the SPA's shared-token gate: 200 if the token is accepted
+    (or the API is open), 401 otherwise. Lets the SPA validate a token without fetching
+    the whole board."""
+    require_auth(request)
+    return {"ok": True}
 
 
 @app.get("/api/cases")

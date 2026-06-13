@@ -244,6 +244,92 @@ function apiUrl(path) {
   return base ? base + '/' + path.replace(/^\//, '') : path;
 }
 
+/* ---------- API auth (shared-token login) ----------
+ * When the backend is auth-gated (API_AUTH_TOKEN set), the SPA holds a shared access token,
+ * entered once at the login gate, and attaches it as `Authorization: Bearer <token>` on every
+ * /api/* call. Kept in sessionStorage so a shared secret is cleared when the tab closes rather
+ * than lingering on disk. When the API is open the token is just empty and nothing prompts. */
+const API_TOKEN_KEY = 'case-tracker-api-token';
+function getApiToken() {
+  try { return sessionStorage.getItem(API_TOKEN_KEY) || ''; } catch (e) { return ''; }
+}
+function setApiToken(t) {
+  try { if (t) sessionStorage.setItem(API_TOKEN_KEY, t); else sessionStorage.removeItem(API_TOKEN_KEY); }
+  catch (e) { /* sessionStorage unavailable (file:// / sandbox) — auth simply isn't used there */ }
+}
+// Merge the bearer header (when we have a token) into a fetch headers object.
+function authHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  const t = getApiToken();
+  if (t) h.Authorization = 'Bearer ' + t;
+  return h;
+}
+// Wrap fetch options so every /api/* request carries the token. Use as fetch(url, withAuth(opts)).
+function withAuth(opts) {
+  opts = opts || {};
+  return Object.assign({}, opts, { headers: authHeaders(opts.headers) });
+}
+// Validate a token against the cheap probe. Returns true when accepted — or when the API is
+// open (an empty token still gets a 200), so an un-gated backend never shows the login screen.
+async function checkApiToken(token) {
+  try {
+    const res = await fetch(apiUrl('api/auth/check'), {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+    });
+    return res.ok;
+  } catch (e) { return false; }
+}
+// Resolve once a valid token is stored (or the API is open). Shows the blocking login gate
+// otherwise. Server mode only — callers gate boot/refresh on this.
+async function ensureAuthed() {
+  if (await checkApiToken(getApiToken())) return;
+  await showLoginGate();
+}
+// A 401 came back mid-session (token cleared/rotated): drop it, re-gate, and let the caller retry.
+async function reauth() {
+  setApiToken('');
+  await showLoginGate('Your session token was rejected. Sign in again to continue.');
+}
+
+// Blocking full-screen login gate. Resolves only once a VALID token is entered and stored.
+function showLoginGate(message) {
+  return new Promise(resolve => {
+    document.getElementById('login-gate')?.remove();
+    const el = document.createElement('div');
+    el.id = 'login-gate';
+    el.innerHTML = `
+      <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+        <h2 id="login-title">Sign in</h2>
+        <p class="login-sub">${escapeHtml(message || 'Enter the team access token to use the case board.')}</p>
+        <input id="login-token" type="password" placeholder="Access token" autocomplete="current-password" aria-label="Access token" />
+        <div class="login-error" data-login-error role="alert" hidden></div>
+        <button class="btn btn-primary" id="login-submit">Sign in</button>
+      </div>`;
+    document.body.appendChild(el);
+    const input = el.querySelector('#login-token');
+    const errEl = el.querySelector('[data-login-error]');
+    const btn = el.querySelector('#login-submit');
+    input.focus();
+    const fail = msg => { errEl.textContent = msg; errEl.hidden = false; btn.disabled = false; input.focus(); input.select(); };
+    const submit = async () => {
+      const token = input.value.trim();
+      if (!token) return fail('Enter your access token.');
+      btn.disabled = true; errEl.hidden = true;
+      if (!(await checkApiToken(token))) return fail('That token was rejected. Check it and try again.');
+      setApiToken(token);
+      el.remove();
+      resolve();
+    };
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+  });
+}
+
+function signOut() {
+  setApiToken('');
+  location.reload();
+}
+
 // Build the /api/cases query for a created-between window. With a newer bound > 0 it asks for a
 // band (created between fromHours and toHours ago); otherwise the legacy "within N hours" form.
 function liveCasesUrl(from, to) {
@@ -2367,11 +2453,11 @@ function purgeCasesOnServer(ids) {
   if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !ids.length) return;
   setSaveStatus('saving', 'Deleting…');
   try {
-    fetch(apiUrl('api/save'), {
+    fetch(apiUrl('api/save'), withAuth({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ purgeIds: ids }),
-    }).then(r => setSaveStatus(r.ok ? 'saved' : 'error')).catch(() => setSaveStatus('error'));
+    })).then(r => { if (r.status === 401) onApiUnauthorized(); setSaveStatus(r.ok ? 'saved' : 'error'); }).catch(() => setSaveStatus('error'));
   } catch (e) { setSaveStatus('error'); }
 }
 
@@ -4286,7 +4372,7 @@ function mergeLiveCase(raw) {
 // Fetch one case from Case Center by id (GET /api/cases?id=…). Returns the parsed cases array,
 // or throws on transport error / rejects with a status. Shared by add + refresh.
 async function fetchCaseById(id) {
-  const res = await fetch(apiUrl('api/cases?id=' + encodeURIComponent(id)), { headers: { Accept: 'application/json' } });
+  const res = await fetch(apiUrl('api/cases?id=' + encodeURIComponent(id)), withAuth({ headers: { Accept: 'application/json' } }));
   if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
   const data = await res.json();
   return (Array.isArray(data) ? data : (data && data.cases)) || [];
@@ -4711,24 +4797,31 @@ function saveCasesToServer(cases) {
   if (!window.__LIVE__ || !/^https?:$/.test(location.protocol) || !cases.length) return;
   setSaveStatus('saving');
   try {
-    fetch(apiUrl('api/save'), {
+    fetch(apiUrl('api/save'), withAuth({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cases }),
-    }).then(r => setSaveStatus(r.ok ? 'saved' : 'error'))
+    })).then(r => { if (r.status === 401) onApiUnauthorized(); setSaveStatus(r.ok ? 'saved' : 'error'); })
       .catch(() => setSaveStatus('error'));
   } catch (e) { setSaveStatus('error'); }
+}
+
+// A save came back 401 in server mode (token rotated/cleared). Re-gate, then re-push the edits
+// that didn't make it, so the operator's work isn't silently lost.
+function onApiUnauthorized() {
+  if (window.API_MODE !== 'server') return;
+  reauth().then(() => { STATE._savedSnapshot = {}; persistChangedCases(); });
 }
 
 // Save a generated snippet to shifts.js / owners.js via the local server (Save buttons).
 function saveJsFile(file, snippet, label) {
   if (!/^https?:$/.test(location.protocol)) { showToast('Run the board via serve.py to save files.', 'warn'); return; }
   setSaveStatus('saving', 'Saving ' + label + '…');
-  fetch(apiUrl('api/save-file'), {
+  fetch(apiUrl('api/save-file'), withAuth({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file, js: snippet }),
-  }).then(r => {
+  })).then(r => {
     if (r.ok) { setSaveStatus('saved', 'Saved ' + label); showToast(label + ' saved.', 'success'); }
     else { setSaveStatus('error'); showToast('Save failed (' + r.status + ').', 'warn'); }
   }).catch(() => { setSaveStatus('error'); showToast('Save failed — is serve.py running?', 'warn'); });
@@ -4765,11 +4858,13 @@ async function tryLoadLiveCases(allCases) {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
-    res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    res = await fetch(url, withAuth({ signal: ctrl.signal, headers: { Accept: 'application/json' } }));
     clearTimeout(t);
   } catch (e) {
     return false; // no backend reachable → seed/demo mode
   }
+  // Flag an auth failure so the boot/refresh flow can show the login gate (vs. a generic "down").
+  window.__NEEDS_LOGIN__ = res.status === 401;
   if (!res.ok) return false;
   let data;
   try { data = await res.json(); } catch (e) { return false; }
@@ -4872,12 +4967,34 @@ function enterLiveMode() {
 // fall back to whatever seed/local state we have, so the board still loads.
 async function bootServerLoad() {
   render();
+  // Sign in first if the API is gated (no-op when it's open), then expose Sign out.
+  await ensureAuthed();
+  setupSignOut();
   showLiveLoading();
-  const ok = await tryLoadLiveCases(true);
+  let ok = await tryLoadLiveCases(true);
+  // A token can be rejected after boot (rotated/expired); re-gate once and retry.
+  if (!ok && window.__NEEDS_LOGIN__) {
+    window.__NEEDS_LOGIN__ = false;
+    await reauth();
+    ok = await tryLoadLiveCases(true);
+  }
   hideLiveLoading();
   render();
   if (!ok) {
     showToast('Could not reach the case API — showing local data. Use “Load New” to retry.', 'warn');
+  }
+}
+
+// Reveal + wire the sidebar "Sign out" link (hidden by default; only meaningful in server mode).
+function setupSignOut() {
+  document.body.classList.add('server-mode');
+  const link = document.getElementById('sign-out');
+  if (link) {
+    link.hidden = false;
+    if (!link.dataset.bound) {
+      link.dataset.bound = '1';
+      link.addEventListener('click', e => { e.preventDefault(); signOut(); });
+    }
   }
 }
 

@@ -10,6 +10,24 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Added (Auth — go-live step 2: shared-token login)
+
+- **The SPA can now authenticate to a token-gated API**, so server mode works
+  with `API_AUTH_TOKEN` set instead of having to leave the API open.
+  - A blocking **login gate** collects the shared access token, validates it via
+    the new `GET /api/auth/check`, and stores it in `sessionStorage` (cleared on
+    tab close). Every `/api/*` call now carries `Authorization: Bearer <token>`
+    (`withAuth()` wraps all five fetch sites).
+  - **Re-auth on 401**: a token rejected mid-session re-opens the gate and
+    re-pushes the operator's unsaved edits, so work isn't lost.
+  - **Sign out** link in the sidebar (shown in server mode) clears the token.
+  - Backend: `GET /api/auth/check` (login probe) and `GET /healthz`
+    (unauthenticated liveness probe, e.g. for Render health checks).
+  - Open APIs are unaffected — an empty token still passes `auth/check`, so no
+    login prompt appears when `API_AUTH_TOKEN` is unset.
+  - Scope: a single shared team secret, not per-operator identity (that's a later
+    step); "who did what" is still the in-app operator switcher.
+
 ### Added (Deploy — no-shell seeding)
 
 - **`backend/seed_board_json.cjs`** emits the demo seed as board-shaped

@@ -1460,6 +1460,46 @@ table.case-table {
   gap: 8px;
   margin-top: 22px;
 }
+/* Full-screen shared-token login gate (server mode). Blocks the board until signed in. */
+#login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 33, 26, .55);
+  backdrop-filter: blur(2px);
+}
+.login-card {
+  width: min(380px, 92vw);
+  background: var(--panel);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-modal);
+  padding: 28px 26px;
+}
+.login-card h2 { margin: 0 0 6px; font-family: var(--font-serif); color: var(--text-deep); }
+.login-sub { margin: 0 0 16px; color: var(--text-muted); font-size: 13.5px; }
+.login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.login-card .btn-primary { width: 100%; justify-content: center; }
+.login-error {
+  margin-bottom: 12px;
+  padding: 8px 11px;
+  border-radius: var(--r-sm);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* Inline form-validation message (replaces blocking alert()) — announced via role="alert". */
 .modal-error {
   margin-top: 16px;

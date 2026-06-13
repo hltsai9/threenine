@@ -70,6 +70,13 @@ unset the API is OPEN** — fine for a localhost demo, but it logs a startup war
 set in any reachable deployment (otherwise anyone can read case PII and purge cases). Static
 file serving (`/`) stays open. See **[`../docs/SETUP.md`](../docs/SETUP.md)** for details.
 
+In **server mode** (`API_MODE='server'`) the SPA itself prompts for that token at a login gate
+and attaches it to every `/api/*` call (`GET /api/auth/check` is the validation probe), so you
+can keep `API_AUTH_TOKEN` set *and* have a working browser board — no need to leave the API
+open. The token is held in `sessionStorage` (cleared when the tab closes); "Sign out" in the
+sidebar clears it. This is a single shared team secret, not per-operator identity. Point Render
+health checks at **`/healthz`** (unauthenticated).
+
 ## Environment variables
 
 `DATABASE_URL`, `API_AUTH_TOKEN`, `CASE_CENTER_*`, `ALLOWED_ORIGINS`, `SERVE_STATIC`,
