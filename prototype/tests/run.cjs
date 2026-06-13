@@ -220,8 +220,12 @@ test('caseHref: empty string when there is no link and no base URL', () =>
 
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
-test('seed: every case has a non-empty string id', () =>
-  ok(app.CASES.every(c => typeof c.id === 'string' && c.id.trim())));
+test('seed: every case has a non-empty string id', () => {
+  // Two shapes possible: legacy board-shape (`id`) or raw Case Center
+  // (`caseId`, mapped at boot via mapRawCcRecord). Accept either.
+  const idField = app.CASES_RAW_CC ? 'caseId' : 'id';
+  ok(app.CASES.every(c => typeof c[idField] === 'string' && c[idField].trim()));
+});
 test('seed: thresholds present and numeric', () =>
   ok(typeof TH.coreIdleHours === 'number' && typeof TH.hqIdleHours === 'number'));
 
@@ -238,7 +242,13 @@ app.showModal = (html, onSubmit) => { _modal = { html, onSubmit }; };
 
 const FIT = app.OWNERS.core[0].id;
 const HQ = app.OWNERS.hq[0].id;
-const SCRATCH_ID = app.CASES[0].id;
+// Pick the first mapped (board-shape) case from STATE via the public caseById
+// helper — covers both raw-CC and legacy seeds without reaching into STATE.
+const SCRATCH_ID = (() => {
+  const idField = app.CASES_RAW_CC ? 'caseId' : 'id';
+  const id = app.CASES[0][idField];
+  return id;
+})();
 function scratch(props) {
   const c = app.caseById(SCRATCH_ID);
   Object.assign(c, {
@@ -403,18 +413,28 @@ test('toolbar (file://): refresh buttons always show; Load New stays http-only',
 /* ---------- recycle bin (4.4) ---------- */
 const REAL_HOUR = 3600 * 1000;
 test('isBinned / binExpired / binMsRemaining', () => {
-  const fresh = { deletedAt: new Date(Date.now() - REAL_HOUR).toISOString() };
-  const old = { deletedAt: new Date(Date.now() - 8 * 24 * REAL_HOUR).toISOString() };
+  // `realNow()` inside the sandbox is anchored to FIXED (load-prototype.cjs
+  // freezes Date for determinism), so build deletedAt off realNow() too — using
+  // the host Date.now() makes this test flaky when the real wall-clock drifts
+  // away from the seed's `window.NOW`.
+  const fixedMs = app.realNow().getTime();
+  const fresh = { deletedAt: new Date(fixedMs - REAL_HOUR).toISOString() };
+  const old = { deletedAt: new Date(fixedMs - 8 * 24 * REAL_HOUR).toISOString() };
   ok(app.isBinned(fresh) && app.isBinned(old) && !app.isBinned({}));
   ok(!app.binExpired(fresh) && app.binExpired(old));
   ok(app.binMsRemaining(fresh) > 0 && app.binMsRemaining(old) === 0);
 });
 test('binned case is hidden from board, archive stats and week table', () => {
-  // Board now renders only PICKED (queued) cases — pick the first non-closed case
-  // that's actually queued so we can verify it appears, then deletes hide it.
-  const id = app.CASES.find(c =>
-    !['closed', 'cancelled'].includes(c.status) && c.agentStatus === 'queued'
-  ).id;
+  // Board now renders only PICKED (queued) cases — find a non-closed, queued
+  // case in STATE (post-mapping) so we can verify it appears, then delete it.
+  // Iterating board-shape cases via caseById walks the same set the renderer
+  // sees — no need to know whether the seed is raw or board.
+  const idField = app.CASES_RAW_CC ? 'caseId' : 'id';
+  const ids = app.CASES.map(r => r[idField]).filter(Boolean);
+  const id = ids.find(x => {
+    const c = app.caseById(x);
+    return c && !['closed', 'cancelled'].includes(c.status) && c.agentStatus === 'queued';
+  });
   const c = app.caseById(id);
   c.agentStatus = 'queued';
   const wk = c.weekId;

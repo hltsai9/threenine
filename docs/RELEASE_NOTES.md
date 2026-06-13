@@ -10,6 +10,53 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Changed (Seed data · raw Case Center shape)
+
+- **`prototype/data.js` rewritten as raw Case Center records.** Each entry is
+  one CC record (`caseId`, `caseStatus`, `subStatus.transition`, `caseLevel`,
+  `userAccount`, `userDept`, `reporter`, `assignee`, `createDateTime`,
+  `processTimeline[]`) — the same shape `fetch_raw()` in `local/casecenter.py`
+  returns from a real Case Center query. A new `window.CASES_RAW_CC = true`
+  flag tells `app.js` to run each record through `mapRawCcRecord()` +
+  `fillBoardDefaults()` at boot, so the renderers always see the board shape
+  they expect (`status` enum, `priority`, `caseLink`, mapped `processTimeline`,
+  derived `assigneeDept`, `waitUser{}`).
+- **Smaller, focused seed (10 cases on W24-2026).** Two New, two With Core
+  Team, two With HQ, one Returned-to-requester (`In-Progress` + `Wait User`),
+  one Return-from-user (`In-Progress` + `Return`), one Closed, one Dropped —
+  covering every entry in the CC → board status map.
+- **`window.SEED_AGENT_LAYER`** sits next to `window.CASES` and overlays the
+  operator-side fields (picks + Track Statuses) onto specific cases AFTER
+  mapping. The seed is intentionally light: C-2402 picked as *Weekend Case*
+  (a MOVING lane on the Route Board); C-2405 and C-2406 picked as
+  *Sanity Check* (so the collapsible bottom group has more than one row).
+  Other Track Status variants are one click away in the picker.
+
+### Internal (CC mapping ported to JS)
+
+- New helpers in `app.js` mirror `local/casecenter.py:map_record`:
+  - `CC_STATUS_MAP` / `CC_STATUS_MAP_BY_STATUS` / `CC_STATUS_MAP_BY_PROCESS_TYPE`
+    (lookup tables — keep in lockstep with the Python).
+  - `_ccSubTransition`, `_ccLastProcessType`, `_ccMapStatus`, `_ccStatusLabel`,
+    `_ccDeptFromTimeline`, `_ccMapProcessTimeline`, `_ccMapWaitUser`.
+  - `mapRawCcRecord(r)` — the JS twin of Python's `map_record(r)`.
+  - `fillBoardDefaults(c)` — sets `weekId`, operator-layer defaults
+    (`agentStatus`, `trackStatus`, `currentOwner`, `slaPaused`, …) so a
+    freshly-mapped record renders straight away.
+  - `applySeedAgentLayer(cases, overlay)` — applies `window.SEED_AGENT_LAYER`.
+  - `buildSeedCases()` — picks the right seed flavour (live-capture, raw CC,
+    or legacy board-shape) and returns the populated array.
+- `STATE.cases` initialises empty; `anchorFreshSeed()` now calls
+  `buildSeedCases()` to populate it (the helpers must be defined first).
+- Storage version bumped **`v7 → v8`** so existing snapshots force a fresh
+  seed on next load.
+- Tests adjusted: structural seed checks accept the raw shape (`caseId`)
+  when `window.CASES_RAW_CC` is set, `SCRATCH_ID` resolves through the
+  active id field, and the recycle-bin time-comparison test anchors its
+  inputs on `app.realNow()` (the sandbox-frozen clock) so it stays
+  deterministic regardless of how far the host wall-clock has drifted from
+  the seed's `window.NOW`.
+
 ### Changed (CommuGround Forest theme polish)
 
 - **Sidebar navigation grows icons.** Each nav row (`Picked`, `Overview`,

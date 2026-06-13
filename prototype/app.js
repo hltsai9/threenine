@@ -26,8 +26,202 @@ const REMINDER_POLL_MS = 10000;        // how often to sweep for due reminders
 const REMINDER_FIRST_RUN_MS = 200;     // first reminder sweep shortly after boot
 const CLOCK_TICK_MS = 1000;            // sidebar clock refresh
 
+// ---- Raw Case Center → board mapping (mirrors local/casecenter.py:map_record) ----
+//
+// Two seed flavours coexist:
+//
+//   • `window.CASES_RAW_CC = true` — every entry in `window.CASES` is a raw
+//     Case Center record (caseStatus, subStatus, caseLevel, userAccount,
+//     processTimeline with raw processStartTime/processEndTime, etc.). At seed
+//     time we run each through `mapRawCcRecord()` and then `fillBoardDefaults()`
+//     so the renderers always see the board shape they expect.
+//
+//   • absent / false — `window.CASES` is already in board shape (the legacy
+//     in-tree seed). The mapping is bypassed and structuredClone is used.
+//
+// Keep the lookup tables and rules in lockstep with casecenter.py; the Status
+// Flow page (#/flow) explains the same mapping for operators.
+const CC_STATUS_MAP = {
+  'In-Progress|Return':    'new',
+  'In-Progress|Wait User': 'returned_to_requester',
+};
+const CC_STATUS_MAP_BY_STATUS = {
+  'Open':            'new',
+  'In-Progress':     'new',
+  'Wait Resolution': 'with_hq',
+  'Close':           'closed',
+  'Drop':            'cancelled',
+};
+const CC_STATUS_MAP_BY_PROCESS_TYPE = {
+  '1st  Line':    'new',         // note: two spaces, matching the Case Center value
+  'Service Team': 'with_core',
+};
+const CC_LEVEL_MAP = { 'Normal': 'medium', 'Urgent': 'high' };
+
+function _ccSubTransition(r) {
+  const sub = r && typeof r === 'object' ? r.subStatus : null;
+  if (!sub || typeof sub !== 'object') return null;
+  return sub.transition || null;
+}
+function _ccLastProcessType(r) {
+  const items = r && typeof r === 'object' ? r.processTimeline : null;
+  if (!Array.isArray(items)) return null;
+  let best = null;  // { key: [whenStr, idx], pt }
+  items.forEach((it, idx) => {
+    if (!it || typeof it !== 'object') return;
+    const when = it.processEndTime || it.processStartTime || '';
+    const key = [when || '', idx];
+    if (!best || key > best.key) best = { key, pt: it.processType || null };
+  });
+  return best ? best.pt : null;
+}
+function _ccMapStatus(caseStatus, sub, lastPt) {
+  if (sub && CC_STATUS_MAP[`${caseStatus}|${sub}`]) return CC_STATUS_MAP[`${caseStatus}|${sub}`];
+  if (lastPt && CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt]) return CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt];
+  if (CC_STATUS_MAP_BY_STATUS[caseStatus]) return CC_STATUS_MAP_BY_STATUS[caseStatus];
+  return 'new';
+}
+function _ccStatusLabel(caseStatus, sub) {
+  const a = String(caseStatus || '');
+  const b = sub ? ' ' + String(sub) : '';
+  return (a + b).trim() || '—';
+}
+function _ccDeptFromTimeline(r, accountId) {
+  if (!accountId) return null;
+  const items = r && typeof r === 'object' ? r.processTimeline : null;
+  if (!Array.isArray(items)) return null;
+  let match = null;
+  items.forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    if (it.processor !== accountId) return;
+    const dept = it.processorDeptName;
+    if (!dept) return;
+    const when = it.processEndTime || it.processStartTime || '';
+    if (!match || when > match[0]) match = [when, dept];
+  });
+  return match ? match[1] : null;
+}
+function _ccMapProcessTimeline(r) {
+  const items = (r && typeof r === 'object' && Array.isArray(r.processTimeline)) ? r.processTimeline : [];
+  return items.filter(it => it && typeof it === 'object').map(it => {
+    const sub = _ccSubTransition(it);
+    return {
+      processType: it.processType || null,
+      processor: it.processor || null,
+      processorDept: it.processorDeptName || null,
+      ccStatus: _ccStatusLabel(it.caseStatus, sub),
+      status: _ccMapStatus(it.caseStatus, sub),
+      startedAt: it.processStartTime || null,
+      endedAt: it.processEndTime || null,
+      minutes: typeof it.processMinutes === 'number' ? it.processMinutes : null,
+    };
+  });
+}
+function _ccMapWaitUser(r) {
+  const sub = r && typeof r === 'object' ? r.subStatus : null;
+  if (!sub || typeof sub !== 'object') return null;
+  const lp = (sub.lastProcessor && typeof sub.lastProcessor === 'object') ? sub.lastProcessor : {};
+  return {
+    reason: sub.reason || null,
+    dueAction: sub.dueAction || null,
+    dueDateTime: sub.dueDateTime || null,
+    transition: sub.transition || null,
+    transitionDateTime: sub.transitionDateTime || null,
+    lastProcessor: { assignee: lp.assignee || null, handlerType: lp.handlerType || null },
+  };
+}
+function mapRawCcRecord(r) {
+  const caseId = String(r.caseId || '');
+  const transition = _ccSubTransition(r);
+  const lastPt = _ccLastProcessType(r);
+  const userAccount = r.userAccount || '';
+  const userName = r.userName || '';
+  const userDisplay = [String(userAccount), String(userName)].filter(Boolean).join(' ').trim();
+  const reporterId = r.reporter || '';
+  const assigneeId = r.assignee || '';
+  const created = r.createDateTime || null;
+  const out = {
+    id: caseId,
+    caseLink: r.caseLink || '',
+    subject: r.subject || '(no subject)',
+    status: _ccMapStatus(r.caseStatus, transition, lastPt),
+    ccStatusLabel: _ccStatusLabel(r.caseStatus, transition),
+    priority: CC_LEVEL_MAP[String(r.caseLevel)] || 'medium',
+    createdAt: created,
+    slaStartedAt: created,
+    user: userDisplay,
+    userDept: r.userDept || null,
+    reporter: reporterId,
+    reporterDept: _ccDeptFromTimeline(r, reporterId),
+    assignee: assigneeId,
+    assigneeDept: _ccDeptFromTimeline(r, assigneeId),
+    processTimeline: _ccMapProcessTimeline(r),
+    caseType: r.caseType || 'access',
+    notes: r.notes || '',
+  };
+  if (transition === 'Wait User') {
+    const wu = _ccMapWaitUser(r);
+    if (wu) out.waitUser = wu;
+  }
+  return out;
+}
+
+// Fill in the board-shape fields the mapper leaves blank because they live in
+// the operator layer (not in Case Center). Run after `mapRawCcRecord()` so a
+// freshly seeded raw record renders straight away.
+function fillBoardDefaults(c) {
+  if (c.weekId == null && c.createdAt) c.weekId = weekIdFor(c.createdAt);
+  if (c.agentStatus == null)      c.agentStatus = 'unqueued';
+  if (c.trackStatus === undefined) c.trackStatus = null;
+  if (c.coreId == null)           c.coreId = null;
+  if (c.hqId == null)             c.hqId = null;
+  if (c.currentOwner == null) {
+    if (c.status === 'with_core') c.currentOwner = 'core';
+    else if (c.status === 'with_hq') c.currentOwner = 'hq';
+    else c.currentOwner = null;
+  }
+  if (c.slaPaused == null)        c.slaPaused = c.status === 'returned_to_requester';
+  if (c.slaAccumulatedMs == null) c.slaAccumulatedMs = 0;
+  if (c.holdMs == null)           c.holdMs = { core: 0, hq: 0 };
+  if (c.holdStartedAt == null)    c.holdStartedAt = null;
+  if (c.lastOwnerContact == null) c.lastOwnerContact = null;
+  if (c.handover == null)         c.handover = null;
+  if (c.reminder == null)         c.reminder = null;
+  if (c.history == null)          c.history = c.createdAt ? [{ at: c.createdAt, who: c.assignee || c.reporter || 'system', kind: 'created' }] : [];
+  if (c.createdBy == null)        c.createdBy = c.reporter || c.assignee || 'system';
+  return c;
+}
+
+// Apply per-case operator-layer overrides from `window.SEED_AGENT_LAYER` onto a
+// freshly mapped seed (picks + Track Statuses, since they sit outside CC shape).
+function applySeedAgentLayer(cases, overlay) {
+  if (!overlay || typeof overlay !== 'object') return;
+  for (const c of cases) {
+    const a = overlay[c.id];
+    if (!a) continue;
+    if (a.agentStatus != null) c.agentStatus = a.agentStatus;
+    if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
+    if (a.handover !== undefined) c.handover = a.handover;
+    if (a.reminder !== undefined) c.reminder = a.reminder;
+  }
+}
+
+// Seed CASES — board-shape, raw-CC, or live-capture — into STATE.cases. Pure
+// function on its input; mutates nothing globally. Called from anchorFreshSeed.
+function buildSeedCases() {
+  if (window.CASES_LIVE_CAPTURE) {
+    return window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
+  }
+  if (window.CASES_RAW_CC) {
+    const out = window.CASES.map(r => fillBoardDefaults(mapRawCcRecord(structuredClone(r))));
+    applySeedAgentLayer(out, window.SEED_AGENT_LAYER);
+    return out;
+  }
+  return window.CASES.map(c => structuredClone(c));
+}
+
 const STATE = {
-  cases: window.CASES.map(c => structuredClone(c)),
+  cases: [],   // populated in seedBoot() — buildSeedCases() needs the helpers above.
   operatorId: window.CURRENT_OPERATOR_ID,
   lastListRoute: '#/cases',
   lastListLabel: 'Cases',
@@ -66,7 +260,7 @@ function windowError(from, to) {
   return null;
 }
 
-const STORAGE_KEY = 'case-tracker-state-v7';
+const STORAGE_KEY = 'case-tracker-state-v8';
 // In live mode (served by local/serve.py; cases come from Case Center on demand via
 // "Load New" / "Refresh Existing", not on page refresh) we persist ONLY the local agent layer —
 // agentStatus, handover, reminder — keyed by case id, so a data pull never clobbers the
@@ -131,7 +325,7 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 7,
+      v: 8,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
@@ -146,7 +340,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 7 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 8 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
@@ -239,10 +433,12 @@ function applyShiftToCurrentShift(off) {
 }
 // Shift the pristine seed (already cloned into STATE.cases) so it anchors on real now.
 function anchorFreshSeed() {
-  // data.js written from live Case Center data: board-shaped cases with real timestamps.
-  // Normalize them (fills weekId/agentStatus/etc. like a live fetch) and don't time-shift.
+  // Build STATE.cases from window.CASES. `buildSeedCases()` handles the three
+  // flavours: live-capture (already board-shape), raw Case Center records
+  // (mapped via mapRawCcRecord), and the legacy board-shape seed.
+  STATE.cases = buildSeedCases();
+  // Live-capture seeds use real wall-clock timestamps and shouldn't be shifted.
   if (window.CASES_LIVE_CAPTURE) {
-    STATE.cases = window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
     STATE.anchorOffset = 0;
     applyShiftToCurrentShift(0);
     NOW = new Date();

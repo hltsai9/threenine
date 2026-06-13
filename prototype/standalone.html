@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Case Tracker — Prototype (standalone)</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmFpbmJvdyIgeDE9IjAiIHkxPSIwIiB4Mj0iNjQiIHkyPSI2NCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmYzYjMwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iMjAlIiBzdG9wLWNvbG9yPSIjZmY5NTAwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iNDAlIiBzdG9wLWNvbG9yPSIjZmZjYzAwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iNjAlIiBzdG9wLWNvbG9yPSIjMzRjNzU5Ij48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iODAlIiBzdG9wLWNvbG9yPSIjMGE4NGZmIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2JmNWFmMiI+PC9zdG9wPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHBvbHlnb24gcG9pbnRzPSIzMiwyIDU3Ljk4LDE3IDU3Ljk4LDQ3IDMyLDYyIDYuMDIsNDcgNi4wMiwxNyIgZmlsbD0idXJsKCNyYWluYm93KSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvcG9seWdvbj4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiBmb250LWZhbWlseT0iLWFwcGxlLXN5c3RlbSwgJiMzOTtTZWdvZSBVSSYjMzk7LCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM4IiBmaWxsPSIjZmZmZmZmIj5DPC90ZXh0Pgo8L3N2Zz4=">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmFpbmJvdyIgeDE9IjAiIHkxPSIwIiB4Mj0iNjQiIHkyPSI2NCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiAgc3RvcC1jb2xvcj0iI2ZmM2IzMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjIwJSIgc3RvcC1jb2xvcj0iI2ZmOTUwMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjQwJSIgc3RvcC1jb2xvcj0iI2ZmY2MwMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjYwJSIgc3RvcC1jb2xvcj0iIzM0Yzc1OSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjgwJSIgc3RvcC1jb2xvcj0iIzBhODRmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiZjVhZjIiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxwb2x5Z29uIHBvaW50cz0iMzIsMiA1Ny45OCwxNyA1Ny45OCw0NyAzMiw2MiA2LjAyLDQ3IDYuMDIsMTciCiAgICAgICAgICAgZmlsbD0idXJsKCNyYWluYm93KSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIgogICAgICAgIGZvbnQtZmFtaWx5PSItYXBwbGUtc3lzdGVtLCAnU2Vnb2UgVUknLCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIgogICAgICAgIGZvbnQtd2VpZ2h0PSI4MDAiIGZvbnQtc2l6ZT0iMzgiIGZpbGw9IiNmZmZmZmYiPkM8L3RleHQ+Cjwvc3ZnPgo=">
 <style>
 /* ============================================================
    CommuGround Forest theme — applied over the Case Tracker prototype.
@@ -2792,8 +2792,27 @@ table.case-table {
 window.API_BASE = '';
 
 
-// Seed data for the Case Tracker prototype.
-// All timestamps are ISO UTC. The app uses a fixed NOW for stable demos.
+// Seed data for the Case Tracker prototype — RAW Case Center records.
+//
+// Each entry below is one raw Case Center record (the same shape `fetch_raw()` in
+// local/casecenter.py returns from a real Case Center query). At boot the app runs
+// every record through `mapRawCcRecord()` + `fillBoardDefaults()` (see app.js) so
+// the renderers always receive the board shape they expect — `status` enum,
+// `priority`, `caseLink`, `processTimeline` with mapped status, derived
+// `assigneeDept`, etc. Keep this file as raw CC; do not pre-map.
+//
+// Lookups consulted by the mapper (mirrors local/casecenter.py):
+//   caseStatus values:           Open · In-Progress · Wait Resolution · Close · Drop
+//   subStatus.transition values: Wait User · Return · null
+//   caseLevel:                   Urgent (→ high) · Normal (→ medium)
+//   processType:                 "1st  Line" (two spaces) · "Service Team" · others
+//
+// `processorDeptName` strings are matched against the `owners.js` rows so the
+// Route Board's dept → station lookup resolves (Core Team / HQ / User).
+//
+// `window.SEED_AGENT_LAYER` overlays the operator-side fields onto specific
+// cases after mapping (picks + Track Statuses + a sample handover note) so the
+// Picked workspace + Route Board demo meaningfully on first load.
 
 window.NOW = new Date('2026-06-12T13:00:00Z');
 
@@ -2803,12 +2822,6 @@ window.THRESHOLDS = {
   approachingSlaHours: 20,
   shiftEndingSoonMinutes: 60,
 };
-
-// Operators & shifts (window.OPERATORS / window.SHIFTS / window.CURRENT_OPERATOR_ID)
-// live in shifts.js so the roster can be edited without touching this file.
-
-// Owners (window.OWNERS — Core Team desks & HQ Product Teams) live in owners.js so the
-// directory can be edited without touching this file.
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '2026-06-12' };
 // Week boundaries: weeks start on SUNDAY 00:00 UTC. W24 of 2026 starts Sun Jun 7.
@@ -2820,685 +2833,362 @@ window.WEEKS = [
   { id: 'W25-2026', label: 'W25 · June 14 – 20, 2026',    startsAt: '2026-06-14T00:00:00Z', endsAt: '2026-06-21T00:00:00Z', isFuture: true },
   { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026',     startsAt: '2026-06-07T00:00:00Z', endsAt: '2026-06-14T00:00:00Z', isCurrent: true },
   { id: 'W23-2026', label: 'W23 · May 31 – June 6, 2026', startsAt: '2026-05-31T00:00:00Z', endsAt: '2026-06-07T00:00:00Z' },
-  { id: 'W22-2026', label: 'W22 · May 24 – 30, 2026',     startsAt: '2026-05-24T00:00:00Z', endsAt: '2026-05-31T00:00:00Z' },
-  { id: 'W21-2026', label: 'W21 · May 17 – 23, 2026',     startsAt: '2026-05-17T00:00:00Z', endsAt: '2026-05-24T00:00:00Z' },
 ];
 
-// Each case mirrors the Excel columns plus the v1 additions from the URD.
-// Two statuses per case:
-//   status      = Case Center status (the real external status). Drives the kanban
-//                 COLUMNS. values: new | with_core | with_hq | sanity_check |
-//                 returned_to_requester | resolved | closed | cancelled
-//   agentStatus = first-line agent status (how the agent is handling it). Drives the
-//                 top/bottom band split inside each column. values: queued | unqueued
-//                 ('queued' = in the agent's active top band). Active-week cases carry it;
-//                 seed a few as 'queued' so each column shows a populated top band.
-// flags: weekend, escalated, scheduled_ooc
+// Tell app.js to treat window.CASES as raw Case Center records and run them
+// through mapRawCcRecord() at boot.
+window.CASES_RAW_CC = true;
+
+// ---- 10 raw Case Center records for W24-2026 -----------------------------
+//
+// Coverage:
+//   2 × Open / triage (New column)
+//   2 × Service Team (With Core Team)
+//   2 × Wait Resolution (With HQ Product Team)
+//   1 × In-Progress + Wait User (Returned to requester)
+//   1 × In-Progress + Return (back to triage from the requester)
+//   1 × Close (closed)
+//   1 × Drop (cancelled)
+
 window.CASES = [
+
+  // -- C-2401 — Open at IT Service Desk (fresh New) --------------------------
   {
-    id: 'C-1041',
-    agentStatus: 'queued',
-    trackStatus: 'weekend_case',
-    assigneeDept: 'IT Service Desk',
-    caseLink: 'https://case-center.example/CC-58821',
+    caseId: 'C-2401',
     subject: 'APAC users locked out after MFA reset',
-    user: 'Hana Park',
-    assignee: 'op-da',
-    coreId: null,
-    hqId: null,
-    currentOwner: null,
-    status: 'new',
-    flags: ['weekend'],
-    priority: 'high',
+    caseStatus: 'Open',
+    subStatus: { transition: null },
+    caseLevel: 'Urgent',
     caseType: 'access',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-12T05:12:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: null,
-    lastOwnerContact: null,
-    handover: null,
-    notes: 'Reported on weekend rotation. ~14 users in Tokyo affected. No workaround yet.',
-    createdAt: '2026-06-12T05:12:00Z',
-    createdBy: 'op-na',
-    history: [
-      { at: '2026-06-12T05:12:00Z', who: 'op-na', kind: 'created', detail: 'Imported from case-center; flagged Weekend Case' },
+    userAccount: 'hana.park',
+    userName: 'Hana Park',
+    userDept: 'APAC Sales',
+    reporter: 'helpdesk-tier1',
+    assignee: 'helpdesk-tier1',
+    caseLink: 'https://case-center.example/CC-2401',
+    createDateTime: '2026-06-12T05:12:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-12T05:12:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2402 — In-Progress, last stage "1st Line" (still New) ---------------
+  // Picked + tracked as Weekend Case in SEED_AGENT_LAYER below.
   {
-    id: 'C-1042',
-    agentStatus: 'unqueued',
-    caseLink: 'https://case-center.example/CC-58800',
+    caseId: 'C-2402',
+    subject: 'Weekend outage: Slack outbound webhooks silent',
+    caseStatus: 'In-Progress',
+    subStatus: { transition: null },
+    caseLevel: 'Urgent',
+    caseType: 'service',
+    userAccount: 'cheng.liu',
+    userName: 'Cheng Liu',
+    userDept: 'APAC Engineering',
+    reporter: 'helpdesk-tier1',
+    assignee: 'helpdesk-tier1',
+    caseLink: 'https://case-center.example/CC-2402',
+    createDateTime: '2026-06-12T10:30:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-12T10:30:00Z', processEndTime: null, processMinutes: null,
+      },
+    ],
+  },
+
+  // -- C-2403 — In-Progress, last stage "Service Team" (With Core Team) ------
+  {
+    caseId: 'C-2403',
     subject: 'Login fails sporadically — APAC region',
-    user: 'Wei Zhang',
-    coreId: 'core-apac',
-    hqId: null,
-    currentOwner: 'core',
-    status: 'with_core',
-    flags: [],
-    priority: 'medium',
+    caseStatus: 'In-Progress',
+    subStatus: { transition: null },
+    caseLevel: 'Normal',
     caseType: 'access',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-11T22:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: '2026-06-11T22:30:00Z',
-    lastOwnerContact: { at: '2026-06-12T07:30:00Z', channel: 'Slack' },
-    handover: { note: 'Pinged Core Team APAC at 09:30, no reply yet. Re-ping at 12:00 UTC.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z' },
-    notes: 'User on macOS Sonoma; password works but session 401s within 60s.',
-    createdAt: '2026-06-11T22:00:00Z',
-    createdBy: 'op-na',
-    history: [
-      { at: '2026-06-11T22:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-06-11T22:30:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — APAC desk' },
+    userAccount: 'wei.zhang',
+    userName: 'Wei Zhang',
+    userDept: 'APAC Sales',
+    reporter: 'helpdesk-tier1',
+    assignee: 'core-apac-eng',
+    caseLink: 'https://case-center.example/CC-2403',
+    createDateTime: '2026-06-11T22:00:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-11T22:00:00Z', processEndTime: '2026-06-11T22:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-apac-eng', processorDeptName: 'Core Team — APAC desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-11T22:30:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2404 — In-Progress, last stage "Service Team" (With Core Team) ------
   {
-    id: 'C-1043',
-    agentStatus: 'queued',
-    trackStatus: 'escalate_to_core',
-    assigneeDept: 'Core Team — EMEA desk',
-    caseLink: 'https://case-center.example/CC-58805',
+    caseId: 'C-2404',
     subject: 'Bulk export from Reports stalls at 80%',
-    user: 'Marcus O’Donnell',
-    coreId: 'core-emea',
-    hqId: null,
-    currentOwner: 'core',
-    status: 'with_core',
-    flags: [],
-    priority: 'medium',
+    caseStatus: 'In-Progress',
+    subStatus: { transition: null },
+    caseLevel: 'Normal',
     caseType: 'data',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-11T13:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: '2026-06-11T13:30:00Z',
-    lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
-    handover: { note: 'Core Team EMEA replied that this looks server-side; recommend escalation to HQ Data.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:30:00Z' },
-    notes: 'Core Team confirmed nothing client-side; suspect HQ Data Platform.',
-    coreCannotResolve: true,
-    createdAt: '2026-06-11T13:00:00Z',
-    createdBy: 'op-db',
-    history: [
-      { at: '2026-06-11T13:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-11T13:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — EMEA desk' },
-      { at: '2026-06-12T11:00:00Z', who: 'op-db', kind: 'note', detail: 'Core Team EMEA: server-side, recommend escalate' },
-    ],
-  },
-  {
-    id: 'C-1044',
-    agentStatus: 'queued',
-    trackStatus: 'escalated_to_hq',
-    assigneeDept: 'HQ Identity Team',
-    caseLink: 'https://case-center.example/CC-58750',
-    subject: 'SAML SSO loop after IdP cert rotation',
-    user: 'Priya Sharma',
-    assignee: 'op-da',
-    coreId: 'core-amer',
-    hqId: 'hq-identity',
-    currentOwner: 'hq',
-    status: 'with_hq',
-    flags: ['escalated'],
-    priority: 'high',
-    caseType: 'access',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-10T17:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 4 * 3600 * 1000, hq: 0 },
-    holdStartedAt: '2026-06-11T01:00:00Z',
-    lastOwnerContact: { at: '2026-06-11T19:00:00Z', channel: 'JIRA' },
-    handover: { note: 'HQ Identity assigned Tue PM PT. No update in ~18h. Re-ping today.', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:55:00Z' },
-    notes: 'Affects entire AMER region. CTO has visibility.',
-    createdAt: '2026-06-10T17:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-10T17:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-10T17:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-10T21:00:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-11T01:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity Team' },
-    ],
-    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    userAccount: 'marcus.odonnell',
+    userName: 'Marcus O’Donnell',
+    userDept: 'EMEA Sales',
+    reporter: 'helpdesk-tier1',
+    assignee: 'core-emea-eng',
+    caseLink: 'https://case-center.example/CC-2404',
+    createDateTime: '2026-06-11T13:00:00+00:00',
     processTimeline: [
-      { processType: 'Triage',        ccStatus: 'Open',            status: 'new',     processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-10T17:00:00Z', endedAt: '2026-06-10T17:30:00Z', minutes: 30 },
-      { processType: 'Investigation', ccStatus: 'In-Progress',     status: 'new',     processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-10T17:30:00Z', endedAt: '2026-06-11T01:00:00Z', minutes: 450 },
-      { processType: 'Escalation',    ccStatus: 'Wait Resolution', status: 'with_hq', processor: 'HQ Identity',     processorDept: 'HQ Identity',      startedAt: '2026-06-11T01:00:00Z', endedAt: '2026-06-12T12:30:00Z', minutes: 2130 },
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-11T13:00:00Z', processEndTime: '2026-06-11T13:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-11T13:30:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2405 — Wait Resolution (With HQ Product Team) -----------------------
+  // Picked + tracked as Sanity Check in SEED_AGENT_LAYER below.
   {
-    id: 'C-1045',
-    agentStatus: 'queued',
-    trackStatus: 'sanity_check',
-    assigneeDept: 'Core Team — AMER desk',
-    caseLink: 'https://case-center.example/CC-58702',
+    caseId: 'C-2405',
     subject: 'Mobile push notifications missing for iOS 18.4',
-    user: 'Ana Souza',
-    coreId: 'core-amer',
-    hqId: 'hq-mobile',
-    currentOwner: 'hq',
-    status: 'sanity_check',
-    flags: [],
-    priority: 'medium',
+    caseStatus: 'Wait Resolution',
+    subStatus: { transition: null },
+    caseLevel: 'Normal',
     caseType: 'mobile',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-09T15:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 6 * 3600 * 1000, hq: 30 * 3600 * 1000 },
-    holdStartedAt: '2026-06-12T08:00:00Z',
-    lastOwnerContact: { at: '2026-06-12T08:00:00Z', channel: 'JIRA' },
-    handover: { note: 'HQ Mobile pushed fix in 4.12.1. Need to verify with requester before close.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T10:15:00Z' },
-    notes: 'Fix released; awaiting requester confirmation.',
-    createdAt: '2026-06-09T15:00:00Z',
-    createdBy: 'op-db',
-    history: [
-      { at: '2026-06-09T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-09T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-10T01:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Mobile App' },
-      { at: '2026-06-12T08:00:00Z', who: 'op-db', kind: 'status', detail: 'HQ → Sanity Check (fix released)' },
-    ],
-    // Case Center's per-stage processing log (mirrors map_process_timeline in casecenter.py).
+    userAccount: 'ana.souza',
+    userName: 'Ana Souza',
+    userDept: 'AMER Customer Success',
+    reporter: 'helpdesk-tier1',
+    assignee: 'hq-mobile-eng',
+    caseLink: 'https://case-center.example/CC-2405',
+    createDateTime: '2026-06-09T15:00:00+00:00',
     processTimeline: [
-      { processType: 'Triage',         ccStatus: 'Open',                  status: 'new',                   processor: 'Helpdesk Tier 1', processorDept: 'IT Service Desk',  startedAt: '2026-06-09T15:00:00Z', endedAt: '2026-06-09T15:30:00Z', minutes: 30 },
-      { processType: 'Investigation',  ccStatus: 'In-Progress',           status: 'new',                   processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-09T15:30:00Z', endedAt: '2026-06-10T01:00:00Z', minutes: 570 },
-      { processType: 'Product fix',    ccStatus: 'Wait Resolution',       status: 'with_hq',               processor: 'HQ Mobile App',   processorDept: 'HQ Mobile App',    startedAt: '2026-06-10T01:00:00Z', endedAt: '2026-06-12T08:00:00Z', minutes: 3300 },
-      { processType: 'Verify w/ user', ccStatus: 'In-Progress Wait User', status: 'returned_to_requester', processor: 'Core Team — AMER',      processorDept: 'Core Team — AMER', startedAt: '2026-06-12T08:00:00Z', endedAt: '2026-06-12T12:00:00Z', minutes: 240 },
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-09T15:00:00Z', processEndTime: '2026-06-09T15:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Core Team — AMER desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-09T15:30:00Z', processEndTime: '2026-06-10T01:00:00Z', processMinutes: 570,
+      },
+      {
+        processType: 'Product fix', processor: 'hq-mobile-eng', processorDeptName: 'HQ Mobile App',
+        caseStatus: 'Wait Resolution', subStatus: { transition: null },
+        processStartTime: '2026-06-10T01:00:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2406 — Wait Resolution (With HQ Product Team) -----------------------
+  // Picked + tracked as Sanity Check in SEED_AGENT_LAYER below.
   {
-    id: 'C-1046',
-    agentStatus: 'queued',
-    trackStatus: 'need_to_contact_user',
-    assigneeDept: 'IT Service Desk',
-    caseLink: 'https://case-center.example/CC-58680',
-    subject: 'Unknown error in Reports v3 — needs requester repro',
-    user: 'Liam Walsh',
-    coreId: 'core-emea',
-    hqId: null,
-    currentOwner: null,
-    status: 'returned_to_requester',
-    flags: [],
-    priority: 'low',
-    caseType: 'data',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-09T09:00:00Z',
-    slaPaused: true,
-    slaAccumulatedMs: 18 * 3600 * 1000,
-    holdMs: { core: 6 * 3600 * 1000, hq: 0 },
-    holdStartedAt: null,
-    lastOwnerContact: { at: '2026-06-11T14:00:00Z', channel: 'Email' },
-    handover: { note: 'Returned to requester for steps to reproduce. SLA paused.', author: 'op-da', from: 'Day', to: 'Night', at: '2026-06-11T19:30:00Z' },
-    notes: 'No repro info; cannot proceed without it.',
-    createdAt: '2026-06-09T09:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-09T09:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-09T09:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
-      { at: '2026-06-11T14:00:00Z', who: 'op-da', kind: 'returned', detail: 'Returned to requester (need repro)' },
+    caseId: 'C-2406',
+    subject: 'SAML SSO loop after IdP cert rotation',
+    caseStatus: 'Wait Resolution',
+    subStatus: { transition: null },
+    caseLevel: 'Urgent',
+    caseType: 'access',
+    userAccount: 'priya.sharma',
+    userName: 'Priya Sharma',
+    userDept: 'AMER Sales',
+    reporter: 'helpdesk-tier1',
+    assignee: 'hq-identity-eng',
+    caseLink: 'https://case-center.example/CC-2406',
+    createDateTime: '2026-06-10T17:00:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-10T17:00:00Z', processEndTime: '2026-06-10T17:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Core Team — AMER desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-10T17:30:00Z', processEndTime: '2026-06-11T01:00:00Z', processMinutes: 450,
+      },
+      {
+        processType: 'Escalation', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity Team',
+        caseStatus: 'Wait Resolution', subStatus: { transition: null },
+        processStartTime: '2026-06-11T01:00:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
-    // Case Center "Wait User" substatus detail (mirrors map_wait_user in casecenter.py) —
-    // present because this case is parked on the end user. dueDateTime here is past NOW, so the
-    // detail shows an "overdue" chip.
-    waitUser: {
+  },
+
+  // -- C-2407 — In-Progress + Wait User (Returned to requester) --------------
+  {
+    caseId: 'C-2407',
+    subject: 'Unknown error in Reports v3 — need requester repro',
+    caseStatus: 'In-Progress',
+    subStatus: {
+      transition: 'Wait User',
       reason: 'Awaiting reproduction steps from requester',
       dueAction: 'Requester to attach error logs + repro steps',
-      dueDateTime: '2026-06-12T10:00:00Z',
-      transition: 'Returned to user',
-      transitionDateTime: '2026-06-11T14:00:00Z',
-      lastProcessor: { assignee: 'op-da', handlerGrp: 'Core Team — EMEA', handlerType: 'Core Team' },
+      dueDateTime: '2026-06-12T10:00:00+00:00',
+      transitionDateTime: '2026-06-11T14:00:00+00:00',
+      lastProcessor: { assignee: 'core-emea-eng', handlerType: 'Core Team' },
     },
-  },
-  {
-    id: 'C-1047',
-    caseLink: 'https://case-center.example/CC-58590',
-    subject: 'Password reset email delayed (resolved last week)',
-    user: 'Tom Becker',
-    coreId: 'core-emea',
-    hqId: 'hq-identity',
-    currentOwner: null,
-    status: 'closed',
-    flags: [],
-    priority: 'low',
-    caseType: 'access',
-    weekId: 'W23-2026',
-    slaStartedAt: '2026-06-04T10:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 32 * 3600 * 1000,
-    holdMs: { core: 5 * 3600 * 1000, hq: 18 * 3600 * 1000 },
-    holdStartedAt: null,
-    lastOwnerContact: { at: '2026-06-06T11:00:00Z', channel: 'JIRA' },
-    handover: null,
-    notes: 'Mailer queue saturation; HQ Identity tuned worker pool. Closed.',
-    closedAt: '2026-06-06T13:00:00Z',
-    resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-06-04T10:00:00Z',
-    createdBy: 'op-db',
-    history: [
-      { at: '2026-06-04T10:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-06T13:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
+    caseLevel: 'Normal',
+    caseType: 'data',
+    userAccount: 'liam.walsh',
+    userName: 'Liam Walsh',
+    userDept: 'EMEA Operations',
+    reporter: 'helpdesk-tier1',
+    assignee: 'liam.walsh',  // returned to the user
+    caseLink: 'https://case-center.example/CC-2407',
+    createDateTime: '2026-06-09T09:00:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-09T09:00:00Z', processEndTime: '2026-06-09T09:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-09T09:30:00Z', processEndTime: '2026-06-11T14:00:00Z', processMinutes: 3150,
+      },
+      {
+        processType: 'Wait User', processor: 'liam.walsh', processorDeptName: 'EMEA Operations',
+        caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
+        processStartTime: '2026-06-11T14:00:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2408 — In-Progress + Return (user replied; back to triage as New) ---
   {
-    id: 'C-1048',
-    agentStatus: 'queued',
-    trackStatus: 'hq_did_not_handle',
-    assigneeDept: 'IT Service Desk',
-    caseLink: 'https://case-center.example/CC-58840',
-    subject: 'CFO laptop cannot reach VPN — exec',
-    user: 'Elena Rossi',
-    coreId: 'core-emea',
-    hqId: null,
-    currentOwner: 'core',
-    status: 'with_core',
-    flags: ['escalated'],
-    priority: 'high',
+    caseId: 'C-2408',
+    subject: 'Requester replied after VPN cert reset — fresh look needed',
+    caseStatus: 'In-Progress',
+    subStatus: { transition: 'Return' },
+    caseLevel: 'Normal',
     caseType: 'network',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-12T08:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: '2026-06-12T08:30:00Z',
-    lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'Slack' },
-    handover: null,
-    notes: 'Exec visibility — keep close eye even though Core Team is responding.',
-    createdAt: '2026-06-12T08:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-12T08:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-12T08:15:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-12T08:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
+    userAccount: 'elena.rossi',
+    userName: 'Elena Rossi',
+    userDept: 'EMEA Finance',
+    reporter: 'helpdesk-tier1',
+    assignee: 'helpdesk-tier1',
+    caseLink: 'https://case-center.example/CC-2408',
+    createDateTime: '2026-06-11T08:30:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-11T08:30:00Z', processEndTime: '2026-06-11T09:00:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Wait User', processor: 'elena.rossi', processorDeptName: 'EMEA Finance',
+        caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
+        processStartTime: '2026-06-11T09:00:00Z', processEndTime: '2026-06-12T11:00:00Z', processMinutes: 1560,
+      },
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'In-Progress', subStatus: { transition: 'Return' },
+        processStartTime: '2026-06-12T11:00:00Z', processEndTime: null, processMinutes: null,
+      },
     ],
   },
+
+  // -- C-2409 — Closed --------------------------------------------------------
   {
-    id: 'C-1049',
-    agentStatus: 'queued',
-    trackStatus: 'case_closed',
-    assigneeDept: 'Core Team — APAC desk',
-    caseLink: 'https://case-center.example/CC-58680B',
-    subject: 'Slow Salesforce export — running 22h on us',
-    user: 'Yui Tanaka',
-    coreId: 'core-apac',
-    hqId: null,
-    currentOwner: 'core',
-    status: 'with_core',
-    flags: [],
-    priority: 'medium',
-    caseType: 'data',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-11T15:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: '2026-06-11T15:30:00Z',
-    lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'Core Team looking; if no resolution by end of day consider returning to requester for more diag.', author: 'op-db', from: 'Day', to: 'Day', at: '2026-06-12T11:45:00Z' },
-    notes: 'Approaching SLA threshold.',
-    createdAt: '2026-06-11T15:00:00Z',
-    createdBy: 'op-db',
-    history: [
-      { at: '2026-06-11T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-11T15:30:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — APAC desk' },
-    ],
-  },
-  {
-    id: 'C-1050',
-    agentStatus: 'queued',
-    trackStatus: 'sanity_check',
-    assigneeDept: 'HQ Data Platform',
-    caseLink: 'https://case-center.example/CC-58770',
-    subject: 'Dashboard tile data stale — owned by me, no handover yet',
-    user: 'Kofi Mensah',
-    coreId: 'core-amer',
-    hqId: 'hq-data',
-    currentOwner: 'hq',
-    status: 'with_hq',
-    flags: [],
-    priority: 'medium',
-    caseType: 'data',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-11T18:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 4 * 3600 * 1000, hq: 0 },
-    holdStartedAt: '2026-06-12T03:00:00Z',
-    lastOwnerContact: { at: '2026-06-12T10:00:00Z', channel: 'JIRA' },
-    handover: { note: 'Last shift\'s note (out of date for current shift).', author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:55:00Z', staleForCurrentShift: true },
-    notes: 'No fresh handover written this shift yet.',
-    createdAt: '2026-06-11T18:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-11T18:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-11T18:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-12T03:00:00Z', who: 'op-na', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
-    ],
-  },
-  {
-    id: 'C-1051',
-    caseLink: 'https://case-center.example/CC-58620',
-    subject: 'Cancelled — duplicate of CC-58590',
-    user: 'Tom Becker',
-    coreId: null,
-    hqId: null,
-    currentOwner: null,
-    status: 'cancelled',
-    flags: [],
-    priority: 'low',
+    caseId: 'C-2409',
+    subject: 'Password reset email delayed — resolved',
+    caseStatus: 'Close',
+    subStatus: { transition: null },
+    caseLevel: 'Normal',
     caseType: 'access',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-10T09:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 1 * 3600 * 1000,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: null,
-    lastOwnerContact: null,
-    handover: null,
-    notes: 'Cancelled — duplicate of CC-58590.',
-    createdAt: '2026-06-10T09:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-10T09:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-10T10:00:00Z', who: 'op-da', kind: 'cancelled', detail: 'Duplicate' },
-    ],
-  },
-  {
-    id: 'C-1052',
-    agentStatus: 'unqueued',
-    caseLink: 'https://case-center.example/CC-58850',
-    subject: 'Slack outage report — APAC weekend rotation',
-    user: 'Cheng Liu',
-    coreId: null,
-    hqId: null,
-    currentOwner: null,
-    status: 'new',
-    flags: ['weekend'],
-    priority: 'medium',
-    caseType: 'service',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-12T11:30:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: null,
-    lastOwnerContact: null,
-    handover: null,
-    notes: 'Logged via on-call rotation; needs Core Team triage.',
-    createdAt: '2026-06-12T11:30:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-12T11:30:00Z', who: 'op-da', kind: 'created' },
-    ],
-  },
-  {
-    id: 'C-1053',
-    agentStatus: 'queued',
-    trackStatus: 'sanity_check',
-    assigneeDept: 'Core Team — EMEA desk',
-    caseLink: 'https://case-center.example/CC-58830',
-    subject: 'EMEA users — Outlook calendar invites duplicated',
-    user: 'Astrid Berg',
-    coreId: 'core-emea',
-    hqId: null,
-    currentOwner: 'core',
-    status: 'with_core',
-    flags: [],
-    priority: 'low',
-    caseType: 'productivity',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-12T08:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 },
-    holdStartedAt: '2026-06-12T11:30:00Z',
-    lastOwnerContact: { at: '2026-06-12T12:30:00Z', channel: 'Slack' },
-    handover: { note: 'Core Team EMEA on it; expect update by 16:00 UTC.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:35:00Z' },
-    notes: 'Fresh contact; no prompt expected.',
-    createdAt: '2026-06-12T08:00:00Z',
-    createdBy: 'op-da',
-    history: [
-      { at: '2026-06-12T08:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-12T11:30:00Z', who: 'op-da', kind: 'assigned', detail: 'Core Team — EMEA desk' },
-    ],
-  },
-  {
-    id: 'C-1054',
-    agentStatus: 'queued',
-    trackStatus: 'sanity_check',
-    assigneeDept: 'HQ Identity Team',
-    caseLink: 'https://case-center.example/CC-58712',
-    subject: 'Identity provider intermittent 5xx — exec affected',
-    user: 'Daniel Field',
-    coreId: 'core-amer',
-    hqId: 'hq-identity',
-    currentOwner: 'hq',
-    status: 'sanity_check',
-    flags: ['escalated'],
-    priority: 'high',
-    caseType: 'access',
-    weekId: 'W24-2026',
-    slaStartedAt: '2026-06-10T20:00:00Z',
-    slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 3 * 3600 * 1000, hq: 22 * 3600 * 1000 },
-    holdStartedAt: '2026-06-12T11:00:00Z',
-    lastOwnerContact: { at: '2026-06-12T11:00:00Z', channel: 'JIRA' },
-    handover: { note: 'HQ Identity reports retries normalized. Need to verify with exec contact.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T12:30:00Z' },
-    notes: 'Watch closely until verified.',
-    createdAt: '2026-06-10T20:00:00Z',
-    createdBy: 'op-na',
-    history: [
-      { at: '2026-06-10T20:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-06-10T20:30:00Z', who: 'op-na', kind: 'flag', detail: 'Marked Escalated (watch)' },
-      { at: '2026-06-10T21:00:00Z', who: 'op-na', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-11T13:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
-      { at: '2026-06-12T11:00:00Z', who: 'op-da', kind: 'status', detail: 'HQ → Sanity Check' },
+    userAccount: 'tom.becker',
+    userName: 'Tom Becker',
+    userDept: 'EMEA Marketing',
+    reporter: 'helpdesk-tier1',
+    assignee: 'hq-identity-eng',
+    caseLink: 'https://case-center.example/CC-2409',
+    createDateTime: '2026-06-08T14:00:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-08T14:00:00Z', processEndTime: '2026-06-08T14:30:00Z', processMinutes: 30,
+      },
+      {
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: '2026-06-08T14:30:00Z', processEndTime: '2026-06-08T19:00:00Z', processMinutes: 270,
+      },
+      {
+        processType: 'Product fix', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity Team',
+        caseStatus: 'Wait Resolution', subStatus: { transition: null },
+        processStartTime: '2026-06-08T19:00:00Z', processEndTime: '2026-06-09T13:00:00Z', processMinutes: 1080,
+      },
+      {
+        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Close', subStatus: { transition: null },
+        processStartTime: '2026-06-09T13:00:00Z', processEndTime: '2026-06-09T13:15:00Z', processMinutes: 15,
+      },
     ],
   },
 
-  // ---- W23 closed cases ----
+  // -- C-2410 — Dropped (cancelled) ------------------------------------------
   {
-    id: 'C-1030',
-    caseLink: 'https://case-center.example/CC-58510',
-    subject: 'New laptop missing certificates',
-    user: 'Sara Mendez',
-    coreId: 'core-amer', hqId: null, currentOwner: null,
-    status: 'closed', flags: [], priority: 'medium', caseType: 'access',
-    weekId: 'W23-2026',
-    slaStartedAt: '2026-06-02T13:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 6 * 3600 * 1000,
-    holdMs: { core: 5 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-06-02T18:00:00Z', channel: 'Slack' },
-    handover: null,
-    notes: 'Core Team pushed certs via MDM. Closed.',
-    closedAt: '2026-06-02T19:00:00Z', resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-06-02T13:00:00Z', createdBy: 'op-da',
-    history: [
-      { at: '2026-06-02T13:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-06-02T19:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
-    ],
-  },
-  {
-    id: 'C-1031',
-    caseLink: 'https://case-center.example/CC-58530',
-    subject: 'Reports v3 dropdowns empty for AMER',
-    user: 'Diego Romero',
-    coreId: 'core-amer', hqId: 'hq-data', currentOwner: null,
-    status: 'closed', flags: [], priority: 'medium', caseType: 'data',
-    weekId: 'W23-2026',
-    slaStartedAt: '2026-06-03T15:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 26 * 3600 * 1000,
-    holdMs: { core: 4 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-06-04T16:00:00Z', channel: 'JIRA' },
-    handover: null,
-    notes: 'HQ Data fixed query timeout. Closed.',
-    closedAt: '2026-06-04T17:00:00Z', resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-06-03T15:00:00Z', createdBy: 'op-db',
-    history: [
-      { at: '2026-06-03T15:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-03T19:00:00Z', who: 'op-db', kind: 'escalated', detail: 'Core Team → HQ Data Platform' },
-      { at: '2026-06-04T17:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
-    ],
-  },
-  {
-    id: 'C-1032',
-    caseLink: 'https://case-center.example/CC-58495',
-    subject: 'Duplicate of CC-58400',
-    user: 'Lin Wei',
-    coreId: null, hqId: null, currentOwner: null,
-    status: 'cancelled', flags: [], priority: 'low', caseType: 'access',
-    weekId: 'W23-2026',
-    slaStartedAt: '2026-06-01T10:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 1 * 3600 * 1000,
-    holdMs: { core: 0, hq: 0 }, holdStartedAt: null,
-    lastOwnerContact: null, handover: null,
-    notes: 'Duplicate.',
-    createdAt: '2026-06-01T10:00:00Z', createdBy: 'op-na',
-    history: [
-      { at: '2026-06-01T10:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-06-01T11:00:00Z', who: 'op-na', kind: 'cancelled', detail: 'Duplicate' },
-    ],
-  },
-  {
-    id: 'C-1033',
-    caseLink: 'https://case-center.example/CC-58555',
-    subject: 'iPad provisioning hung at step 4',
-    user: 'Mei Tanaka',
-    coreId: 'core-apac', hqId: null, currentOwner: null,
-    status: 'closed', flags: [], priority: 'low', caseType: 'mobile',
-    weekId: 'W23-2026',
-    slaStartedAt: '2026-06-04T22:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 18 * 3600 * 1000,
-    holdMs: { core: 12 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-06-05T18:00:00Z', channel: 'Slack' },
-    handover: null,
-    notes: 'Returned to user for reset, then closed.',
-    closedAt: '2026-06-05T20:00:00Z', resolutionCode: 'fixed_with_workaround',
-    createdAt: '2026-06-04T22:00:00Z', createdBy: 'op-na',
-    history: [
-      { at: '2026-06-04T22:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-06-05T08:00:00Z', who: 'op-na', kind: 'returned', detail: 'Returned to requester' },
-      { at: '2026-06-05T20:00:00Z', who: 'op-db', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
+    caseId: 'C-2410',
+    subject: 'Duplicate of CC-2407 — cancelled',
+    caseStatus: 'Drop',
+    subStatus: { transition: null },
+    caseLevel: 'Normal',
+    caseType: 'data',
+    userAccount: 'liam.walsh',
+    userName: 'Liam Walsh',
+    userDept: 'EMEA Operations',
+    reporter: 'helpdesk-tier1',
+    assignee: 'helpdesk-tier1',
+    caseLink: 'https://case-center.example/CC-2410',
+    createDateTime: '2026-06-08T11:00:00+00:00',
+    processTimeline: [
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-08T11:00:00Z', processEndTime: '2026-06-08T12:00:00Z', processMinutes: 60,
+      },
+      {
+        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        caseStatus: 'Drop', subStatus: { transition: null },
+        processStartTime: '2026-06-08T12:00:00Z', processEndTime: '2026-06-08T12:10:00Z', processMinutes: 10,
+      },
     ],
   },
 
-  // ---- W22 closed cases ----
-  {
-    id: 'C-1015',
-    caseLink: 'https://case-center.example/CC-58300',
-    subject: 'VPN client auth loop on Windows',
-    user: 'Petra Schmidt',
-    coreId: 'core-emea', hqId: null, currentOwner: null,
-    status: 'closed', flags: [], priority: 'medium', caseType: 'network',
-    weekId: 'W22-2026',
-    slaStartedAt: '2026-05-26T09:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 9 * 3600 * 1000,
-    holdMs: { core: 7 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-05-26T17:00:00Z', channel: 'Slack' },
-    handover: null,
-    notes: 'Core Team EMEA reset client; closed.',
-    closedAt: '2026-05-26T18:00:00Z', resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-05-26T09:00:00Z', createdBy: 'op-db',
-    history: [
-      { at: '2026-05-26T09:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-05-26T18:00:00Z', who: 'op-db', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
-    ],
-  },
-  {
-    id: 'C-1016',
-    caseLink: 'https://case-center.example/CC-58320',
-    subject: 'Exec laptop disk encryption failed mid-update',
-    user: 'Keith Walters',
-    coreId: 'core-amer', hqId: 'hq-identity', currentOwner: null,
-    status: 'closed', flags: ['escalated'], priority: 'high', caseType: 'access',
-    weekId: 'W22-2026',
-    slaStartedAt: '2026-05-27T14:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 22 * 3600 * 1000,
-    holdMs: { core: 5 * 3600 * 1000, hq: 14 * 3600 * 1000 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-05-28T11:00:00Z', channel: 'JIRA' },
-    handover: null,
-    notes: 'HQ Identity team rolled back update; closed with workaround.',
-    closedAt: '2026-05-28T12:00:00Z', resolutionCode: 'fixed_with_workaround',
-    createdAt: '2026-05-27T14:00:00Z', createdBy: 'op-da',
-    history: [
-      { at: '2026-05-27T14:00:00Z', who: 'op-da', kind: 'created' },
-      { at: '2026-05-27T14:30:00Z', who: 'op-da', kind: 'flag', detail: 'Marked Escalated' },
-      { at: '2026-05-27T19:00:00Z', who: 'op-da', kind: 'escalated', detail: 'Core Team → HQ Identity' },
-      { at: '2026-05-28T12:00:00Z', who: 'op-da', kind: 'closed', detail: 'Resolution: fixed_with_workaround' },
-    ],
-  },
-  {
-    id: 'C-1017',
-    caseLink: 'https://case-center.example/CC-58360',
-    subject: 'Weekend: APAC mass SSO failures',
-    user: 'Hiro Sato',
-    coreId: 'core-apac', hqId: 'hq-identity', currentOwner: null,
-    status: 'closed', flags: ['weekend'], priority: 'high', caseType: 'access',
-    weekId: 'W22-2026',
-    slaStartedAt: '2026-05-30T07:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 14 * 3600 * 1000,
-    holdMs: { core: 3 * 3600 * 1000, hq: 9 * 3600 * 1000 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-05-30T20:00:00Z', channel: 'JIRA' },
-    handover: null,
-    notes: 'Identity issued cert refresh; closed Sat night.',
-    closedAt: '2026-05-30T21:00:00Z', resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-05-30T07:00:00Z', createdBy: 'op-na',
-    history: [
-      { at: '2026-05-30T07:00:00Z', who: 'op-na', kind: 'created' },
-      { at: '2026-05-30T21:00:00Z', who: 'op-na', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
-    ],
-  },
-
-  // ---- W21 closed case ----
-  {
-    id: 'C-0998',
-    caseLink: 'https://case-center.example/CC-58100',
-    subject: 'Office printer queue stuck — EMEA',
-    user: 'Ronan Doyle',
-    coreId: 'core-emea', hqId: null, currentOwner: null,
-    status: 'closed', flags: [], priority: 'low', caseType: 'productivity',
-    weekId: 'W21-2026',
-    slaStartedAt: '2026-05-20T11:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 4 * 3600 * 1000,
-    holdMs: { core: 3 * 3600 * 1000, hq: 0 }, holdStartedAt: null,
-    lastOwnerContact: { at: '2026-05-20T14:00:00Z', channel: 'Slack' },
-    handover: null,
-    notes: 'Restarted print spooler.',
-    closedAt: '2026-05-20T15:00:00Z', resolutionCode: 'fixed_by_owner',
-    createdAt: '2026-05-20T11:00:00Z', createdBy: 'op-db',
-    history: [
-      { at: '2026-05-20T11:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-05-20T15:00:00Z', who: 'op-db', kind: 'closed', detail: 'Resolution: fixed_by_owner' },
-    ],
-  },
-
-  // ---- Carried-over from W23 → W24 (still open) ----
-  {
-    id: 'C-1029',
-    agentStatus: 'unqueued',
-    caseLink: 'https://case-center.example/CC-58475',
-    subject: 'Intermittent push notification delays — multi-week',
-    user: 'Alicia Romero',
-    coreId: 'core-amer', hqId: null, currentOwner: 'core',
-    status: 'with_core', flags: [], priority: 'medium', caseType: 'mobile',
-    weekId: 'W24-2026',
-    carriedFrom: 'W23-2026',
-    slaStartedAt: '2026-06-04T10:00:00Z', slaPaused: false,
-    slaAccumulatedMs: 0,
-    holdMs: { core: 0, hq: 0 }, holdStartedAt: '2026-06-04T11:00:00Z',
-    lastOwnerContact: { at: '2026-06-12T09:00:00Z', channel: 'Slack' },
-    handover: { note: 'Carried over from W23. Core Team AMER still investigating; suspect APNs throttling.', author: 'op-da', from: 'Day', to: 'Day', at: '2026-06-12T11:00:00Z' },
-    notes: 'Reproducible only intermittently; Core Team collecting client logs.',
-    createdAt: '2026-06-04T10:00:00Z', createdBy: 'op-db',
-    history: [
-      { at: '2026-06-04T10:00:00Z', who: 'op-db', kind: 'created' },
-      { at: '2026-06-04T11:00:00Z', who: 'op-db', kind: 'assigned', detail: 'Core Team — AMER desk' },
-      { at: '2026-06-08T08:00:00Z', who: 'op-da', kind: 'rolled_over', detail: 'Carried W23 → W24 (manual rollover)' },
-    ],
-  },
 ];
+
+// ---- Operator-layer overlay --------------------------------------------------
+//
+// Applied AFTER the CC mapping (see applySeedAgentLayer in app.js). Sits outside
+// Case Center: picks (agentStatus = 'queued') and Track Statuses are operator
+// intent, not CC fields. Keep this light — three picked cases, two Track
+// Statuses (Weekend Case + Sanity Check) — so the Route Board demos
+// MOVING + WATCH-ring-pulse + SANITY-collapsible without being overwhelming.
+
+window.SEED_AGENT_LAYER = {
+  // Weekend Case: drives a MOVING lane (User → HQ, scheduled handoff Sun 17:30).
+  'C-2402': { agentStatus: 'queued', trackStatus: 'weekend_case' },
+  // Sanity Check: two picks so the collapsible group has more than one row.
+  'C-2405': { agentStatus: 'queued', trackStatus: 'sanity_check' },
+  'C-2406': { agentStatus: 'queued', trackStatus: 'sanity_check' },
+};
 
 
 // Shift & operator roster for the Case Tracker.
@@ -3689,8 +3379,202 @@ const REMINDER_POLL_MS = 10000;        // how often to sweep for due reminders
 const REMINDER_FIRST_RUN_MS = 200;     // first reminder sweep shortly after boot
 const CLOCK_TICK_MS = 1000;            // sidebar clock refresh
 
+// ---- Raw Case Center → board mapping (mirrors local/casecenter.py:map_record) ----
+//
+// Two seed flavours coexist:
+//
+//   • `window.CASES_RAW_CC = true` — every entry in `window.CASES` is a raw
+//     Case Center record (caseStatus, subStatus, caseLevel, userAccount,
+//     processTimeline with raw processStartTime/processEndTime, etc.). At seed
+//     time we run each through `mapRawCcRecord()` and then `fillBoardDefaults()`
+//     so the renderers always see the board shape they expect.
+//
+//   • absent / false — `window.CASES` is already in board shape (the legacy
+//     in-tree seed). The mapping is bypassed and structuredClone is used.
+//
+// Keep the lookup tables and rules in lockstep with casecenter.py; the Status
+// Flow page (#/flow) explains the same mapping for operators.
+const CC_STATUS_MAP = {
+  'In-Progress|Return':    'new',
+  'In-Progress|Wait User': 'returned_to_requester',
+};
+const CC_STATUS_MAP_BY_STATUS = {
+  'Open':            'new',
+  'In-Progress':     'new',
+  'Wait Resolution': 'with_hq',
+  'Close':           'closed',
+  'Drop':            'cancelled',
+};
+const CC_STATUS_MAP_BY_PROCESS_TYPE = {
+  '1st  Line':    'new',         // note: two spaces, matching the Case Center value
+  'Service Team': 'with_core',
+};
+const CC_LEVEL_MAP = { 'Normal': 'medium', 'Urgent': 'high' };
+
+function _ccSubTransition(r) {
+  const sub = r && typeof r === 'object' ? r.subStatus : null;
+  if (!sub || typeof sub !== 'object') return null;
+  return sub.transition || null;
+}
+function _ccLastProcessType(r) {
+  const items = r && typeof r === 'object' ? r.processTimeline : null;
+  if (!Array.isArray(items)) return null;
+  let best = null;  // { key: [whenStr, idx], pt }
+  items.forEach((it, idx) => {
+    if (!it || typeof it !== 'object') return;
+    const when = it.processEndTime || it.processStartTime || '';
+    const key = [when || '', idx];
+    if (!best || key > best.key) best = { key, pt: it.processType || null };
+  });
+  return best ? best.pt : null;
+}
+function _ccMapStatus(caseStatus, sub, lastPt) {
+  if (sub && CC_STATUS_MAP[`${caseStatus}|${sub}`]) return CC_STATUS_MAP[`${caseStatus}|${sub}`];
+  if (lastPt && CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt]) return CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt];
+  if (CC_STATUS_MAP_BY_STATUS[caseStatus]) return CC_STATUS_MAP_BY_STATUS[caseStatus];
+  return 'new';
+}
+function _ccStatusLabel(caseStatus, sub) {
+  const a = String(caseStatus || '');
+  const b = sub ? ' ' + String(sub) : '';
+  return (a + b).trim() || '—';
+}
+function _ccDeptFromTimeline(r, accountId) {
+  if (!accountId) return null;
+  const items = r && typeof r === 'object' ? r.processTimeline : null;
+  if (!Array.isArray(items)) return null;
+  let match = null;
+  items.forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    if (it.processor !== accountId) return;
+    const dept = it.processorDeptName;
+    if (!dept) return;
+    const when = it.processEndTime || it.processStartTime || '';
+    if (!match || when > match[0]) match = [when, dept];
+  });
+  return match ? match[1] : null;
+}
+function _ccMapProcessTimeline(r) {
+  const items = (r && typeof r === 'object' && Array.isArray(r.processTimeline)) ? r.processTimeline : [];
+  return items.filter(it => it && typeof it === 'object').map(it => {
+    const sub = _ccSubTransition(it);
+    return {
+      processType: it.processType || null,
+      processor: it.processor || null,
+      processorDept: it.processorDeptName || null,
+      ccStatus: _ccStatusLabel(it.caseStatus, sub),
+      status: _ccMapStatus(it.caseStatus, sub),
+      startedAt: it.processStartTime || null,
+      endedAt: it.processEndTime || null,
+      minutes: typeof it.processMinutes === 'number' ? it.processMinutes : null,
+    };
+  });
+}
+function _ccMapWaitUser(r) {
+  const sub = r && typeof r === 'object' ? r.subStatus : null;
+  if (!sub || typeof sub !== 'object') return null;
+  const lp = (sub.lastProcessor && typeof sub.lastProcessor === 'object') ? sub.lastProcessor : {};
+  return {
+    reason: sub.reason || null,
+    dueAction: sub.dueAction || null,
+    dueDateTime: sub.dueDateTime || null,
+    transition: sub.transition || null,
+    transitionDateTime: sub.transitionDateTime || null,
+    lastProcessor: { assignee: lp.assignee || null, handlerType: lp.handlerType || null },
+  };
+}
+function mapRawCcRecord(r) {
+  const caseId = String(r.caseId || '');
+  const transition = _ccSubTransition(r);
+  const lastPt = _ccLastProcessType(r);
+  const userAccount = r.userAccount || '';
+  const userName = r.userName || '';
+  const userDisplay = [String(userAccount), String(userName)].filter(Boolean).join(' ').trim();
+  const reporterId = r.reporter || '';
+  const assigneeId = r.assignee || '';
+  const created = r.createDateTime || null;
+  const out = {
+    id: caseId,
+    caseLink: r.caseLink || '',
+    subject: r.subject || '(no subject)',
+    status: _ccMapStatus(r.caseStatus, transition, lastPt),
+    ccStatusLabel: _ccStatusLabel(r.caseStatus, transition),
+    priority: CC_LEVEL_MAP[String(r.caseLevel)] || 'medium',
+    createdAt: created,
+    slaStartedAt: created,
+    user: userDisplay,
+    userDept: r.userDept || null,
+    reporter: reporterId,
+    reporterDept: _ccDeptFromTimeline(r, reporterId),
+    assignee: assigneeId,
+    assigneeDept: _ccDeptFromTimeline(r, assigneeId),
+    processTimeline: _ccMapProcessTimeline(r),
+    caseType: r.caseType || 'access',
+    notes: r.notes || '',
+  };
+  if (transition === 'Wait User') {
+    const wu = _ccMapWaitUser(r);
+    if (wu) out.waitUser = wu;
+  }
+  return out;
+}
+
+// Fill in the board-shape fields the mapper leaves blank because they live in
+// the operator layer (not in Case Center). Run after `mapRawCcRecord()` so a
+// freshly seeded raw record renders straight away.
+function fillBoardDefaults(c) {
+  if (c.weekId == null && c.createdAt) c.weekId = weekIdFor(c.createdAt);
+  if (c.agentStatus == null)      c.agentStatus = 'unqueued';
+  if (c.trackStatus === undefined) c.trackStatus = null;
+  if (c.coreId == null)           c.coreId = null;
+  if (c.hqId == null)             c.hqId = null;
+  if (c.currentOwner == null) {
+    if (c.status === 'with_core') c.currentOwner = 'core';
+    else if (c.status === 'with_hq') c.currentOwner = 'hq';
+    else c.currentOwner = null;
+  }
+  if (c.slaPaused == null)        c.slaPaused = c.status === 'returned_to_requester';
+  if (c.slaAccumulatedMs == null) c.slaAccumulatedMs = 0;
+  if (c.holdMs == null)           c.holdMs = { core: 0, hq: 0 };
+  if (c.holdStartedAt == null)    c.holdStartedAt = null;
+  if (c.lastOwnerContact == null) c.lastOwnerContact = null;
+  if (c.handover == null)         c.handover = null;
+  if (c.reminder == null)         c.reminder = null;
+  if (c.history == null)          c.history = c.createdAt ? [{ at: c.createdAt, who: c.assignee || c.reporter || 'system', kind: 'created' }] : [];
+  if (c.createdBy == null)        c.createdBy = c.reporter || c.assignee || 'system';
+  return c;
+}
+
+// Apply per-case operator-layer overrides from `window.SEED_AGENT_LAYER` onto a
+// freshly mapped seed (picks + Track Statuses, since they sit outside CC shape).
+function applySeedAgentLayer(cases, overlay) {
+  if (!overlay || typeof overlay !== 'object') return;
+  for (const c of cases) {
+    const a = overlay[c.id];
+    if (!a) continue;
+    if (a.agentStatus != null) c.agentStatus = a.agentStatus;
+    if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
+    if (a.handover !== undefined) c.handover = a.handover;
+    if (a.reminder !== undefined) c.reminder = a.reminder;
+  }
+}
+
+// Seed CASES — board-shape, raw-CC, or live-capture — into STATE.cases. Pure
+// function on its input; mutates nothing globally. Called from anchorFreshSeed.
+function buildSeedCases() {
+  if (window.CASES_LIVE_CAPTURE) {
+    return window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
+  }
+  if (window.CASES_RAW_CC) {
+    const out = window.CASES.map(r => fillBoardDefaults(mapRawCcRecord(structuredClone(r))));
+    applySeedAgentLayer(out, window.SEED_AGENT_LAYER);
+    return out;
+  }
+  return window.CASES.map(c => structuredClone(c));
+}
+
 const STATE = {
-  cases: window.CASES.map(c => structuredClone(c)),
+  cases: [],   // populated in seedBoot() — buildSeedCases() needs the helpers above.
   operatorId: window.CURRENT_OPERATOR_ID,
   lastListRoute: '#/cases',
   lastListLabel: 'Cases',
@@ -3729,7 +3613,7 @@ function windowError(from, to) {
   return null;
 }
 
-const STORAGE_KEY = 'case-tracker-state-v7';
+const STORAGE_KEY = 'case-tracker-state-v8';
 // In live mode (served by local/serve.py; cases come from Case Center on demand via
 // "Load New" / "Refresh Existing", not on page refresh) we persist ONLY the local agent layer —
 // agentStatus, handover, reminder — keyed by case id, so a data pull never clobbers the
@@ -3794,7 +3678,7 @@ function saveState() {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      v: 7,
+      v: 8,
       cases: STATE.cases,
       operatorId: STATE.operatorId,
       anchorOffset: STATE.anchorOffset,   // ms the seed was shifted to anchor on real time
@@ -3809,7 +3693,7 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (parsed.v !== 7 || !Array.isArray(parsed.cases)) return false;
+    if (parsed.v !== 8 || !Array.isArray(parsed.cases)) return false;
     STATE.cases = parsed.cases;
     if (typeof parsed.anchorOffset === 'number') STATE.anchorOffset = parsed.anchorOffset;
     if (parsed.operatorId && window.OPERATORS.some(o => o.id === parsed.operatorId)) {
@@ -3902,10 +3786,12 @@ function applyShiftToCurrentShift(off) {
 }
 // Shift the pristine seed (already cloned into STATE.cases) so it anchors on real now.
 function anchorFreshSeed() {
-  // data.js written from live Case Center data: board-shaped cases with real timestamps.
-  // Normalize them (fills weekId/agentStatus/etc. like a live fetch) and don't time-shift.
+  // Build STATE.cases from window.CASES. `buildSeedCases()` handles the three
+  // flavours: live-capture (already board-shape), raw Case Center records
+  // (mapped via mapRawCcRecord), and the legacy board-shape seed.
+  STATE.cases = buildSeedCases();
+  // Live-capture seeds use real wall-clock timestamps and shouldn't be shifted.
   if (window.CASES_LIVE_CAPTURE) {
-    STATE.cases = window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
     STATE.anchorOffset = 0;
     applyShiftToCurrentShift(0);
     NOW = new Date();
