@@ -10,6 +10,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Added (Deploy — no-shell seeding)
+
+- **`backend/seed_board_json.cjs`** emits the demo seed as board-shaped
+  `{"cases":[...]}` (running the prototype's own mapper headlessly), so a hosted
+  DB can be seeded over the public API — `node backend/seed_board_json.cjs | curl
+  -XPOST .../api/save` — with no Case Center access, no Python, and no shell on
+  the server. Complements `seed_extract.cjs` (which prints raw, unmapped records).
+
 ### Changed (Deploy — Render Postgres paste-and-go)
 
 - **`backend/db.py` normalises the DB URL scheme.** Managed providers (Render,
