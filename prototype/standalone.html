@@ -2856,6 +2856,20 @@ table.case-table {
 // Left empty by default so standalone.html / file:// demos stay in pure seed mode.
 window.API_BASE = '';
 
+// How the operator layer (picks / Track Status / handover / reminder) is persisted:
+//
+//   ''        (default) -> single-user / demo. Operator layer is cached in this browser's
+//                          localStorage; the seed (or serve.py's Case Center pull) is the
+//                          case source. No cross-browser sharing.
+//   'server'            -> the API (backend/api.py, DB-backed) is the source of truth. The
+//                          SPA loads ALL cases — including the operator layer — from it on
+//                          boot, does NOT overlay localStorage, and round-trips every edit
+//                          via POST /api/save. This is the multi-operator deployment mode.
+//
+// Set to 'server' only when serving against backend/api.py (whose response advertises
+// operatorLayer:"server"); leave '' for file:// demos and the serve.py single-user proxy.
+window.API_MODE = '';
+
 
 // Seed data for the Case Tracker prototype — RAW Case Center records.
 //
@@ -3736,12 +3750,17 @@ function snapshotSavedCases() {
 function saveState() {
   try {
     if (window.__LIVE__) {
-      localStorage.setItem(AGENT_KEY, JSON.stringify({
-        v: 1,
-        operatorId: STATE.operatorId,
-        agent: agentLayerFromState(),
-      }));
-      persistChangedCases();   // push any operator edits to data.js via the local server
+      // In server-authoritative mode the DB is the source of truth, so don't cache the operator
+      // layer locally (it must never override the shared server copy on the next boot). The edits
+      // themselves still round-trip to the API below.
+      if (!window.__SERVER_OPERATOR_LAYER__) {
+        localStorage.setItem(AGENT_KEY, JSON.stringify({
+          v: 1,
+          operatorId: STATE.operatorId,
+          agent: agentLayerFromState(),
+        }));
+      }
+      persistChangedCases();   // push any operator edits to the server (data.js or the DB)
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -8167,22 +8186,28 @@ function persistChangedCases() {
 
 // Try the local backend. Returns true if live Case Center data was loaded; false otherwise
 // (public Pages demo, file://, or backend down) — in which case the seed data stays.
-async function tryLoadLiveCases() {
-  // Only meaningful when served over http(s) (i.e. by local/serve.py). Skip for file://
-  // and avoid a noisy console error when someone just opens standalone.html directly.
+async function tryLoadLiveCases(allCases) {
+  // Only meaningful when served over http(s) (i.e. by local/serve.py or backend/api.py). Skip
+  // for file:// and avoid a noisy console error when someone just opens standalone.html directly.
   if (!/^https?:$/.test(location.protocol)) return false;
+  // allCases=true (server-mode boot) pulls the whole DB store — no Case Center look-back window,
+  // which is an ingestion concern for the DB backend. Otherwise use the look-back query (serve.py).
+  const url = allCases ? apiUrl('api/cases') : liveCasesUrl(STATE.lookbackHours, STATE.lookbackToHours);
   let res;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS); // see CONFIG at top
-    res = await fetch(liveCasesUrl(STATE.lookbackHours, STATE.lookbackToHours), { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
     clearTimeout(t);
   } catch (e) {
-    return false; // no local backend reachable → seed/demo mode
+    return false; // no backend reachable → seed/demo mode
   }
   if (!res.ok) return false;
   let data;
   try { data = await res.json(); } catch (e) { return false; }
+  // operatorLayer:"server" means the payload carries the authoritative operator layer from the
+  // DB — trust it and do NOT overlay this browser's localStorage copy (so the board is shared).
+  if (data && data.operatorLayer === 'server') window.__SERVER_OPERATOR_LAYER__ = true;
   const cases = Array.isArray(data) ? data : (data && data.cases);
   if (!Array.isArray(cases)) return false;
 
@@ -8222,8 +8247,9 @@ async function tryLoadLiveCases() {
   }
 
   // Re-apply the operator's local layer (queue placement, handover notes, reminders) and snapshot
-  // the result so only later edits POST back to the server.
-  applyStoredAgentLayer();
+  // the result so only later edits POST back to the server. In server-authoritative mode the
+  // payload already carries the shared operator layer, so skip the localStorage overlay.
+  if (!window.__SERVER_OPERATOR_LAYER__) applyStoredAgentLayer();
   snapshotSavedCases();
   return true;
 }
@@ -8273,8 +8299,26 @@ function enterLiveMode() {
   snapshotSavedCases();
 }
 
+// Server-mode boot: the DB API is the source of truth. Render the shell immediately, then pull
+// the full store (cases + shared operator layer) and re-render. If the API is unreachable we
+// fall back to whatever seed/local state we have, so the board still loads.
+async function bootServerLoad() {
+  render();
+  showLiveLoading();
+  const ok = await tryLoadLiveCases(true);
+  hideLiveLoading();
+  render();
+  if (!ok) {
+    showToast('Could not reach the case API — showing local data. Use “Load New” to retry.', 'warn');
+  }
+}
+
 function boot() {
   if (!location.hash) location.hash = '#/cases';
+  if (window.API_MODE === 'server' && /^https?:$/.test(location.protocol)) {
+    bootServerLoad();
+    return;
+  }
   if (window.CASES_LIVE_CAPTURE && /^https?:$/.test(location.protocol)) {
     enterLiveMode();
   }

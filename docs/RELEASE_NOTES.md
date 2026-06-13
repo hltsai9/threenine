@@ -10,6 +10,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Added (Server-authoritative operator layer — go-live step 1)
+
+- **The SPA can now treat the DB API as the source of truth for the operator
+  layer** (picks / Track Status / handover / reminder), so the board is shared
+  across operators and devices instead of being browser-local. Enabled by
+  `window.API_MODE = 'server'` in `prototype/config.js` (default `''` keeps the
+  existing single-user/demo + `serve.py` behavior).
+  - `backend/api.py` `GET /api/cases` now advertises `operatorLayer: "server"`.
+  - In server mode the SPA boot-loads the **full** DB store (`tryLoadLiveCases(true)`,
+    no Case Center look-back window), **skips** the `localStorage` operator-layer
+    overlay so it can't clobber another operator's saved work, and still
+    round-trips every edit through `POST /api/save` → `merge.upsert_operator`.
+  - Falls back to local/seed data with a warning if the API is unreachable.
+  - Known limitation (deferred to step 2 / auth): operator *identity* is still the
+    in-app switcher, and in server mode it's session-only (not persisted in
+    `localStorage`). No cross-operator live push yet — refresh to see others' edits.
+
 ### Fixed (Security — review batch)
 
 - **XSS / injection hardening at the data boundary.** Untrusted Case Center

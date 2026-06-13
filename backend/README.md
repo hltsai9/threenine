@@ -55,6 +55,13 @@ kubectl apply -f deploy/k8s/                 # API Deployment+Service, ingest Cr
 The Ingress serves `/` (SPA) and `/api/*` (API) from one host — same origin, no CORS,
 no mixed content — so `prototype/config.js` keeps `API_BASE = ''`.
 
+For a multi-operator deployment, also set **`window.API_MODE = 'server'`** in
+`prototype/config.js`. That makes the SPA treat the DB API as the source of truth: it loads
+all cases — *including* the shared operator layer (picks / Track Status / handover / reminder)
+— from `/api/cases` on boot, stops overlaying each browser's `localStorage`, and round-trips
+every edit to `POST /api/save`. With the default `API_MODE = ''` the operator layer stays
+single-user (browser-local), which is correct for `file://` demos and the `serve.py` proxy.
+
 ## Auth
 
 `/api/cases` and `/api/save` are gated by a shared-secret bearer token. Set `API_AUTH_TOKEN`

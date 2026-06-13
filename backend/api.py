@@ -7,8 +7,8 @@ Ingress) and never configure an API key or cookie.
     uvicorn backend.api:app --host 0.0.0.0 --port 8000
 
 Endpoints (same contract the SPA already expects):
-    GET  /api/cases            -> {"cases": [ ...board-shaped case objects... ]}
-    GET  /api/cases?id=C-1041  -> {"cases": [ that one case ]}
+    GET  /api/cases            -> {"cases": [...], "operatorLayer": "server"}
+    GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
 
 Config (env):
@@ -100,7 +100,12 @@ def get_cases(request: Request, id: str | None = None):
     # The legacy query params are accepted and ignored so old SPA URLs keep working.
     with SessionLocal() as session:
         cases = case_by_id(session, id) if id else all_cases(session)
-    return {"cases": cases}
+    # operatorLayer="server" tells the SPA that these payloads carry the AUTHORITATIVE
+    # operator layer (picks / Track Status / handover / reminder) straight from the DB, so
+    # it must NOT overlay its browser-local (localStorage) copy on top. That's what makes the
+    # board shared across operators/devices. serve.py's proxy omits this flag, so the SPA keeps
+    # its single-user localStorage behavior there.
+    return {"cases": cases, "operatorLayer": "server"}
 
 
 @app.post("/api/save")
