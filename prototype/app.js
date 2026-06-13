@@ -1669,12 +1669,15 @@ function renderCaseDetailBody(c) {
   })()
   : `<div class="muted tiny">No handover note.</div>`;
 
-  const history = (c.history || []).slice().reverse().map(h => `
+  const history = (c.history || []).slice().reverse().map(h => {
+    const op = getOperator(h.who);
+    const who = op ? op.name : h.who;
+    return `
     <li>
       <span class="when">${fmtAbsolute(h.at)}</span>
-      <span><strong>${escapeHtml(h.kind)}</strong> by ${escapeHtml(h.who)}${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span>
-    </li>
-  `).join('');
+      <span><strong>${escapeHtml(h.kind)}</strong> by ${escapeHtml(who)}${h.detail ? ' — ' + escapeHtml(h.detail) : ''}</span>
+    </li>`;
+  }).join('');
 
   return `
     <div class="detail-grid">

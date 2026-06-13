@@ -90,6 +90,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Changed (Case history · operator name instead of id)
+
+- **Case history rows now show the operator's name** ("Mia (DA)") instead of
+  the raw operator id ("op-da"). Lookup goes through `getOperator(h.who)`;
+  if the id is unknown (e.g. an old import) the row falls back to the
+  literal `who` field so nothing breaks.
+
 ### Changed (Process timeline · legend grouped by processType)
 
 - **Process-timeline legend now groups by `processType`** — the same key the
