@@ -90,6 +90,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Changed (Process timeline · legend grouped by processType)
+
+- **Process-timeline legend now groups by `processType`** — the same key the
+  bar segments use for their visible label — so legend rows align with what
+  you see on the bar. Falls back to `ccStatus` / mapped board-status label
+  when a stage has no `processType`. Entries that aggregate two or more
+  stages also show "· N stages" beside the duration.
+
 ### Added (Picked workspace · collapse the list)
 
 - **Toggle button to hide / show the picked case list.** The list pane (left

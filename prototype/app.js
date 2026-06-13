@@ -1554,16 +1554,19 @@ function renderProcessTimeline(c) {
     return `<div class="tl-seg pill-${s.status || 'new'}" style="width:${pct}%" title="${escapeHtml(tip)}">${pct > 12 ? escapeHtml(labelText) : ''}</div>`;
   }).join('');
 
-  // Legend: total process time grouped by the Case Center status label.
+  // Legend: total process time grouped by `processType` — same key the bar
+  // segments use for their visible label, so the two stay in sync. Falls back
+  // to ccStatus / mapped board status label when a stage has no processType.
   const groups = new Map();
   segs.forEach(s => {
-    const key = s.ccStatus || statusLabel(s.status || 'new');
-    const g = groups.get(key) || { status: s.status || 'new', ms: 0 };
+    const key = s.processType || s.ccStatus || statusLabel(s.status || 'new');
+    const g = groups.get(key) || { status: s.status || 'new', ms: 0, count: 0 };
     g.ms += s.ms;
+    g.count += 1;
     groups.set(key, g);
   });
   const legend = [...groups.entries()].map(([label, g]) =>
-    `<span class="tl-key"><span class="tl-dot pill-${g.status}"></span>${escapeHtml(label)} <span class="muted">${fmtDuration(g.ms)}</span></span>`
+    `<span class="tl-key"><span class="tl-dot pill-${g.status}"></span>${escapeHtml(label)} <span class="muted">${fmtDuration(g.ms)}${g.count > 1 ? ` · ${g.count} stages` : ''}</span></span>`
   ).join('');
 
   // Markers: the clock time each stage began (and the last stage's end), placed at the
