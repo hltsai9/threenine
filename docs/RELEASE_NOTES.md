@@ -90,6 +90,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Changed (Handover note · names on both sides; WATCH ring pulses until you act)
+
+- **Handover note meta now spells out both sides by name** (and shift). It
+  reads e.g. *"From Mia (DA) (Day) → To Ren (NA) (Night) · 2026-06-12 18:30"*
+  rather than the old shift-only "Day → Night · op-da" line. When the
+  handover was addressed to a specific operator (via the "Hand over to…"
+  picker) the recipient block shows that operator's name and shift; for
+  generic end-of-shift handovers it falls back to the target shift label.
+- **WATCH ring pulses while the case still needs your hand-off.** On the
+  Hand-off Route Board, every WATCH lane's dashed circle now animates —
+  shrinking down to the size of the solid dot and expanding back — until
+  the current operator has personally authored a fresh, non-stale handover
+  note for that case. Once you've handed it over, the ring goes quiet.
+
 ### Changed (Route Board · WATCH covers need_to_contact_user)
 
 - **`need_to_contact_user` moves from STAY to WATCH** on the Hand-off Route

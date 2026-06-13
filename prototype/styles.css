@@ -2408,3 +2408,26 @@ table.case-table {
   color: #7B857E;
 }
 .rota-week-tab.active .rota-week-tab-sub { color: #cad8c4; }
+
+/* ---- WATCH ring pulse: shrinks to the 16px dot, expands back to 34px,
+ *  while the current operator hasn't personally handed the case over. */
+@keyframes rb-watch-ring-pulse {
+  0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
+  50%  { transform: translate(-50%, -50%) scale(0.47); opacity: 1;    }
+  100% { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
+}
+.rb-watch-ring-pulse {
+  animation: rb-watch-ring-pulse 2.2s ease-in-out infinite;
+}
+
+/* ---- Handover note meta: both sides spelled out by name + shift ---- */
+.handover-note .meta {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: baseline;
+  margin-top: 6px;
+  color: var(--text-faint-2, #7B857E);
+  font-size: 12px;
+}
+.handover-note .meta strong { color: var(--text, #2c3a30); margin-right: 2px; }
+.handover-note .handover-arrow { color: var(--accent, #2E5641); font-weight: 700; }
+.handover-note .handover-when { margin-left: 4px; }

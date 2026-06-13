@@ -1013,13 +1013,18 @@ function _renderWatchRow(c, top) {
   const dotColor = station === 'User' ? '#33596B' : '#8C4A2F';
   // The id sits on whichever side has room — to the right of the dashed ring when
   // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
-  const idLeftCalc = `calc(${pct}% + 22px)`;
   const eyeLeftCalc = `calc(${pct}% + 22px)`;
   // For User position, push the id further right so the eye + id don't collide.
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
+  // The dashed ring pulses (shrinks to dot size, expands back) until the current
+  // operator has personally handed this case over. Once the latest handover note
+  // is authored by the current operator the ring goes quiet — a visual nudge
+  // for *Watching at HQ / User* cases that still need a hand-off.
+  const handoveredByMe = c.handover && c.handover.author === STATE.operatorId && !c.handover.staleForCurrentShift;
+  const pulseCls = handoveredByMe ? '' : ' rb-watch-ring-pulse';
   return `
     <div class="rb-row rb-row-watch${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-watch-ring" style="left:${pct}%;"></div>
+      <div class="rb-watch-ring${pulseCls}" style="left:${pct}%;"></div>
       <div class="rb-watch-dot"  style="left:${pct}%; background:${dotColor};"></div>
       <div class="rb-watch-eye"  style="left:${eyeLeftCalc};" aria-hidden="true">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1630,16 +1635,29 @@ function renderCaseDetailBody(c) {
   const firstLineMs = hold.triage;
   const firstLineHolding = c.currentOwner === null && c.status === 'new';
 
-  const handoverHtml = c.handover ? `
+  const handoverHtml = c.handover ? (() => {
+    const author = getOperator(c.handover.author);
+    const recipient = c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+    // "<author name> (<author shift>) → <recipient name> (<recipient shift>)"
+    // when both sides have names; fall back to "<shift> → <shift>" when the
+    // handover was shift-targeted rather than addressed to a specific operator.
+    const fromLabel = author ? `${author.name} (${c.handover.from})` : c.handover.from;
+    const toLabel = recipient
+      ? `${recipient.name} (${recipient.shift})`
+      : c.handover.to;
+    return `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
       ${escapeHtml(c.handover.note)}
       <div class="meta">
-        ${escapeHtml(c.handover.from)} → ${escapeHtml(c.handover.to)} ·
-        ${escapeHtml(c.handover.author)} · ${fmtAbsolute(c.handover.at)}
+        <span class="handover-from"><strong>From</strong> ${escapeHtml(fromLabel)}</span>
+        <span class="handover-arrow">→</span>
+        <span class="handover-to"><strong>To</strong> ${escapeHtml(toLabel)}</span>
+        <span class="handover-when">· ${fmtAbsolute(c.handover.at)}</span>
         ${c.handover.staleForCurrentShift ? ' · <strong>stale for current shift</strong>' : ''}
       </div>
-    </div>
-  ` : `<div class="muted tiny">No handover note.</div>`;
+    </div>`;
+  })()
+  : `<div class="muted tiny">No handover note.</div>`;
 
   const history = (c.history || []).slice().reverse().map(h => `
     <li>
