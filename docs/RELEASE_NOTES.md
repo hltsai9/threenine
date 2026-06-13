@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Changed (Deploy — Render Postgres paste-and-go)
+
+- **`backend/db.py` normalises the DB URL scheme.** Managed providers (Render,
+  Heroku) hand out `postgres://` / `postgresql://`, which SQLAlchemy rejects or
+  maps to the un-bundled psycopg2 driver. It now rewrites both to
+  `postgresql+psycopg://`, so the provider's connection string can be pasted
+  verbatim into `DATABASE_URL` (Alembic gets it too via `env.py`).
+- **`psycopg[binary]` is now installed by default** in `backend/requirements.txt`
+  (prebuilt wheel, no native build; only used when `DATABASE_URL` is Postgres) so
+  a Postgres deploy doesn't crash on a missing driver.
+
 ### Added (Server-authoritative operator layer — go-live step 1)
 
 - **The SPA can now treat the DB API as the source of truth for the operator

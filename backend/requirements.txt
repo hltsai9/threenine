@@ -4,7 +4,8 @@ uvicorn[standard]>=0.29
 SQLAlchemy>=2.0
 alembic>=1.13
 
-# Production database drivers — install the ONE matching your DATABASE_URL.
-# (Left commented so the SQLite demo needs no native build / network.)
-# psycopg[binary]>=3.1   # PostgreSQL  (postgresql+psycopg://...)
-# PyMySQL>=1.1           # MySQL/MariaDB (mysql+pymysql://...)
+# Production database drivers.
+# psycopg ships as a prebuilt wheel (no native build), so installing it is harmless for the
+# SQLite demo; it's only USED when DATABASE_URL points at Postgres. Required for Render.
+psycopg[binary]>=3.1     # PostgreSQL  (postgresql+psycopg://...)
+# PyMySQL>=1.1           # MySQL/MariaDB (mysql+pymysql://...) — uncomment if you use MySQL

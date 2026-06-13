@@ -26,6 +26,15 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_SQLITE = "sqlite:///" + os.path.join(REPO_ROOT, "casetracker.db")
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_SQLITE)
 
+# Managed Postgres providers (Render, Heroku, …) hand out `postgres://` or `postgresql://`
+# URLs. SQLAlchemy rejects the former and maps the latter to psycopg2 — the driver we do NOT
+# bundle. Normalise both to the psycopg (v3) driver in requirements.txt so the provider's URL
+# can be pasted verbatim. (alembic/env.py imports this value, so migrations get it too.)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
+
 # SQLite + a threaded web server need check_same_thread off; other drivers ignore it.
 _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, future=True, connect_args=_connect_args)
