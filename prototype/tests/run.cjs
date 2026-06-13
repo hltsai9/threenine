@@ -218,6 +218,30 @@ test('caseHref: builds from base URL + id when caseLink is empty', () => {
 test('caseHref: empty string when there is no link and no base URL', () =>
   eq(caseHref({ id: 'C-9' }), ''));
 
+/* ---------- XSS / injection hardening (safeId / safeUrl / caseHref) ----------
+ * Case Center caseId + caseLink are untrusted and flow into innerHTML attributes,
+ * #/cases/<id> routes and href="...". These boundary sanitisers must strip markup
+ * breakout chars from ids and reject non-http(s) schemes from links. */
+const { safeId, safeUrl, sanitizeCaseIdentity } = app;
+test('safeId: strips markup/attribute breakout chars', () =>
+  eq(safeId('"><img src=x onerror=alert(1)>'), 'img src=x onerror=alert(1)'));
+test('safeId: preserves ordinary case ids (hyphens, dots, digits)', () =>
+  eq(safeId('C-2401.3'), 'C-2401.3'));
+test('safeId: coerces null/undefined to empty string', () =>
+  eq([safeId(null), safeId(undefined)], ['', '']));
+test('safeUrl: keeps http(s) links', () => {
+  eq(safeUrl('https://cc.example/CC-1'), 'https://cc.example/CC-1');
+  eq(safeUrl('http://cc.example/CC-1'), 'http://cc.example/CC-1');
+});
+test('safeUrl: rejects javascript:/data: and other schemes', () =>
+  eq([safeUrl('javascript:alert(1)'), safeUrl('data:text/html,<script>'), safeUrl('JavaScript:alert(1)')], ['', '', '']));
+test('caseHref: refuses a javascript: caseLink (falls through to empty)', () =>
+  eq(caseHref({ id: 'C-1', caseLink: 'javascript:alert(1)' }), ''));
+test('sanitizeCaseIdentity: cleans id and caseLink in place', () => {
+  const c = sanitizeCaseIdentity({ id: 'A"><b>', caseLink: 'javascript:alert(1)' });
+  eq([c.id, c.caseLink], ['Ab', '']);
+});
+
 /* ---------- seed sanity (structural; robust to data.js regeneration) ---------- */
 test('seed: CASES is a non-empty array', () => ok(Array.isArray(app.CASES) && app.CASES.length > 0));
 test('seed: every case has a non-empty string id', () => {

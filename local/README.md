@@ -64,14 +64,19 @@ feed, not the app.) On Windows use `python` instead of `python3`.
 - Only the `window.CASES` block of `data.js` is rewritten; `NOW`/`THRESHOLDS`/`CURRENT_SHIFT`/
   `WEEKS` are preserved. It's marked `window.CASES_LIVE_CAPTURE = true` so captured cases show
   with their real timestamps (no demo time-shift) and render even offline.
-- Disable the `data.js` auto-write with `CASE_TRACKER_WRITE_DATA_JS=0`.
+- Disable the persist step entirely with `CASE_TRACKER_WRITE_DATA_JS=0`.
 - All backups and the merge store (`local/cases.store.json`) are **gitignored**.
 
 ## ⚠️ Privacy — do NOT commit live data
 
-Once the server writes real Case Center cases into `data.js`, that tracked file (which also
-deploys to **public** GitHub Pages) holds real data. **Don't commit or push it.** Strongest
-safeguard on your machine:
+`prototype/data.js` is the committed demo seed and also deploys to **public** GitHub Pages, so
+overwriting it with a live capture would publish real Case Center data. This is now **safe by
+default**: a live fetch only updates the gitignored store and **does not rewrite `data.js`**
+unless you opt in with `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1`
+(see [`../docs/SETUP.md`](../docs/SETUP.md)).
+
+If you do enable the overwrite, the file then holds real data — **don't commit or push it.**
+Strongest safeguard on your machine:
 ```bash
 git update-index --skip-worktree prototype/data.js
 ```

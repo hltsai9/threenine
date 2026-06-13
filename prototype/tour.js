@@ -4,77 +4,55 @@
 // things rather than clicking buttons for the user.
 
 (function () {
-  const STORAGE_KEY = 'case-tracker-tour-seen-v1';
+  // Bumped to v2 when the tour was rewritten for the Picked-workspace + Hand-off
+  // Route Board UI (the old kanban tour pointed at removed elements).
+  const STORAGE_KEY = 'case-tracker-tour-seen-v2';
 
   const STEPS = [
     {
       kind: 'modal',
       title: 'Welcome to CommuGround',
-      body: 'A click-through demo of the Excel replacement. This tour walks through the main features in about 10 steps. You can skip anytime, and re-launch later from the "Take the tour" link in the sidebar.',
+      body: 'A click-through Case Tracker for first-line IT operators — track each case and coordinate the hand-off between the requester, the Core Team, and HQ. This tour walks the main views in a few steps. Skip anytime, and re-launch later from the "Take the tour" link in the sidebar.',
     },
     {
       kind: 'pointer',
       route: '#/cases',
       selector: '#op-switcher',
       placement: 'right',
-      title: "You're viewing as Mia (Day shift)",
-      body: 'This dropdown switches the active operator. Choose Ren (Night) or Kai (Day) and the board — queues, handover prompts, and shift status — all re-derive from that operator\'s perspective.',
+      title: "You're viewing as the current operator",
+      body: 'This dropdown switches the active operator. Pick a different person and the whole view — your Picked workspace, suggested Track Statuses, and shift-handover prompts — re-derives from that operator\'s shift.',
     },
     {
       kind: 'pointer',
       route: '#/cases',
-      selector: '.kanban',
+      selector: '.picked-workspace-top',
       placement: 'bottom',
-      title: 'The board — two statuses per case',
-      body: 'Everything happens here. The four columns are the Case Center status (the real, external status): New → With Core Team → With HQ Product Team → Sanity Check / With Requester. Each column then splits top/bottom — that row split is the first-line agent status.',
+      title: 'Hand-off Route Board',
+      body: 'The heart of the tool: one strip showing where every case sits across User → Core Team → HQ. A travelling dot = a case moving between parties; a dashed ring = one you\'re watching; a square = parked at a station. The legend pairs each colour with a shape, so it reads at a glance under time pressure.',
     },
     {
       kind: 'pointer',
       route: '#/cases',
-      selector: '.kanban-band-top',
-      placement: 'bottom',
-      title: 'Top band — your queue',
-      body: 'The top band of each column is your active queue: the cases you have pulled in to work right now. It replaces the old standalone Action Queue page — your picks live right on the board, at the top of whichever column the case sits in.',
-    },
-    {
-      kind: 'pointer',
-      route: '#/cases',
-      selector: '.kanban-card .queue-toggle',
-      placement: 'right',
-      title: '+ Queue lifts a card to the top',
-      body: 'Each card has a small + Queue button. Click it to lift the case into your top band; click again (now ✓ Queued) to drop it back to the backlog band. Cards also carry one-click actions (assign, chase, escalate, verify) and a ⚠ Note button to write a handover.',
-    },
-    {
-      kind: 'pointer',
-      route: '#/cases',
-      selector: '.reading-panel',
+      selector: '.picked-workspace-list',
       placement: 'top',
-      title: 'Reading panel — act without leaving the board',
-      body: 'Click any card to populate this panel with the case\'s routing, two clocks, latest handover note, notes, and history. From here you can change status, send reminders, and write the handover note — no navigation needed. Use Open full case → for the full detail page.',
-    },
-    {
-      kind: 'pointer',
-      route: '#/cases/C-1044',
-      selector: '.clock-grid',
-      placement: 'bottom',
-      title: 'Two clocks per case',
-      body: 'SLA clock = time on us (pauses when you return the case to the requester). Owner-hold totals split by Core Team vs HQ — so we can answer "how much time is each owner consuming?" This case escalated Core Team → HQ, so both accumulators have value.',
-    },
-    {
-      kind: 'pointer',
-      route: '#/cases/C-1044',
-      selector: '.handover-note',
-      placement: 'top',
-      title: 'Latest handover note',
-      body: 'Each open case carries one current handover note labelled Day → Night (or vice versa). It\'s a structured field, not a comment. Yellow background means it\'s stale for the current shift and needs a fresh write.',
+      title: 'Your Picked workspace',
+      body: 'The cases you\'ve pulled in to actively work this shift. Pick cases from Overview (next step) and they show up here. Click any row to open its full detail in the panel beside it.',
     },
     {
       kind: 'pointer',
       route: '#/cases',
-      selector: '.kanban-handover-banner, .kanban',
+      selector: '.picked-workspace-detail',
+      placement: 'top',
+      title: 'Case detail — act without leaving the page',
+      body: 'Select a case and this panel shows its two clocks (SLA "time on us", plus Core vs HQ hold totals — answering "how long is each party holding this?"), its routing, latest handover note, and full history. From here you set the Track Status, write a handover note addressed to a teammate, set a reminder, and jump out to Case Center.',
+    },
+    {
+      kind: 'pointer',
+      route: '#/archive',
+      selector: '.archive-grid',
       placement: 'bottom',
-      title: 'Handover, on the board',
-      body: 'There is no separate handover screen. When your shift is ending, a banner here tells you how many open cases still need a fresh note for your shift, and each card shows a ⚠ Note button. Write every note straight from the board before passing the watch.',
+      title: 'Overview — triage inbox',
+      body: 'Every case by week. This is where you triage: scan a week\'s table and hit + Pick to lift a case into your Picked workspace. Cards show totals, carry-overs, bounces (returned to requester), and median time-on-us.',
     },
     {
       kind: 'pointer',
@@ -82,24 +60,25 @@
       selector: '.shift-grid',
       placement: 'bottom',
       title: 'Shifts — Day vs Night coverage',
-      body: 'Side-by-side view of both shifts with rosters and handover counts. Click into a shift for its detail page, where a "View as <operator>" button lets you see what the other shift sees without leaving the screen.',
+      body: 'Side-by-side view of both shifts with rosters and handover counts. Click into a shift for its detail, where "View as <operator>" lets you see what the other shift sees without switching operator.',
     },
     {
       kind: 'pointer',
-      route: '#/archive',
-      selector: '.archive-grid',
-      placement: 'bottom',
-      title: 'Weekly Archive',
-      body: 'Browse past weekly workbooks (W20 through current W23). Each card shows totals, carry-overs, bounces (returned to requester), and median time-on-us. Click a week for its filtered case table.',
+      route: '#/owners',
+      selector: '#owners-editor',
+      placement: 'top',
+      title: 'Owners — who cases route to',
+      body: 'The Core Team desks and HQ Product Teams a case can be handed to. Edit them here for the session; paste the snippet into owners.js to keep them. "Reset to seed" undoes session edits.',
     },
     {
       kind: 'modal',
       title: 'That\'s the tour',
-      body: 'Re-launch any time from "Take the tour" in the sidebar. Your changes persist in the browser (localStorage) — click "Reset to seed" in the sidebar footer to start fresh. The README at the repo root has a full feature reference, and docs/URD.md is the spec the prototype is built from.',
+      body: 'Re-launch any time from "Take the tour" in the sidebar. Your changes persist in the browser (localStorage) — "Reset to seed" in the sidebar footer starts fresh. The README at the repo root has a full feature reference.',
     },
   ];
 
   let currentStep = 0;
+  let dir = 1;   // travel direction, so a skipped (missing-target) step skips the right way
   let active = false;
   let lastHighlight = null;
   let resizeHandler = null;
@@ -135,10 +114,12 @@
   }
 
   function next() {
+    dir = 1;
     if (currentStep < STEPS.length - 1) { currentStep++; showStep(); }
     else stop(true);
   }
   function prev() {
+    dir = -1;
     if (currentStep > 0) { currentStep--; showStep(); }
   }
 
@@ -184,11 +165,17 @@
       document.body.appendChild(overlay);
     } else {
       const target = document.querySelector(step.selector);
-      if (target) {
-        target.classList.add('tour-highlight');
-        lastHighlight = target;
-        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (!target) {
+        // The anchor isn't in the current DOM — skip rather than point a tooltip at
+        // nothing. Travel in the same direction the user was going; stop if we run off
+        // either end (avoids an infinite loop if every remaining step is missing).
+        if (dir < 0) { if (currentStep > 0) { currentStep--; showStep(); } else stop(false); }
+        else { if (currentStep < STEPS.length - 1) { currentStep++; showStep(); } else stop(true); }
+        return;
       }
+      target.classList.add('tour-highlight');
+      lastHighlight = target;
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
       overlay.innerHTML = `
         <div class="tour-tooltip" data-placement="${step.placement || 'bottom'}">
           ${counter}

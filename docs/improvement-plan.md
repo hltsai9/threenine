@@ -15,6 +15,29 @@ The roadmap preserves that zero-dependency design unless explicitly noted.
 
 ---
 
+## 0. Follow-ups deferred from the 2026-06-13 multi-angle review
+
+The 2026-06-13 review (UX / front-end / back-end) was mostly implemented in that day's
+commit. Two recommendations were **intentionally deferred** because they are large,
+maintainability/perf-oriented refactors with real regression risk and no test coverage of
+the rendering layer to catch breakage:
+
+- [ ] **Split `prototype/app.js` (~4.8k lines) into modules** (state / router / per-view
+  renderers / live-data / persistence). Keep the zero-dependency design (plain `<script>`s
+  or ES modules) and update `bundle.mjs` accordingly. Blocked on first adding render-layer
+  test coverage so the split can be verified.
+- [ ] **Event delegation for the render loop.** Replace the ~30 `querySelectorAll +
+  addEventListener` rebinds in `bindHandlers()` with a single delegated listener on a stable
+  root (`#main`) keyed off `data-action`, and move high-frequency interactions (card select,
+  filter) to targeted DOM updates instead of full `render()`. Eliminates per-render rebind
+  cost and the manual scroll-restore hack.
+
+Smaller back-end items noted but not done (prototype-acceptable for now): default
+`AUTO_CREATE=0` for prod with a migration assertion; DB connection-pool tuning + fuller
+structured logging; making `POST /api/save` non-blocking.
+
+---
+
 ## 1. Codebase review & roadmap
 
 ### Overview

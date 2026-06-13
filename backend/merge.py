@@ -25,6 +25,28 @@ CC_OWNED_FIELDS = (
 )
 
 
+# SQLite serializes writes (a single writer at a time) and does not support row-level
+# SELECT ... FOR UPDATE, so we only request locking on dialects that implement it. This
+# keeps the demo on SQLite working while making concurrent ingest+save safe on
+# Postgres/MySQL (no lost updates from the read-modify-write below).
+_FOR_UPDATE_DIALECTS = {"postgresql", "mysql", "mariadb", "oracle", "mssql"}
+
+
+def _supports_for_update(session):
+    try:
+        return session.get_bind().dialect.name in _FOR_UPDATE_DIALECTS
+    except Exception:
+        return False
+
+
+def _get_locked(session, cid, lock):
+    """session.get(Case, cid), taking a row lock (SELECT ... FOR UPDATE) when `lock` is
+    set and the dialect supports it. Falls back to a plain get on SQLite."""
+    if lock and _supports_for_update(session):
+        return session.get(Case, cid, with_for_update=True)
+    return session.get(Case, cid)
+
+
 def _parse_created_at(payload):
     """Best-effort parse of payload.createdAt (ISO-8601, may end in 'Z') to an aware
     datetime, or None. Python 3.11+ accepts both 'Z' and explicit offsets."""
@@ -46,9 +68,9 @@ def _scalars_from(payload):
     }
 
 
-def _store(session, cid, payload):
-    """Insert or replace a case row from a full payload."""
-    row = session.get(Case, cid)
+def _store(session, cid, payload, row=None):
+    """Insert or replace a case row from a full payload. Pass `row` (the already-fetched,
+    possibly row-locked Case) to avoid a second SELECT that would drop the FOR UPDATE lock."""
     scalars = _scalars_from(payload)
     if row is None:
         session.add(Case(id=cid, payload=payload, **scalars))
@@ -66,7 +88,9 @@ def upsert_cc(session, cases):
         cid = c.get("id")
         if not cid:
             continue
-        row = session.get(Case, cid)
+        # Lock the existing row so a concurrent operator save/ingest can't slip a write in
+        # between this read and our write (lost update). No-op on SQLite (serialized writes).
+        row = _get_locked(session, cid, lock=True)
         if row is None:
             _store(session, cid, dict(c))           # brand-new → take the full record
             added += 1
@@ -74,7 +98,7 @@ def upsert_cc(session, cases):
             overlay = {k: c[k] for k in CC_OWNED_FIELDS if k in c}
             merged = {**row.payload, **overlay}
             if merged != row.payload:
-                _store(session, cid, merged)
+                _store(session, cid, merged, row=row)
                 updated += 1
     return added, updated
 
@@ -86,17 +110,17 @@ def upsert_operator(session, cases, purge_ids=()):
         cid = c.get("id")
         if not cid:
             continue
-        row = session.get(Case, cid)
+        row = _get_locked(session, cid, lock=True)   # lock to avoid a lost update
         if row is None:
             _store(session, cid, dict(c))           # new case → full insert
             added += 1
         else:
             merged = {**row.payload, **c}            # operator edits are authoritative
             if merged != row.payload:
-                _store(session, cid, merged)
+                _store(session, cid, merged, row=row)
                 updated += 1
     for cid in (purge_ids or ()):
-        row = session.get(Case, cid)
+        row = _get_locked(session, cid, lock=True)
         if row is not None:
             session.delete(row)
             purged += 1

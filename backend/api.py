@@ -13,6 +13,9 @@ Endpoints (same contract the SPA already expects):
 
 Config (env):
     DATABASE_URL      see backend/db.py (default SQLite)
+    API_AUTH_TOKEN    shared-secret bearer token guarding /api/*. Unset/empty =
+                      API is OPEN (localhost/demo default); set it to require
+                      `Authorization: Bearer <token>` on /api/cases and /api/save.
     ALLOWED_ORIGINS   comma-separated origins for a separate-host front end (CORS).
                       Leave unset for the same-origin deployment.
     SERVE_STATIC      "1" (default) to also serve prototype/ at / for convenience;
@@ -20,10 +23,12 @@ Config (env):
     AUTO_CREATE       "1" (default) to create tables on startup; "0" to rely on
                       Alembic migrations in production.
 """
+import hmac
+import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,16 +36,52 @@ from fastapi.staticfiles import StaticFiles
 from .db import REPO_ROOT, SessionLocal, init_db
 from .merge import all_cases, case_by_id, upsert_operator
 
+logger = logging.getLogger("case_tracker.api")
+
+# Shared-secret bearer token. When unset/empty the API stays OPEN to preserve the
+# localhost/demo behavior; a one-time warning is logged at startup so it isn't a silent
+# hole in production. When set, /api/cases and /api/save require a matching bearer token.
+_API_AUTH_TOKEN = os.environ.get("API_AUTH_TOKEN", "") or ""
+
+
+def require_auth(request: Request) -> None:
+    """Gate an API route on the shared-secret bearer token (constant-time compare).
+
+    No-op when API_AUTH_TOKEN is unset/empty (demo mode). Raises 401 on a missing or
+    mismatched `Authorization: Bearer <token>` header when a token is configured."""
+    if not _API_AUTH_TOKEN:
+        return
+    header = request.headers.get("Authorization", "")
+    scheme, _, presented = header.partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(presented.strip(), _API_AUTH_TOKEN):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not _API_AUTH_TOKEN:
+        logger.warning(
+            "API_AUTH_TOKEN is unset — /api/cases and /api/save are UNAUTHENTICATED "
+            "(anyone reachable can read case PII and purge cases). Set API_AUTH_TOKEN "
+            "to require a bearer token in any non-localhost deployment."
+        )
     if os.environ.get("AUTO_CREATE", "1") not in ("0", "false", "False", ""):
+        # AUTO_CREATE creates tables from the live model on every start, which masks schema
+        # drift in production. Kept on by default only so the SQLite demo "just works".
+        logger.warning(
+            "AUTO_CREATE is on — tables are created from the live model on startup. "
+            "For production prefer Alembic migrations and set AUTO_CREATE=0."
+        )
         init_db()
     yield
 
 
 app = FastAPI(title="Case Tracker API", lifespan=lifespan)
 
+# ALLOWED_ORIGINS must be an explicit allowlist (no "*"): it is load-bearing now that the
+# API can be auth-gated — a permissive origin would let any site drive an authenticated
+# operator's browser into the API. allow_credentials is intentionally NOT enabled (the
+# bearer token travels in the Authorization header, not a cookie).
 _origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 if _origins:
     app.add_middleware(
@@ -52,7 +93,8 @@ if _origins:
 
 
 @app.get("/api/cases")
-def get_cases(id: str | None = None):
+def get_cases(request: Request, id: str | None = None):
+    require_auth(request)
     # NOTE: time-windowing (hours/fromHours/toHours) is now an ingestion concern — the
     # DB is the accumulated store, so a read returns everything (or one case by id).
     # The legacy query params are accepted and ignored so old SPA URLs keep working.
@@ -63,6 +105,7 @@ def get_cases(id: str | None = None):
 
 @app.post("/api/save")
 async def save(request: Request):
+    require_auth(request)
     data = await request.json()
     if isinstance(data, dict):
         cases = data.get("cases", [])

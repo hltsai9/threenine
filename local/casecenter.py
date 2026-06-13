@@ -30,10 +30,13 @@ browser and must NOT come from Case Center — it is merged back automatically.
 """
 import inspect
 import json
+import logging
 import os
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+logger = logging.getLogger("case_tracker.casecenter")
 
 # Case Center stores datetimes in GMT. Some fields come back with an explicit offset
 # (createDateTime → "...+00:00"), but others (process timeline / Wait User times) can arrive
@@ -350,6 +353,11 @@ def fetch_raw():
     "Created within … h / Load" control works, e.g.:
         jql = f"created >= -{int(LOOKBACK_HOURS)}h ORDER BY created DESC"
     (You can also accept it as a parameter: def fetch_raw(lookback_hours=6): ... )
+
+    TIMEOUT CONTRACT (REQUIRED): your request MUST set an explicit network timeout so a
+    hung Case Center can't wedge the ingest CronJob or the local proxy indefinitely. With
+    stdlib use `urllib.request.urlopen(req, timeout=30)`; with requests pass `timeout=30`.
+    Both examples below already do this — keep the timeout when you paste your request.
     """
     api_key, cookie = _load_secrets()  # noqa: F841 (used by your request below)
 
@@ -421,4 +429,23 @@ def fetch_cases(lookback_hours=None, case_id=None, to_hours=None):
                 data = data[key]
                 break
     records = data if isinstance(data, list) else [data]
-    return [map_record(r) for r in records]
+    cases, skipped = map_records(records)
+    if skipped:
+        logger.warning("fetch_cases: skipped %d malformed record(s) of %d", skipped, len(records))
+    return cases
+
+
+def map_records(records):
+    """Map a list of raw Case Center records to board cases, skipping (and logging) any
+    record that fails to map rather than aborting the whole batch. Returns (cases, skipped)
+    so one malformed case can't sink an entire ingest/fetch run."""
+    cases = []
+    skipped = 0
+    for r in records:
+        try:
+            cases.append(map_record(r))
+        except Exception:
+            skipped += 1
+            cid = r.get("caseId") if isinstance(r, dict) else None
+            logger.warning("map_record failed for record %r — skipping", cid, exc_info=True)
+    return cases, skipped

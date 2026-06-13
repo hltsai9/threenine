@@ -57,8 +57,11 @@ def resolve_webroot():
 
 WEBROOT, WEBROOT_OK = resolve_webroot()
 
-# Write fetched live cases into prototype/data.js (backup + merge). On by default; set
-# CASE_TRACKER_WRITE_DATA_JS=0 to disable.
+# Run the persist step (merge fetched cases into the sidecar store, and — if allowed — into
+# data.js). On by default; set CASE_TRACKER_WRITE_DATA_JS=0 to skip persistence entirely.
+# NOTE: this only gates whether persist runs. Overwriting the committed/public prototype/data.js
+# is separately gated, SAFE-BY-DEFAULT, on CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1 inside
+# persist.py — so by default a live fetch updates the gitignored store but never rewrites data.js.
 WRITE_DATA_JS = os.environ.get("CASE_TRACKER_WRITE_DATA_JS", "1") not in ("0", "false", "False", "")
 
 # Import the adapter that talks to your on-prem Case Center.

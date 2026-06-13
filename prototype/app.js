@@ -209,15 +209,17 @@ function applySeedAgentLayer(cases, overlay) {
 // Seed CASES — board-shape, raw-CC, or live-capture — into STATE.cases. Pure
 // function on its input; mutates nothing globally. Called from anchorFreshSeed.
 function buildSeedCases() {
+  let out;
   if (window.CASES_LIVE_CAPTURE) {
-    return window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
-  }
-  if (window.CASES_RAW_CC) {
-    const out = window.CASES.map(r => fillBoardDefaults(mapRawCcRecord(structuredClone(r))));
+    out = window.CASES.map(c => normalizeLiveCase(structuredClone(c)));
+  } else if (window.CASES_RAW_CC) {
+    out = window.CASES.map(r => fillBoardDefaults(mapRawCcRecord(structuredClone(r))));
     applySeedAgentLayer(out, window.SEED_AGENT_LAYER);
-    return out;
+  } else {
+    out = window.CASES.map(c => structuredClone(c));
   }
-  return window.CASES.map(c => structuredClone(c));
+  // Single chokepoint: every seeded case gets its id/caseLink sanitised, whatever the shape.
+  return out.map(sanitizeCaseIdentity);
 }
 
 const STATE = {
@@ -475,7 +477,10 @@ function caseById(id) { return STATE.cases.find(c => c.id === id); }
 // it), fall back to building it from the case id + the base URL serve.py exposes as
 // window.CASE_CENTER_BASE_URL. Mirrors build_case_link() in casecenter.py.
 function caseHref(c) {
-  if (c && c.caseLink) return c.caseLink;
+  // Only ever hand back a real http(s) link; safeUrl rejects javascript:/data: so
+  // a hostile caseLink can't run on click even if it bypassed boundary sanitising.
+  const link = c && c.caseLink ? safeUrl(c.caseLink) : '';
+  if (link) return link;
   const base = window.CASE_CENTER_BASE_URL;
   if (base && c && c.id) return String(base).replace(/\/+$/, '') + '/' + c.id;
   return '';
@@ -650,6 +655,35 @@ function escapeHtml(s) {
   }[ch]));
 }
 
+// Case/owner ids flow *unescaped* into many HTML, attribute and URL sinks
+// (data-case-id="...", href="#/cases/...", base + '/' + id). A hostile Case
+// Center caseId like `"><img src=x onerror=alert(1)>` would otherwise inject,
+// so we strip the characters that enable markup/attribute breakout at the data
+// boundary (see sanitizeCaseIdentity). Real ids are simple tokens, so this is
+// lossless for them while closing every id sink at once.
+function safeId(x) {
+  return String(x ?? '').replace(/[<>"'`]/g, '');
+}
+
+// caseLink comes from the API and lands in href="...". escapeHtml keeps it
+// inside the quotes but does NOT neutralise a `javascript:`/`data:` scheme, so
+// allow only real web links; anything else collapses to '' (callers then fall
+// back to building a link from the base URL + id, or render no link).
+function safeUrl(u) {
+  const s = String(u ?? '').trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+// Defence-in-depth applied wherever a case enters STATE: keep id and caseLink
+// in their safe forms so the renderer never has to be trusted to escape them.
+function sanitizeCaseIdentity(c) {
+  if (c && typeof c === 'object') {
+    c.id = safeId(c.id);
+    if ('caseLink' in c) c.caseLink = safeUrl(c.caseLink);
+  }
+  return c;
+}
+
 function ownerLocalNow(owner) {
   if (!owner) return null;
   try {
@@ -820,7 +854,7 @@ function renderSidebar() {
   const sw = document.getElementById('op-switcher');
   if (sw) {
     sw.innerHTML = window.OPERATORS
-      .map(o => `<option value="${o.id}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
+      .map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
       .join('');
     if (sw.dataset.bound !== '1') {
       sw.addEventListener('change', () => {
@@ -1401,7 +1435,32 @@ function renderPickedList() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
   if (sorted.length === 0) {
-    return `<div class="picked-list-empty">No picked cases.<br><a href="#/archive">Open Overview</a></div>`;
+    // Don't dead-end on an empty page pointing elsewhere: surface the most recent
+    // unpicked open cases so the operator can triage ("what needs me now?") right here.
+    const fresh = STATE.cases
+      .filter(c => !c.deletedAt && !isPicked(c) && !['closed', 'cancelled'].includes(c.status))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 6);
+    if (!fresh.length) {
+      return `<div class="picked-list-empty">No cases to pick right now.<br><a href="#/archive">Open Overview</a></div>`;
+    }
+    const rows = fresh.map(c => `
+      <div class="pick-suggest-row" data-case-id="${c.id}" data-action="select-case">
+        <div class="pick-suggest-main">
+          <div class="pick-suggest-head-line">
+            <span class="mono muted">${c.id}</span>
+            <span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span>
+          </div>
+          <div class="pick-suggest-subject">${escapeHtml(c.subject)}</div>
+        </div>
+        ${renderQueueToggleButton(c, 'tiny')}
+      </div>`).join('');
+    return `
+      <div class="pick-suggest">
+        <div class="pick-suggest-title">No cases picked yet — recent cases to triage:</div>
+        ${rows}
+        <a class="pick-suggest-more" href="#/archive">See all in Overview →</a>
+      </div>`;
   }
   return `<div class="picked-list">${sorted.map(renderPickedListRow).join('')}</div>`;
 }
@@ -1510,62 +1569,6 @@ function renderCaseList() {
 function renderRefreshButton(c, size /* 'tiny' | 'normal' */) {
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
   return `<button class="${cls} refresh-case-btn" data-action="refresh-case" data-case-id="${c.id}" title="Re-fetch this case from Case Center" onclick="event.stopPropagation()">⟳</button>`;
-}
-
-// Legacy kanban card renderer — preserved as a no-op shim because the kanban-by-CC-status
-// grouping was removed (see plan §1). The new Picked workspace uses route lanes instead
-// of cards. Nothing in the active render path calls this anymore.
-function renderKanbanCard(_c) { return ''; }
-
-// Dead code below intentionally kept for now but unreachable; safe to delete in a follow-up.
-function _legacyRenderKanbanCard(c) {
-  const flags = '';
-  const owner = c.currentOwner ? getOwner(c.currentOwner, c.currentOwner === 'core' ? c.coreId : c.hqId) : null;
-  const isSel = STATE.kanbanSelected === c.id;
-  const bellState = c.reminder
-    ? (c.reminder.fired ? '<span class="kanban-bell-mini bell-due" title="Reminder due">●</span>' : '<span class="kanban-bell-mini bell-set" title="Reminder ' + escapeHtml(fmtUntil(c.reminder.fireAt)) + '">●</span>')
-    : '';
-
-  // Primary one-click action for this case, if one applies (assign / chase / escalate / verify).
-  const primary = derivePromptsForCase(c)[0];
-  const primaryBtn = primary ? `
-    <button class="btn-tiny kanban-cta" data-action="prompt" data-case-id="${c.id}" data-kind="${primary.kind}" title="${escapeHtml(PROMPT_DEFS[primary.kind].label)}" onclick="event.stopPropagation()">
-      <span class="prompt-icon ${PROMPT_DEFS[primary.kind].cls}">${PROMPT_DEFS[primary.kind].icon}</span>
-      ${escapeHtml(PROMPT_DEFS[primary.kind].action)}
-    </button>
-  ` : '';
-
-  // Handover affordance — write a fresh shift note straight from the card.
-  const handoverBtn = needsHandoverNote(c) ? `
-    <button class="btn-tiny kanban-handover-btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover" title="Write a handover note for this shift" onclick="event.stopPropagation()">⚠ Note</button>
-  ` : '';
-
-  const mine = isAssignedToMe(c);
-  return `
-    <div class="kanban-card ${isSel ? 'is-selected' : ''} ${mine ? 'is-mine' : ''}" data-action="kanban-select" data-case-id="${c.id}">
-      <div class="kanban-card-head">
-        <span class="mono muted">${c.id}</span>
-        <div class="kanban-card-head-right">
-          ${mine ? '<span class="kanban-mine" title="Assigned to you">● me</span>' : ''}
-          <span class="priority-${c.priority}">${escapeHtml(c.priority)}</span>
-          ${bellState}
-          ${isQueued(c) ? '<span class="kanban-queued" title="In your queue">★</span>' : ''}
-        </div>
-      </div>
-      ${flags ? `<div class="kanban-card-flags">${flags}</div>` : ''}
-      <div class="kanban-card-subject">${escapeHtml(c.subject)}</div>
-      <div class="kanban-card-meta">
-        <span>${owner ? escapeHtml(owner.name.replace(/^(Core Team|FIT|HQ) — /, '')) : (c.assignee ? escapeHtml(c.assignee) : '<span class="muted">unassigned</span>')}</span>
-        <span class="muted">${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' ⏸' : ''}</span>
-      </div>
-      <div class="kanban-card-actions">
-        ${primaryBtn}
-        ${handoverBtn}
-        ${renderRefreshButton(c, 'tiny')}
-        ${renderQueueToggleButton(c, 'tiny')}
-      </div>
-    </div>
-  `;
 }
 
 function renderReadingPanel(c) {
@@ -3660,17 +3663,70 @@ function showToast(message, type = 'info') {
   setTimeout(dismiss, 5000);
 }
 
+// The modal currently on screen, so modalError() can surface inline validation
+// without each handler having to thread the modal element through.
+let _activeModal = null;
+let _modalLastFocus = null;
+
+// Inline, accessible replacement for alert()-based form validation: shows the
+// message inside the open modal (role="alert" so screen readers announce it) and
+// returns false so the caller can `return modalError('…')`. No-ops safely when
+// there's no live modal (e.g. the headless test harness stubs showModal).
+function modalError(msg) {
+  const modal = _activeModal;
+  if (!modal || typeof modal.querySelector !== 'function') return false;
+  let el = modal.querySelector('[data-modal-error]');
+  if (!el && typeof document !== 'undefined' && document.createElement) {
+    el = document.createElement('div');
+    el.setAttribute('data-modal-error', '');
+    el.className = 'modal-error';
+    el.setAttribute('role', 'alert');
+    const actions = modal.querySelector('.modal-actions');
+    if (actions && actions.parentNode) actions.parentNode.insertBefore(el, actions);
+    else if (modal.appendChild) modal.appendChild(el);
+  }
+  if (el && 'textContent' in el && el.classList) el.textContent = msg;
+  return false;
+}
+
+function trapModalTab(e, modal) {
+  const sel = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const list = Array.prototype.filter.call(modal.querySelectorAll(sel), el => el.offsetParent !== null);
+  if (!list.length) return;
+  const first = list[0], last = list[list.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
 function showModal(html, onSubmit) {
   const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
-  const close = () => { root.innerHTML = ''; };
-  root.querySelector('[data-modal-cancel]')?.addEventListener('click', close);
-  root.querySelector('[data-modal-submit]')?.addEventListener('click', () => {
-    if (onSubmit(root.querySelector('.modal'))) close();
+  _modalLastFocus = document.activeElement;
+  root.innerHTML = `<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true" tabindex="-1">${html}</div></div>`;
+  const modal = root.querySelector('.modal');
+  _activeModal = modal;
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'Tab') { trapModalTab(e, modal); }
+  };
+  const close = () => {
+    root.innerHTML = '';
+    _activeModal = null;
+    document.removeEventListener('keydown', onKey);
+    // Return focus to whatever opened the modal (keyboard users don't get dumped to <body>).
+    if (_modalLastFocus && _modalLastFocus.focus) { try { _modalLastFocus.focus(); } catch (e) { /* ignore */ } }
+    _modalLastFocus = null;
+  };
+  modal.querySelector('[data-modal-cancel]')?.addEventListener('click', close);
+  modal.querySelector('[data-modal-submit]')?.addEventListener('click', () => {
+    if (onSubmit(modal)) close();
   });
   root.querySelector('.modal-backdrop')?.addEventListener('click', e => {
     if (e.target.classList.contains('modal-backdrop')) close();
   });
+  document.addEventListener('keydown', onKey);
+  // Autofocus the first field so keyboard/AT users start inside the dialog.
+  const first = modal.querySelector('input, textarea, select, [data-modal-submit]');
+  (first || modal).focus?.();
 }
 
 /* ---------- Action handlers ---------- */
@@ -3804,7 +3860,7 @@ function handlePrompt(caseId, kind) {
     `, (modal) => {
       const code = fieldVal(modal, 'code');
       const note = fieldVal(modal, 'note').trim();
-      if (!note) { alert('Resolution note is required.'); return false; }
+      if (!note) return modalError('Resolution note is required.');
       // stop active clocks
       if (c.currentOwner && c.holdStartedAt) {
         c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
@@ -3837,7 +3893,7 @@ function handlePrompt(caseId, kind) {
       </div>
     `, (modal) => {
       const reason = fieldVal(modal, 'reason').trim();
-      if (!reason) { alert('A reason is required.'); return false; }
+      if (!reason) return modalError('A reason is required.');
       // stop owner clock, freeze SLA
       if (c.currentOwner && c.holdStartedAt) {
         c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
@@ -3872,7 +3928,7 @@ function handlePrompt(caseId, kind) {
       </div>
     `, (modal) => {
       const note = fieldVal(modal, 'note').trim();
-      if (!note) { alert('Handover note is required.'); return false; }
+      if (!note) return modalError('Handover note is required.');
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
       logHistory(c, op, 'handover', `Handover note (${op.shift} → ${target})`);
@@ -3968,7 +4024,7 @@ function handlePrompt(caseId, kind) {
     `, (modal) => {
       const code = fieldVal(modal, 'code');
       const note = fieldVal(modal, 'note').trim();
-      if (!note) { alert('Resolution note is required.'); return false; }
+      if (!note) return modalError('Resolution note is required.');
 
       if (c.currentOwner && c.holdStartedAt) {
         c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
@@ -4009,7 +4065,7 @@ function handlePrompt(caseId, kind) {
       </div>
     `, (modal) => {
       const reason = fieldVal(modal, 'reason').trim();
-      if (!reason) { alert('A reason is required.'); return false; }
+      if (!reason) return modalError('A reason is required.');
 
       if (c.currentOwner && c.holdStartedAt) {
         c.holdMs[c.currentOwner] += new Date(NOW) - new Date(c.holdStartedAt);
@@ -4099,7 +4155,7 @@ function handlePrompt(caseId, kind) {
       const fireAt = atTime
         ? nextTimeIso(atTime)
         : new Date(realNow().getTime() + parseInt(fieldVal(modal, 'when'), 10) * 60000).toISOString();
-      if (!fireAt) { alert('Enter a valid time (HH:MM).'); return false; }
+      if (!fireAt) return modalError('Enter a valid time (HH:MM).');
       c.reminder = {
         fireAt,
         note,
@@ -4167,7 +4223,7 @@ function handleHandoverTo(caseId, recipientOpId) {
     </div>
   `, (modal) => {
     const note = fieldVal(modal, 'note').trim();
-    if (!note) { alert('Handover note is required.'); return false; }
+    if (!note) return modalError('Handover note is required.');
     c.handover = {
       note,
       author: op.id,
@@ -4200,7 +4256,7 @@ function handleNewCase(op) {
     </div>
   `, (modal) => {
     const id = fieldVal(modal, 'caseId').trim();
-    if (!id) { alert('Enter a case ID.'); return false; }
+    if (!id) return modalError('Enter a case ID.');
     addCaseById(id);   // async; modal closes now
     return true;
   });
@@ -4308,7 +4364,7 @@ function handleReassign(caseId, type) {
 
   const opts = [
     `<option value="">— Unassign —</option>`,
-    ...dir.map(o => `<option value="${o.id}" ${o.id === currentId ? 'selected' : ''}>${detailLabel(o)}</option>`),
+    ...dir.map(o => `<option value="${escapeHtml(o.id)}" ${o.id === currentId ? 'selected' : ''}>${detailLabel(o)}</option>`),
   ].join('');
 
   showModal(`
@@ -4532,14 +4588,18 @@ function bindHandlers() {
   });
   const filter = document.getElementById('case-filter');
   if (filter) {
-    filter.addEventListener('input', () => {
+    // Debounce: walking every table row on each keystroke is wasted work while the operator
+    // is still typing — only filter once input settles (~120ms).
+    let filterTimer = null;
+    const applyFilter = () => {
       const q = filter.value.toLowerCase();
       document.querySelectorAll('table.case-table tbody tr').forEach(tr => {
         tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
       });
-      document.querySelectorAll('.kanban-card').forEach(card => {
-        card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
-      });
+    };
+    filter.addEventListener('input', () => {
+      clearTimeout(filterTimer);
+      filterTimer = setTimeout(applyFilter, 120);
     });
   }
 }
@@ -4574,7 +4634,7 @@ setInterval(updateClock, CLOCK_TICK_MS);
 function normalizeLiveCase(c) {
   const nowIso = new Date(NOW).toISOString();
   const createdAt = c.createdAt || c.slaStartedAt || nowIso;
-  return Object.assign({
+  return sanitizeCaseIdentity(Object.assign({
     flags: [],
     priority: 'medium',
     caseType: 'access',
@@ -4595,7 +4655,7 @@ function normalizeLiveCase(c) {
     subject: '(no subject)',
     slaStartedAt: c.createdAt || nowIso,
     createdAt: c.slaStartedAt || nowIso,
-  }, c);
+  }, c));
 }
 
 // Fields Case Center authoritatively owns — these are refreshed onto an existing case. Everything
@@ -4613,7 +4673,9 @@ function overlayLiveCase(existing, raw) {
   for (const k of CC_OWNED_FIELDS) {
     if (raw[k] !== undefined) existing[k] = raw[k];
   }
-  return existing;
+  // caseLink is CC-owned, so re-sanitise after the refresh (a hostile link must
+  // not slip in through an update either).
+  return sanitizeCaseIdentity(existing);
 }
 
 // Push operator edits back to the local server so they get written into data.js.

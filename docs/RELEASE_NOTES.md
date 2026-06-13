@@ -10,6 +10,76 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Fixed (Security — review batch)
+
+- **XSS / injection hardening at the data boundary.** Untrusted Case Center
+  `caseId` and `caseLink` values flowed unescaped into many `innerHTML`,
+  attribute and `href` sinks. Added `safeId()` (strips markup/attribute-breakout
+  chars), `safeUrl()` (allows only `http(s):`, rejecting `javascript:`/`data:`)
+  and `sanitizeCaseIdentity()`, applied at every point a case enters `STATE`
+  (`buildSeedCases`, `normalizeLiveCase`, `overlayLiveCase`). `caseHref()` now
+  also refuses non-http(s) links, and the two unescaped owner-id `<option>`
+  sinks are escaped. Locked in by 7 new tests (`prototype/tests/run.cjs`).
+- **Backend API now supports authN/authZ.** `backend/api.py` gained an
+  `API_AUTH_TOKEN` bearer-token gate (constant-time compare) on `/api/cases`
+  and `/api/save`; unset = open (demo preserved) but logs a warning. Previously
+  anyone reachable could read all case PII and purge any case via `purgeIds`.
+- **Live capture can no longer clobber the public seed.** `local/persist.py`
+  refuses to overwrite the Pages-deployed `prototype/data.js` unless
+  `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1`, closing the accidental-PII-to-public
+  leak that previously relied only on a manual `skip-worktree`.
+
+### Fixed (Accessibility — review batch)
+
+- **Visible keyboard focus everywhere.** Added a global `:focus-visible` ring
+  and replaced the bare `outline:none` on `.op-switcher`; keyboard/low-vision
+  operators can now see what's focused.
+- **Muted text meets WCAG AA.** Darkened `--text-faint` / `-2` / `-3` and
+  `--sidebar-muted` (were ≈3.6 / 2.9 / 2.4:1 on white) to ≈5:1 — these carry
+  triage metadata scanned under time pressure.
+- **Reduced-motion support.** Added `@media (prefers-reduced-motion: reduce)` to
+  neutralise the always-on route-board travelling dot, WATCH ring pulse and
+  overdue-bell pulse.
+- **Accessible modals.** `showModal` now renders `role="dialog"`/`aria-modal`,
+  autofocuses the first field, supports Escape-to-close + a Tab focus-trap, and
+  returns focus to the opener on close. Blocking `alert()` validation replaced
+  with inline, `role="alert"` messages (`modalError`).
+
+### Changed (UX — review batch)
+
+- **Onboarding tour rewritten for the current UI.** `tour.js` described the
+  removed kanban board (four columns, `+ Queue`, case `C-1044`); it now walks the
+  Picked workspace, Hand-off Route Board, Overview triage, Shifts and Owners, and
+  silently skips any step whose anchor is missing instead of pointing a tooltip at
+  nothing. Storage key bumped to `v2` so returning users see the corrected tour.
+- **Actionable empty workspace.** An empty Picked list no longer dead-ends on a
+  link to Overview — it now surfaces the most recent unpicked open cases with a
+  one-click **+ Pick**, so day-one triage starts on the landing view.
+
+### Internal (review batch)
+
+- Removed dead `renderKanbanCard` shim + `_legacyRenderKanbanCard` (unreachable
+  since the kanban removal; still carried `${c.id}` sinks and bundle weight).
+- Debounced the case-filter input (~120ms) and dropped its dead `.kanban-card`
+  branch.
+- Atomic upserts in `backend/merge.py` (`SELECT … FOR UPDATE` on dialects that
+  support it; SQLite serialises) to close the ingest+save lost-update window —
+  `CC_OWNED_FIELDS` merge semantics unchanged. Per-record try/except in live
+  ingestion (`local/casecenter.py` `map_records`) so one bad case is skipped, not
+  fatal. `print()` → `logging` on the touched API/ingest paths.
+
+### Docs (review batch)
+
+- `docs/SETUP.md` documents `API_AUTH_TOKEN` and the `data.js` overwrite guard;
+  `backend/README.md` / `local/README.md` updated for auth and the capture guard.
+
+> Note: the review also recommended a full `app.js` module split and an
+> event-delegation rewrite (maintainability/perf, high regression risk) — these
+> are deferred to a follow-up (see `docs/improvement-plan.md`). The reviewer's
+> "restore chase/escalate verbs" suggestion was intentionally **not** taken:
+> `renderDetailActions` documents those as deliberately moved to Case Center, and
+> they remain reachable via the contextual prompt surface.
+
 ### Changed (Seed data · raw Case Center shape)
 
 - **`prototype/data.js` rewritten as raw Case Center records.** Each entry is

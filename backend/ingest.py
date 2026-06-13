@@ -15,12 +15,15 @@ operator work is preserved (backend/merge.upsert_cc).
 """
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
 
 from .db import SessionLocal, init_db
 from .merge import upsert_cc, upsert_operator
+
+logger = logging.getLogger("case_tracker.ingest")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -37,11 +40,14 @@ def _load_casecenter():
 
 def ingest_live(hours=None, to_hours=None, case_id=None):
     cc = _load_casecenter()
+    # fetch_cases maps each raw record defensively: one malformed case is logged and skipped
+    # (via casecenter.map_records) rather than aborting the whole run. It returns only the
+    # cases that mapped cleanly, so a single bad record can't sink the ingest.
     cases = cc.fetch_cases(lookback_hours=hours, to_hours=to_hours, case_id=case_id)
     with SessionLocal() as session:
         added, updated = upsert_cc(session, cases)
         session.commit()
-    print(f"ingest: fetched {len(cases)} case(s) → +{added} new, {updated} updated")
+    logger.info("ingest: mapped %d case(s) → +%d new, %d updated", len(cases), added, updated)
     return added, updated
 
 
@@ -56,11 +62,15 @@ def seed_from_data_js(path=None):
     with SessionLocal() as session:
         added, updated, _ = upsert_operator(session, cases)
         session.commit()
-    print(f"seed: loaded {len(cases)} case(s) from {os.path.relpath(data_js, REPO_ROOT)} → +{added} new, {updated} updated")
+    logger.info("seed: loaded %d case(s) from %s → +%d new, %d updated",
+                len(cases), os.path.relpath(data_js, REPO_ROOT), added, updated)
     return added, updated
 
 
 def main(argv=None):
+    # Run as a CLI/CronJob: configure root logging so ingest progress and the per-record
+    # skip warnings (from casecenter.map_records) actually reach the console / pod logs.
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(description="Ingest cases into the Case Tracker DB.")
     p.add_argument("--seed-from-data-js", nargs="?", const=True, default=False,
                    metavar="PATH", help="Demo: load prototype/data.js (or PATH) instead of Case Center.")

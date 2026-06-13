@@ -10,7 +10,7 @@
   --panel-tint: #fafcfa;
   --sidebar: #ffffff;
   --sidebar-fg: #1e2b24;
-  --sidebar-muted: #8a958d;
+  --sidebar-muted: #5b675f;       /* darkened for WCAG AA (was #8a958d ≈ 2.9:1 on white) */
 
   /* Borders & hairlines */
   --border: #e6ebe6;
@@ -22,9 +22,12 @@
   --text-deep: #1c2a22;
   --text-body: #3f4a43;
   --text-muted: #56635b;
-  --text-faint: #7c887f;
-  --text-faint-2: #8a958d;
-  --text-faint-3: #97a199;
+  /* Muted inks darkened to meet WCAG AA (≈5:1) on white — these carry triage
+     metadata (owner, age, status, counts) an operator scans under time pressure.
+     Previously #7c887f/#8a958d/#97a199 measured ≈3.6/2.9/2.4:1. */
+  --text-faint: #54605a;
+  --text-faint-2: #5b675f;
+  --text-faint-3: #626e66;
 
   /* Forest-green accent system */
   --accent: #2e5942;             /* deep forest — primary accent */
@@ -91,6 +94,32 @@
 }
 
 * { box-sizing: border-box; }
+
+/* ---- Accessibility base ----------------------------------------------------
+   A visible keyboard-focus ring for every natively focusable control. Most
+   buttons, nav links and selects had no :focus style at all, so keyboard and
+   low-vision operators couldn't tell what was focused. Uses :focus-visible so
+   the ring shows for keyboard/AT focus but not on mouse clicks. More specific
+   rings (e.g. .ts-picker, .op-switcher) still take over where defined. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Respect reduced-motion: several decorative loops (route-board travelling dot,
+   the WATCH ring pulse, the overdue-bell pulse) run continuously, which is a
+   vestibular-accessibility problem. Near-instant duration + a single iteration
+   neutralises them while leaving layout intact. !important is the standard,
+   intentional exception here — it must beat every per-element animation rule. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 html, body {
   margin: 0;
@@ -1431,6 +1460,16 @@ table.case-table {
   gap: 8px;
   margin-top: 22px;
 }
+/* Inline form-validation message (replaces blocking alert()) — announced via role="alert". */
+.modal-error {
+  margin-top: 16px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* ---------- Misc ---------- */
 .muted { color: var(--text-faint-2); }
@@ -1498,7 +1537,7 @@ table.case-table {
   background-position: right center;
 }
 .op-switcher:hover { color: var(--accent); }
-.op-switcher:focus { outline: none; }
+.op-switcher:focus-visible { outline: none; border-radius: var(--r-sm); box-shadow: 0 0 0 3px var(--accent-bg); }
 .op-switcher option { color: var(--text); font-weight: 600; font-family: var(--font-ui); }
 
 /* Themed popup for the operator switcher (matches .ts-picker), trigger stays borderless. */
@@ -2120,6 +2159,32 @@ table.case-table {
   text-align: center;
   padding: 28px 12px;
 }
+/* Actionable empty state: triage-starter list of recent unpicked cases. */
+.pick-suggest { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px; }
+.pick-suggest-title { color: var(--text-muted); font-size: 12px; font-weight: 600; margin: 2px 2px 4px; }
+.pick-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--panel-tint);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.pick-suggest-row:hover { background: var(--accent-bg); border-color: var(--accent-soft); }
+.pick-suggest-main { min-width: 0; flex: 1; }
+.pick-suggest-head-line { display: flex; align-items: center; gap: 8px; }
+.pick-suggest-subject {
+  font-size: 12.5px;
+  color: var(--text-body);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick-suggest-more { align-self: flex-end; font-size: 12px; margin-top: 2px; }
 .picked-row {
   padding: 8px 10px;
   border-radius: 8px;

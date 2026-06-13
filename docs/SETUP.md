@@ -76,12 +76,14 @@ Then wire your request in **`local/casecenter.py`**:
 | Var | Used by | Default | Purpose |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | backend (api/ingest) | SQLite file in repo root | DB connection — the demo↔prod switch (`sqlite://…`, `postgresql+psycopg://…`, `mysql+pymysql://…`) |
+| `API_AUTH_TOKEN` | `backend/api.py` | _(empty)_ | Shared-secret bearer token for `/api/cases` + `/api/save`. **Empty = API is OPEN** (localhost/demo); set it in any reachable deployment to require `Authorization: Bearer <token>` (else 401). |
 | `CASE_CENTER_API_KEY` / `CASE_CENTER_COOKIE` | ingest / `serve.py` | — | Case Center credentials (ingestion side only) |
 | `CASE_CENTER_BASE_URL` | `casecenter.py` | _(empty)_ | Builds each case's clickable link |
 | `CASE_CENTER_LOOKBACK_HOURS` | `casecenter.py` | `6` | Default look-back window for the fetch |
-| `ALLOWED_ORIGINS` | `backend/api.py` | _(empty)_ | CORS origins — only for a separate-host SPA |
+| `ALLOWED_ORIGINS` | `backend/api.py` | _(empty)_ | CORS origins — explicit allowlist (no `*`); load-bearing now that the API can be auth-gated. Only for a separate-host SPA. |
 | `SERVE_STATIC` | `backend/api.py` | `1` | Also serve `prototype/` at `/` (same origin) |
-| `AUTO_CREATE` | backend | `1` | Create tables on start (set `0` to use Alembic) |
+| `AUTO_CREATE` | backend | `1` | Create tables on start (set `0` + use Alembic for production) |
 | `PORT` | `local/serve.py` | `8787` | Port for the single-user live proxy |
 | `CASE_TRACKER_WEBROOT` | `local/serve.py` | `../prototype` | Where the board files live |
-| `CASE_TRACKER_WRITE_DATA_JS` | `local/serve.py` | `1` | Write pulled cases into `data.js` (`0` disables) |
+| `CASE_TRACKER_WRITE_DATA_JS` | `local/serve.py` | `1` | Run the persist step after a fetch (`0` disables it entirely) |
+| `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE` | `local/persist.py` | _(unset = safe)_ | Gate on actually rewriting the **committed/public** `prototype/data.js` with a live capture. Unset = the demo seed is left untouched (only the gitignored store updates); set `=1` to capture real cases into `data.js` — then **do NOT commit/push it**. |

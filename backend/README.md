@@ -55,10 +55,19 @@ kubectl apply -f deploy/k8s/                 # API Deployment+Service, ingest Cr
 The Ingress serves `/` (SPA) and `/api/*` (API) from one host — same origin, no CORS,
 no mixed content — so `prototype/config.js` keeps `API_BASE = ''`.
 
+## Auth
+
+`/api/cases` and `/api/save` are gated by a shared-secret bearer token. Set `API_AUTH_TOKEN`
+and clients must send `Authorization: Bearer <token>` (else `401`). **If `API_AUTH_TOKEN` is
+unset the API is OPEN** — fine for a localhost demo, but it logs a startup warning and must be
+set in any reachable deployment (otherwise anyone can read case PII and purge cases). Static
+file serving (`/`) stays open. See **[`../docs/SETUP.md`](../docs/SETUP.md)** for details.
+
 ## Environment variables
 
-`DATABASE_URL`, `CASE_CENTER_*`, `ALLOWED_ORIGINS`, `SERVE_STATIC`, `AUTO_CREATE`, and the rest are
-documented once in **[`../docs/SETUP.md`](../docs/SETUP.md)** (Environment variables).
+`DATABASE_URL`, `API_AUTH_TOKEN`, `CASE_CENTER_*`, `ALLOWED_ORIGINS`, `SERVE_STATIC`,
+`AUTO_CREATE`, and the rest are documented once in
+**[`../docs/SETUP.md`](../docs/SETUP.md)** (Environment variables).
 
 ## Files
 
