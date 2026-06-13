@@ -2440,6 +2440,57 @@ table.case-table {
 .handover-note .handover-arrow { color: var(--accent, #2E5641); font-weight: 700; }
 .handover-note .handover-when { margin-left: 4px; }
 
+/* ---- Picked list collapse toggle ---- */
+.picked-workspace-bottom { position: relative; }
+.picked-workspace-bottom.is-list-collapsed {
+  /* Detail expands to fill the row when the list is hidden. */
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.picked-workspace-bottom.is-list-collapsed .picked-workspace-list {
+  display: none;
+}
+.picked-list-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--border, #C5CCC1);
+  margin-bottom: 8px;
+}
+.picked-list-title {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint, #5B6660);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.picked-list-toggle, .picked-list-show-btn {
+  background: white;
+  border: 1px solid var(--border, #C5CCC1);
+  border-radius: 6px;
+  padding: 3px 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  color: #2E5641;
+  font-weight: 600;
+  transition: background 120ms, border-color 120ms;
+}
+.picked-list-toggle:hover, .picked-list-show-btn:hover {
+  background: #eef5ec;
+  border-color: #2E5641;
+}
+.picked-list-show-btn {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  z-index: 5;
+}
+.picked-workspace-bottom.is-list-collapsed .picked-workspace-detail {
+  padding-top: 38px; /* leave room for the floating "Show list" button */
+}
+
 </style>
 </head>
 <body>
@@ -4669,8 +4720,15 @@ function renderCaseList() {
         <div class="picked-workspace-top">
           ${renderRouteBoardStrip()}
         </div>
-        <div class="picked-workspace-bottom">
-          <div class="picked-workspace-list">${renderPickedList()}</div>
+        <div class="picked-workspace-bottom${STATE.pickedListCollapsed ? ' is-list-collapsed' : ''}">
+          <div class="picked-workspace-list">
+            <div class="picked-list-header">
+              <span class="picked-list-title">Picked cases (${pickedCases().length})</span>
+              <button class="picked-list-toggle" data-action="toggle-picked-list" title="Hide list">◂ Hide</button>
+            </div>
+            ${renderPickedList()}
+          </div>
+          ${STATE.pickedListCollapsed ? `<button class="picked-list-show-btn" data-action="toggle-picked-list" title="Show list">▸ Show list</button>` : ''}
           <div class="picked-workspace-detail">${renderReadingPanel(activeCase)}</div>
         </div>
       </div>
@@ -7608,6 +7666,12 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="toggle-sanity"]').forEach(el => {
     el.addEventListener('click', () => {
       STATE.sanityExpanded = !STATE.sanityExpanded;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-picked-list"]').forEach(el => {
+    el.addEventListener('click', () => {
+      STATE.pickedListCollapsed = !STATE.pickedListCollapsed;
       render();
     });
   });

@@ -1285,8 +1285,15 @@ function renderCaseList() {
         <div class="picked-workspace-top">
           ${renderRouteBoardStrip()}
         </div>
-        <div class="picked-workspace-bottom">
-          <div class="picked-workspace-list">${renderPickedList()}</div>
+        <div class="picked-workspace-bottom${STATE.pickedListCollapsed ? ' is-list-collapsed' : ''}">
+          <div class="picked-workspace-list">
+            <div class="picked-list-header">
+              <span class="picked-list-title">Picked cases (${pickedCases().length})</span>
+              <button class="picked-list-toggle" data-action="toggle-picked-list" title="Hide list">◂ Hide</button>
+            </div>
+            ${renderPickedList()}
+          </div>
+          ${STATE.pickedListCollapsed ? `<button class="picked-list-show-btn" data-action="toggle-picked-list" title="Show list">▸ Show list</button>` : ''}
           <div class="picked-workspace-detail">${renderReadingPanel(activeCase)}</div>
         </div>
       </div>
@@ -4224,6 +4231,12 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="toggle-sanity"]').forEach(el => {
     el.addEventListener('click', () => {
       STATE.sanityExpanded = !STATE.sanityExpanded;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="toggle-picked-list"]').forEach(el => {
+    el.addEventListener('click', () => {
+      STATE.pickedListCollapsed = !STATE.pickedListCollapsed;
       render();
     });
   });

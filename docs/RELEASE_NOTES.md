@@ -90,6 +90,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Added (Picked workspace · collapse the list)
+
+- **Toggle button to hide / show the picked case list.** The list pane (left
+  1/3 of the bottom zone) carries a new header row with "Picked cases (N)"
+  on the left and a "◂ Hide" toggle on the right. Hiding the list collapses
+  the grid to a single column and expands the **case detail** pane to fill
+  the full width; a floating "▸ Show list" button appears at the top-left
+  of the detail so the operator can bring the list back. State persists
+  across renders via `STATE.pickedListCollapsed`.
+
 ### Changed (Handover note · names on both sides; WATCH ring pulses until you act)
 
 - **Handover note meta now spells out both sides by name** (and shift). It
