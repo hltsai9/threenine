@@ -968,8 +968,11 @@ function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
   if (scheduledHandoff(c)) return 'moving';
-  if (ts === 'escalated_to_hq') return 'watch';
-  return 'stay';  // case_closed, need_to_contact_user, untracked
+  // WATCH covers both "watching at HQ" (escalated_to_hq) and "watching at User"
+  // (need_to_contact_user) — same row shape, station position derived from the
+  // Track Status definition's `watch` field.
+  if (ts === 'escalated_to_hq' || ts === 'need_to_contact_user') return 'watch';
+  return 'stay';  // case_closed, untracked
 }
 
 function _renderMovingRow(c, top, animDelay) {
@@ -1002,28 +1005,34 @@ function _renderMovingRow(c, top, animDelay) {
 
 function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const ts = caseTrackStatus(c);
+  const def = TRACK_STATUS_BY_ID[ts] || {};
+  const station = def.watch || 'HQ';
+  const pct = ROUTE_STATION_POS[station] ?? 88;
+  // Dot colour matches the station's square in the header (User #33596B, HQ #8C4A2F).
+  const dotColor = station === 'User' ? '#33596B' : '#8C4A2F';
+  // The id sits on whichever side has room — to the right of the dashed ring when
+  // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
+  const idLeftCalc = `calc(${pct}% + 22px)`;
+  const eyeLeftCalc = `calc(${pct}% + 22px)`;
+  // For User position, push the id further right so the eye + id don't collide.
+  const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
   return `
     <div class="rb-row rb-row-watch${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-watch-ring" style="left:88%;"></div>
-      <div class="rb-watch-dot"  style="left:88%;"></div>
-      <div class="rb-watch-eye"  style="left:calc(88% + 22px);" aria-hidden="true">
+      <div class="rb-watch-ring" style="left:${pct}%;"></div>
+      <div class="rb-watch-dot"  style="left:${pct}%; background:${dotColor};"></div>
+      <div class="rb-watch-eye"  style="left:${eyeLeftCalc};" aria-hidden="true">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>
-      <div class="rb-watch-id" style="left:calc(88% + 42px);">${escapeHtml(c.id)}</div>
+      <div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)}</div>
     </div>
   `;
 }
 
 function _renderStayRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
-  const needsUser = caseTrackStatus(c) === 'need_to_contact_user';
-  const eyeIcon = needsUser ? `
-    <div class="rb-stay-eye" style="left:calc(12% - 22px);" aria-hidden="true">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C8AA0" stroke-width="1.6"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-    </div>` : '';
   return `
     <div class="rb-row rb-row-stay${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      ${eyeIcon}
       <div class="rb-stay-dot" style="left:12%;"></div>
       <div class="rb-stay-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · stays</div>
     </div>
@@ -1778,6 +1787,23 @@ function renderDetailActions(c) {
   }
 
   items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
+
+  // "Hand over to" — pick a specific operator to address the handover note at.
+  // Open the same note modal pre-filled with the chosen recipient.
+  const meId = STATE.operatorId;
+  const recipientOpts = (window.OPERATORS || [])
+    .filter(o => o.id !== meId)
+    .map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)} · ${escapeHtml(o.shift)}</option>`)
+    .join('');
+  if (recipientOpts) {
+    items.push(`
+      <select class="ts-picker handover-to-picker" data-action="handover-to-select" data-case-id="${c.id}" title="Pick an operator and address a handover note to them">
+        <option value="">Hand over to…</option>
+        ${recipientOpts}
+      </select>
+    `);
+  }
+
   items.push(renderBellButton(c, 'detail'));
   items.push(renderQueueToggleButton(c, 'normal'));
   items.push(renderRefreshButton(c, 'normal'));
@@ -3891,6 +3917,39 @@ function handlePrompt(caseId, kind) {
   }
 }
 
+function handleHandoverTo(caseId, recipientOpId) {
+  const c = caseById(caseId);
+  const op = getOperator(STATE.operatorId);
+  const recipient = getOperator(recipientOpId);
+  if (!c || !op || !recipient) return;
+  showModal(`
+    <h3>Hand over to ${escapeHtml(recipient.name)}</h3>
+    <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(recipient.shift)} · case ${escapeHtml(c.id)}</div>
+    <label>Note for ${escapeHtml(recipient.name)}</label>
+    <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Send handover</button>
+    </div>
+  `, (modal) => {
+    const note = fieldVal(modal, 'note').trim();
+    if (!note) { alert('Handover note is required.'); return false; }
+    c.handover = {
+      note,
+      author: op.id,
+      from: op.shift,
+      to: recipient.shift,
+      toOperator: recipient.id,
+      at: new Date(NOW).toISOString(),
+      staleForCurrentShift: false,
+    };
+    logHistory(c, op, 'handover', `Handover to ${recipient.name} (${op.shift} → ${recipient.shift})`);
+    showToast(`Handover note for ${c.id} addressed to ${recipient.name}.`, 'success');
+    render();
+    return true;
+  });
+}
+
 function handleNewCase(op) {
   if (!/^https?:$/.test(location.protocol)) {
     showToast('Adding a case by ID requires running the board via serve.py.', 'warn');
@@ -4120,6 +4179,15 @@ function bindHandlers() {
       }
       logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
       render();
+    });
+  });
+  document.querySelectorAll('[data-action="handover-to-select"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const recipientOpId = el.value;
+      const caseId = el.dataset.caseId;
+      el.value = '';
+      if (!recipientOpId) return;
+      handleHandoverTo(caseId, recipientOpId);
     });
   });
   document.querySelectorAll('[data-action="reassign"]').forEach(el => {

@@ -90,6 +90,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - `.github/workflows/pages.yml` — branch `claude/vigilant-knuth-slap60` added to
   the deploy triggers so the GitHub Pages site picks up this branch's bundle.
 
+### Changed (Route Board · WATCH covers need_to_contact_user)
+
+- **`need_to_contact_user` moves from STAY to WATCH** on the Hand-off Route
+  Board. The WATCH row is now station-aware: the dashed ring + solid dot +
+  amber eye render at the watched station (User at 12% for *Need to contact
+  user*, HQ at 88% for *Escalated to HQ — keep an eye*) using the matching
+  station colour for the dot (`#33596B` / `#8C4A2F`). The case id sits to
+  the right of the eye.
+- The STAY row no longer carries the blue-grey outline eye icon — that case
+  type now renders as a WATCH row at User.
+
+### Added (Detail panel · Hand over to a specific operator)
+
+- **"Hand over to…" picker** in the case detail panel toolbar. Lists every
+  operator other than the current one (with their shift); selecting an
+  operator opens a handover modal pre-addressed to that person. The saved
+  handover gets a new `toOperator` field on top of the existing
+  `from`/`to` shift labels, and the history entry records the recipient's
+  name (e.g. *"Handover to Mia (DA) (Day → Day)"*). The original
+  *Write handover note* button stays for shift-to-shift handovers without
+  naming a recipient.
+
 ### Added (Shifts page · multi-week rota)
 
 - **Per-week rota editing.** The Shifts page rota editor now lets the team
