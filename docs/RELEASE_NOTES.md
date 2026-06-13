@@ -8,6 +8,44 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-13
+
+### Changed (CommuGround Forest theme polish)
+
+- **Sidebar navigation grows icons.** Each nav row (`Picked`, `Overview`,
+  `Shifts`, `Owners`, `Status Flow`, `Clock model`) now carries an inline
+  SVG icon that tints `--accent-soft` on the active route and `--text-muted`
+  on hover. New `.nav-icon` / `.nav-label` CSS hooks keep alignment crisp.
+- **Operator card** in the sidebar footer is redesigned around an `.op-id`
+  block (logo-gradient avatar + "On shift" cap + borderless `.op-switcher`
+  select) with the per-fact rows (`Shift`, `Ends`, `Week`) sitting under
+  it. Brand block drops the "prototype" badge and adds a "SUPPORT × SRE"
+  serif sub-line.
+- **Themed dropdowns.** `.op-switcher` and `.ts-picker` now match the
+  Forest palette — custom chevron, hover/focus rings, and a fully styled
+  open popup (`@supports (appearance: base-select)`) with selection
+  checkmarks. Falls back gracefully on browsers without
+  `appearance: base-select`.
+- **Forest link colors everywhere.** A zero-specificity `:where(a)` rule
+  paints content hyperlinks `--accent` with a soft underline; UA blue and
+  visited purple are gone. `.btn`, `.nav a`, `.muted` links keep their
+  own colors because the selector has no weight.
+- **Route Board same-station fix.** When a scheduled handoff's `from` and
+  `to` resolve to the same station (e.g. a Weekend Case whose CC
+  `assigneeDept` already maps to HQ), the MOVING row no longer draws a
+  zero-length line with a detached arrowhead stacked on the dot — it just
+  renders the "at station" marker.
+- Misc alignment polish across the Route Board (origin dot 3px white
+  border + #3f6e5e shadow, station square colours nudged), `.shift-info`
+  card padding, and the brand block.
+
+### Internal
+
+- `prototype/standalone.html` regenerated from the modular sources to
+  capture every CSS / JS / HTML change in one self-contained bundle.
+
+---
+
 ## 2026-06-12
 
 ### Changed
