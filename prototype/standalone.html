@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Case Tracker — Prototype (standalone)</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmFpbmJvdyIgeDE9IjAiIHkxPSIwIiB4Mj0iNjQiIHkyPSI2NCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiAgc3RvcC1jb2xvcj0iI2ZmM2IzMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjIwJSIgc3RvcC1jb2xvcj0iI2ZmOTUwMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjQwJSIgc3RvcC1jb2xvcj0iI2ZmY2MwMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjYwJSIgc3RvcC1jb2xvcj0iIzM0Yzc1OSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjgwJSIgc3RvcC1jb2xvcj0iIzBhODRmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiZjVhZjIiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxwb2x5Z29uIHBvaW50cz0iMzIsMiA1Ny45OCwxNyA1Ny45OCw0NyAzMiw2MiA2LjAyLDQ3IDYuMDIsMTciCiAgICAgICAgICAgZmlsbD0idXJsKCNyYWluYm93KSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIgogICAgICAgIGZvbnQtZmFtaWx5PSItYXBwbGUtc3lzdGVtLCAnU2Vnb2UgVUknLCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIgogICAgICAgIGZvbnQtd2VpZ2h0PSI4MDAiIGZvbnQtc2l6ZT0iMzgiIGZpbGw9IiNmZmZmZmYiPkM8L3RleHQ+Cjwvc3ZnPgo=">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0Ij4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmFpbmJvdyIgeDE9IjAiIHkxPSIwIiB4Mj0iNjQiIHkyPSI2NCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmYzYjMwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iMjAlIiBzdG9wLWNvbG9yPSIjZmY5NTAwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iNDAlIiBzdG9wLWNvbG9yPSIjZmZjYzAwIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iNjAlIiBzdG9wLWNvbG9yPSIjMzRjNzU5Ij48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iODAlIiBzdG9wLWNvbG9yPSIjMGE4NGZmIj48L3N0b3A+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2JmNWFmMiI+PC9zdG9wPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPHBvbHlnb24gcG9pbnRzPSIzMiwyIDU3Ljk4LDE3IDU3Ljk4LDQ3IDMyLDYyIDYuMDIsNDcgNi4wMiwxNyIgZmlsbD0idXJsKCNyYWluYm93KSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvcG9seWdvbj4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiBmb250LWZhbWlseT0iLWFwcGxlLXN5c3RlbSwgJiMzOTtTZWdvZSBVSSYjMzk7LCBIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM4IiBmaWxsPSIjZmZmZmZmIj5DPC90ZXh0Pgo8L3N2Zz4=">
 <style>
 /* ============================================================
    CommuGround Forest theme — applied over the Case Tracker prototype.
@@ -117,6 +117,12 @@ html, body {
   min-height: 100vh;
 }
 
+/* Content hyperlinks — forest accent, never the UA blue/purple. :where() keeps
+   zero specificity so .btn / .nav a / .muted links keep their own colors. */
+:where(a) { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+:where(a:visited) { color: var(--accent); }
+:where(a:hover) { text-decoration-color: var(--accent); }
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   background: var(--sidebar);
@@ -145,12 +151,22 @@ html, body {
   box-shadow: 0 4px 12px rgba(47,107,70,.4);
   flex-shrink: 0;
 }
+.brand-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .brand-name {
   font-family: var(--font-serif);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--text);
-  letter-spacing: -.005em;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+}
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-faint-2);
+  letter-spacing: .08em;
+  margin-top: 1px;
 }
 .badge {
   background: var(--chip-soft);
@@ -173,17 +189,29 @@ html, body {
 }
 .nav a {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 11px 13px;
-  color: #7d7a99;
+  gap: 11px;
+  padding: 10px 13px;
+  color: var(--text-muted);
   text-decoration: none;
   border-radius: 12px;
   font-size: 13.5px;
   font-weight: 600;
   transition: background .12s, color .12s;
 }
+.nav-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  color: var(--text-faint-2);
+  transition: color .12s;
+}
+.nav-icon svg { width: 100%; height: 100%; display: block; }
+.nav-label { flex: 1; min-width: 0; }
 .nav a:hover { background: var(--bg); }
+.nav a:hover .nav-icon { color: var(--text-muted); }
+.nav a.active .nav-icon { color: var(--accent-soft); }
 .nav a.active {
   background: var(--accent-bg);
   color: var(--accent);
@@ -227,18 +255,14 @@ html, body {
   font-weight: 600;
 }
 .shift-info {
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-top: 4px;
+  margin: 4px -4px 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12.5px;
-  background: var(--chip-soft-2);
-  margin: 4px -4px 0;
-  padding: 12px 14px;
-  border-radius: 13px;
+  background: white;
+  padding: 11px 12px;
+  border-radius: 12px;
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
 }
 .kv { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .kv .k { color: var(--text-faint-2); font-weight: 600; }
@@ -395,7 +419,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
 .kanban-handover-banner strong { color: var(--high); }
 .kanban-live-banner {
   background: var(--accent-bg);
-  border: 1px solid #d8cdf6;
+  border: 1px solid #cfe0d4;
   border-radius: var(--r-md);
   padding: 8px 14px;
   margin-bottom: 12px;
@@ -421,8 +445,9 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   font-weight: 600;
   box-shadow: 0 12px 32px rgba(20,33,26,.36);
 }
-.lookback-ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
-.lookback-ctl input { width: 60px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: white; }
+.lookback-ctl { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; background: var(--chip-soft-2); border: 1px solid var(--border); border-radius: 11px; padding: 4px 5px 4px 12px; }
+.lookback-ctl input { width: 48px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-weight: 600; text-align: center; background: white; }
+.lookback-ctl .btn { padding: 7px 12px; }
 .live-spinner {
   width: 14px;
   height: 14px;
@@ -534,7 +559,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
 /* ---------- Buttons ---------- */
 .btn {
   padding: 8px 12px;
-  border: 1px solid #ece9f5;
+  border: 1px solid var(--border);
   background: white;
   border-radius: 10px;
   font-size: 12.5px;
@@ -542,6 +567,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   cursor: pointer;
   font-family: inherit;
   color: var(--text-muted);
+  white-space: nowrap;
   transition: background .12s, border-color .12s, color .12s, transform .08s;
 }
 .btn:hover { background: var(--chip-soft-2); color: var(--text); }
@@ -741,7 +767,7 @@ table.case-table {
 .kanban-band { display: flex; flex-direction: column; gap: 8px; }
 .kanban-band-top {
   background: var(--accent-bg);
-  border: 1px solid #d8cdf6;
+  border: 1px solid #cfe0d4;
   border-radius: 10px;
   padding: 8px;
 }
@@ -980,8 +1006,8 @@ table.case-table {
 /* Core Team members readout on the Owners page */
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
   margin-top: 8px;
 }
 .team-card {
@@ -1091,7 +1117,7 @@ table.case-table {
   color: var(--accent);
   font-weight: 700;
 }
-.kanban-cta:hover { background: #e3d9fa; }
+.kanban-cta:hover { background: #d6ebdd; }
 .kanban-cta .prompt-icon { width: 14px; height: 14px; font-size: 9px; line-height: 14px; }
 .kanban-handover-btn {
   border-color: transparent;
@@ -1279,10 +1305,10 @@ table.case-table {
 .tl-key { display: inline-flex; align-items: center; gap: 5px; }
 .tl-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 /* holder colors mapped to CommuGround palette */
-.tl-triage    { background: #cfd5ee; color: var(--col-new-deep); }
-.tl-core       { background: #f8c5dc; color: var(--col-local-deep); }
+.tl-triage    { background: #d2dad2; color: var(--col-new-deep); }
+.tl-core       { background: #cce8d3; color: var(--col-local-deep); }
 .tl-hq        { background: #a7e0d9; color: var(--col-hq-deep); }
-.tl-sanity    { background: #cdc3f4; color: var(--col-sanity-deep); }
+.tl-sanity    { background: #bcdacf; color: var(--col-sanity-deep); }
 .tl-requester { background: #b4e6df; color: var(--col-hq-deep); }
 .tl-done      { background: #c4e2d1; color: var(--col-resolved-deep); }
 .wu-due { font-size: 11px; padding: 2px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); white-space: nowrap; font-weight: 700; }
@@ -1435,18 +1461,122 @@ table.case-table {
 .tz-hint.out-of-hours { background: var(--high-bg); color: var(--high); }
 
 /* ---------- Operator switcher ---------- */
-.op-switcher {
-  background: white;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-family: inherit;
-  font-weight: 600;
-  max-width: 130px;
+.op-id { display: flex; align-items: center; gap: 10px; }
+.op-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--grad-logo);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(47,107,70,.3);
 }
-.op-switcher option { color: var(--text); }
+.op-avatar svg { width: 18px; height: 18px; }
+.op-id-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.op-cap {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-faint-2);
+}
+.op-switcher {
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 1px 18px 1px 0;
+  margin: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+.op-switcher:hover { color: var(--accent); }
+.op-switcher:focus { outline: none; }
+.op-switcher option { color: var(--text); font-weight: 600; font-family: var(--font-ui); }
+
+/* Themed popup for the operator switcher (matches .ts-picker), trigger stays borderless. */
+@supports (appearance: base-select) {
+  .op-switcher {
+    appearance: base-select;
+    background-image: none;
+    padding: 1px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .op-switcher::picker-icon {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    margin-left: auto;
+    transition: transform .2s ease;
+  }
+  .op-switcher:open::picker-icon { transform: rotate(180deg); }
+  .op-switcher:open { color: var(--accent); }
+  .op-switcher::picker(select) {
+    appearance: base-select;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-modal);
+    padding: 6px;
+    margin-top: 8px;
+    min-width: 200px;
+    font-family: var(--font-ui);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .14s ease, transform .14s ease, overlay .14s allow-discrete, display .14s allow-discrete;
+  }
+  .op-switcher:open::picker(select) { opacity: 1; transform: translateY(0); }
+  @starting-style {
+    .op-switcher:open::picker(select) { opacity: 0; transform: translateY(-4px); }
+  }
+  .op-switcher option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .op-switcher option:hover,
+  .op-switcher option:focus { background: var(--accent-bg); color: var(--accent); outline: none; }
+  .op-switcher option:checked { color: var(--accent); font-weight: 700; }
+  .op-switcher option::checkmark {
+    content: "";
+    order: 99;
+    margin-left: auto;
+    color: var(--accent-soft);
+  }
+}
+.op-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--hairline-2);
+}
+.of { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.of-k { flex: 0 0 auto; color: var(--text-faint-2); font-weight: 600; font-size: 11.5px; }
+.of-v { color: var(--text); font-weight: 700; font-size: 11.5px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ---------- Tabs ---------- */
 .tabs {
@@ -1538,6 +1668,7 @@ table.case-table {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 14px;
+  margin-bottom: 16px;
 }
 
 /* ---------- Roster editor (Shifts page) ---------- */
@@ -1604,7 +1735,7 @@ table.case-table {
   font-weight: 600;
   color: var(--text-muted);
 }
-.shift-card .roster .op.is-you { background: var(--accent-bg); border-color: #d8cdf6; color: var(--accent); font-weight: 700; }
+.shift-card .roster .op.is-you { background: var(--accent-bg); border-color: #cfe0d4; color: var(--accent); font-weight: 700; }
 .shift-card .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1672,10 +1803,10 @@ table.case-table {
 .bell-btn:hover { background: var(--chip-soft-2); color: var(--text); }
 .bell-btn.bell-set {
   background: var(--accent-bg);
-  border-color: #d8cdf6;
+  border-color: #cfe0d4;
   color: var(--accent);
 }
-.bell-btn.bell-set:hover { background: #e3d9fa; }
+.bell-btn.bell-set:hover { background: #d6ebdd; }
 .bell-btn.bell-due {
   background: var(--danger-bg);
   border-color: #f1c0c8;
@@ -1958,8 +2089,11 @@ table.case-table {
 .picked-workspace-top {
   /* The hand-off Route Board brings its own band chrome (green band + white
    * card), so this container stays transparent and just provides the scroll
-   * envelope. */
+   * envelope. overflow-x is pinned to hidden — otherwise setting only
+   * overflow-y auto-promotes the X axis to auto and shows a near-empty
+   * horizontal scrollbar from the vertical gutter's few px of overhang. */
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 220px;
 }
 .picked-workspace-bottom {
@@ -2046,14 +2180,90 @@ table.case-table {
 /* --- Track Status picker dropdown --- */
 
 .ts-picker {
-  padding: 6px 10px;
+  padding: 8px 34px 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: white;
+  border-radius: 9px;
+  background-color: white;
+  color: var(--text);
+  font-family: var(--font-ui);
   font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   min-width: 220px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  transition: border-color .12s, box-shadow .12s;
 }
-.ts-picker:focus { outline: 2px solid var(--accent, #3e7050); outline-offset: 1px; }
+.ts-picker:hover { border-color: var(--accent-soft); }
+.ts-picker:focus { outline: none; border-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-bg); }
+.ts-picker option { font-weight: 600; color: var(--text); }
+
+/* Modern stylable select — themes the open popup too (Chrome 135+/supported
+   browsers). Falls back to the themed closed box + native menu elsewhere. */
+@supports (appearance: base-select) {
+  .ts-picker {
+    appearance: base-select;
+    background-image: none;
+    padding-right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ts-picker::picker-icon {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    margin-left: auto;
+    transition: transform .2s ease;
+  }
+  .ts-picker:open::picker-icon { transform: rotate(180deg); }
+  .ts-picker:open { border-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .ts-picker::picker(select) {
+    appearance: base-select;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-modal);
+    padding: 6px;
+    margin-top: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-family: var(--font-ui);
+    /* fade/slide in */
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .14s ease, transform .14s ease, overlay .14s allow-discrete, display .14s allow-discrete;
+  }
+  .ts-picker:open::picker(select) { opacity: 1; transform: translateY(0); }
+  @starting-style {
+    .ts-picker:open::picker(select) { opacity: 0; transform: translateY(-4px); }
+  }
+  .ts-picker option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .ts-picker option:hover,
+  .ts-picker option:focus {
+    background: var(--accent-bg);
+    color: var(--accent);
+    outline: none;
+  }
+  .ts-picker option:checked { color: var(--accent); font-weight: 700; }
+  .ts-picker option::checkmark {
+    content: "";
+    order: 99;
+    margin-left: auto;
+    color: var(--accent-soft);
+  }
+}
 
 /* ============================================================================
  *  Hand-off Route Board (rb-*)
@@ -2065,7 +2275,10 @@ table.case-table {
   background: #234231;
   border-bottom: 4px solid #2E5641;
   padding: 18px 36px;
-  margin: 0 -22px 14px;
+  margin: 0 0 14px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-panel);
   font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
@@ -2171,7 +2384,7 @@ table.case-table {
 
 .rb-row {
   position: absolute;
-  left: 16px; right: 16px;
+  left: 0; right: 0;
   cursor: pointer;
   z-index: 1;
   border-radius: 8px;
@@ -2196,7 +2409,7 @@ table.case-table {
 .rb-row-moving .rb-origin-dot {
   top: 50%;
   width: 16px; height: 16px; border-radius: 50%;
-  background: #33596B;
+  background: #3f6e5e;
   border: 3px solid white;
   transform: translate(-50%, -50%);
   z-index: 3;
@@ -2497,31 +2710,39 @@ table.case-table {
 <div id="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-name">Case Tracker</div>
-      <span class="badge">prototype</span>
+      <div class="brand-text">
+        <div class="brand-name">CommuGround</div>
+        <div class="brand-sub">SUPPORT × SRE</div>
+      </div>
     </div>
     <nav class="nav">
       <a href="#/cases" data-route="cases">
-        <span>Picked</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+        <span class="nav-label">Picked</span>
         <span class="count" id="nav-cases-count">—</span>
       </a>
       <a href="#/archive" data-route="archive">
-        <span>Overview</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+        <span class="nav-label">Overview</span>
         <span class="count" id="nav-archive-count">—</span>
       </a>
       <a href="#/shifts" data-route="shifts">
-        <span>Shifts</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+        <span class="nav-label">Shifts</span>
         <span class="count" id="nav-shifts-count">—</span>
       </a>
       <a href="#/owners" data-route="owners">
-        <span>Owners</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></span>
+        <span class="nav-label">Owners</span>
         <span class="count" id="nav-owners-count">—</span>
       </a>
       <a href="#/flow" data-route="flow">
-        <span>Status Flow</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 6a9 9 0 0 1-9 9"/><circle cx="18" cy="6" r="3"/></svg></span>
+        <span class="nav-label">Status Flow</span>
       </a>
       <a href="#/clocks" data-route="clocks">
-        <span>Clock model</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <span class="nav-label">Clock model</span>
       </a>
     </nav>
     <div class="sidebar-clock">
@@ -2529,13 +2750,20 @@ table.case-table {
       <div class="clock-date" id="clock-date">—</div>
     </div>
     <div class="shift-info">
-      <div class="kv">
-        <span class="k">Operator</span>
-        <select id="op-switcher" class="op-switcher"></select>
+      <div class="op-id">
+        <span class="op-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <div class="op-id-text">
+          <span class="op-cap">On shift</span>
+          <select id="op-switcher" class="op-switcher"></select>
+        </div>
       </div>
-      <div class="kv"><span class="k">Shift</span><span class="v" id="op-shift">—</span></div>
-      <div class="kv"><span class="k">Ends</span><span class="v" id="op-ends">—</span></div>
-      <div class="kv"><span class="k">Week</span><span class="v" id="op-week">—</span></div>
+      <div class="op-facts">
+        <div class="of"><span class="of-k">Shift</span><span class="of-v" id="op-shift">—</span></div>
+        <div class="of"><span class="of-k">Ends</span><span class="of-v" id="op-ends">—</span></div>
+        <div class="of"><span class="of-k">Week</span><span class="of-v" id="op-week">—</span></div>
+      </div>
     </div>
     <div class="footer-note">
       Click-through prototype.<br>
@@ -4423,14 +4651,21 @@ function _renderMovingRow(c, top, animDelay) {
   const chipCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
 
-  return `
-    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+  // When origin and destination resolve to the same station the travel line has
+  // zero length; drawing the line/arrowhead/track then leaves a detached triangle
+  // stacked on the dot. In that case render only the "at station" marker.
+  const degenerate = Math.abs(widthPct) < 0.5;
+  const travel = degenerate ? '' : `
       <div class="rb-line"            style="left:${originPct}%; width:${widthPct}%; background:${color};"></div>
       <div class="rb-line-arrowhead"  style="left:${destPct}%; border-left-color:${color};"></div>
       <div class="rb-travel-track"    style="left:${originPct}%; width:${widthPct}%;">
         <span class="rb-travel-dot" style="background:${color}; animation-delay:${animDelay}s;"></span>
-      </div>
-      <div class="rb-origin-dot"      style="left:${originPct}%; background:#33596B; box-shadow:0 0 0 1.5px #33596B;"></div>
+      </div>`;
+
+  return `
+    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      ${travel}
+      <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
       <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
@@ -4444,8 +4679,8 @@ function _renderWatchRow(c, top) {
   const def = TRACK_STATUS_BY_ID[ts] || {};
   const station = def.watch || 'HQ';
   const pct = ROUTE_STATION_POS[station] ?? 88;
-  // Dot colour matches the station's square in the header (User #33596B, HQ #8C4A2F).
-  const dotColor = station === 'User' ? '#33596B' : '#8C4A2F';
+  // Dot colour matches the station's square in the header (User #3f6e5e, HQ #8C4A2F).
+  const dotColor = station === 'User' ? '#3f6e5e' : '#8C4A2F';
   // The id sits on whichever side has room — to the right of the dashed ring when
   // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
   const eyeLeftCalc = `calc(${pct}% + 22px)`;
@@ -4576,8 +4811,8 @@ function renderRouteBoardStrip() {
         <div class="rb-guide" style="left:50%;"></div>
         <div class="rb-guide" style="left:88%;"></div>
         <div class="rb-station rb-station-user" style="left:12%; top:${HEADER_TOP}px;">
-          <span class="rb-station-square" style="background:#33596B;"></span>
-          <span class="rb-station-label"  style="color:#33596B;">USER</span>
+          <span class="rb-station-square" style="background:#3f6e5e;"></span>
+          <span class="rb-station-label"  style="color:#3f6e5e;">USER</span>
         </div>
         <div class="rb-station rb-station-core" style="left:50%; top:${HEADER_TOP}px;">
           <span class="rb-station-square" style="background:#8A3434;"></span>
@@ -6609,90 +6844,90 @@ function renderStatusFlow() {
       <svg class="status-flow-svg" viewBox="0 0 980 580" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arr-forward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#4e8063"/>
           </marker>
           <marker id="arr-pause" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#0891b2"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#5a9277"/>
           </marker>
           <marker id="arr-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9c5a52"/>
           </marker>
         </defs>
 
         <g class="flow-node">
-          <rect x="40" y="40" width="120" height="60" rx="8" fill="#e0e7ff" stroke="#3730a3" stroke-width="2"/>
+          <rect x="40" y="40" width="120" height="60" rx="8" fill="#eef1ee" stroke="#6b756d" stroke-width="2"/>
           <text x="100" y="76" text-anchor="middle" font-weight="600" font-size="13">New</text>
         </g>
         <g class="flow-node">
-          <rect x="220" y="40" width="160" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <rect x="220" y="40" width="160" height="60" rx="8" fill="#e9f1ea" stroke="#3e7050" stroke-width="2"/>
           <text x="300" y="76" text-anchor="middle" font-weight="600" font-size="13">With Core Team</text>
         </g>
         <g class="flow-node">
-          <rect x="440" y="40" width="180" height="60" rx="8" fill="#fee2e2" stroke="#991b1b" stroke-width="2"/>
+          <rect x="440" y="40" width="180" height="60" rx="8" fill="#e3ede7" stroke="#2f6147" stroke-width="2"/>
           <text x="530" y="68" text-anchor="middle" font-weight="600" font-size="13">With HQ</text>
           <text x="530" y="86" text-anchor="middle" font-size="11">Product Team</text>
         </g>
         <g class="flow-node">
-          <rect x="680" y="40" width="160" height="60" rx="8" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <rect x="680" y="40" width="160" height="60" rx="8" fill="#e0ebe7" stroke="#2a5648" stroke-width="2"/>
           <text x="760" y="76" text-anchor="middle" font-weight="600" font-size="13">Sanity Check</text>
         </g>
 
         <g class="flow-node">
-          <rect x="300" y="250" width="240" height="60" rx="8" fill="#cffafe" stroke="#155e75" stroke-width="2"/>
+          <rect x="300" y="250" width="240" height="60" rx="8" fill="#ece4d6" stroke="#97744a" stroke-width="2"/>
           <text x="420" y="278" text-anchor="middle" font-weight="600" font-size="13">Returned to Requester</text>
-          <text x="420" y="296" text-anchor="middle" font-size="11" fill="#155e75">SLA clock paused</text>
+          <text x="420" y="296" text-anchor="middle" font-size="11" fill="#97744a">SLA clock paused</text>
         </g>
 
         <g class="flow-node">
-          <rect x="680" y="450" width="160" height="60" rx="8" fill="#e5e7eb" stroke="#4b5563" stroke-width="2"/>
+          <rect x="680" y="450" width="160" height="60" rx="8" fill="#eef1ee" stroke="#56635b" stroke-width="2"/>
           <text x="760" y="486" text-anchor="middle" font-weight="600" font-size="13">Closed</text>
         </g>
 
         <g class="flow-node">
-          <rect x="40" y="450" width="160" height="60" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="2" stroke-dasharray="4,3"/>
-          <text x="120" y="486" text-anchor="middle" font-weight="600" font-size="13" fill="#6b7280">Cancelled</text>
+          <rect x="40" y="450" width="160" height="60" rx="8" fill="#f1f4f1" stroke="#7c887f" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="120" y="486" text-anchor="middle" font-weight="600" font-size="13" fill="#7c887f">Cancelled</text>
         </g>
 
-        <g stroke="#2563eb" stroke-width="2" fill="none">
+        <g stroke="#4e8063" stroke-width="2" fill="none">
           <path d="M160,70 L218,70" marker-end="url(#arr-forward)"/>
           <path d="M380,70 L438,70" marker-end="url(#arr-forward)"/>
           <path d="M620,70 L678,70" marker-end="url(#arr-forward)"/>
           <path d="M760,100 L760,448" marker-end="url(#arr-forward)"/>
         </g>
-        <g font-size="11" fill="#2563eb" font-weight="500">
+        <g font-size="11" fill="#4e8063" font-weight="500">
           <text x="189" y="34" text-anchor="middle">Assign Core Team</text>
           <text x="409" y="34" text-anchor="middle">Escalate to HQ</text>
           <text x="649" y="34" text-anchor="middle">Move to Sanity</text>
           <text x="772" y="280" text-anchor="start">Verify &amp; close</text>
         </g>
 
-        <g stroke="#0891b2" stroke-width="2" fill="none">
+        <g stroke="#5a9277" stroke-width="2" fill="none">
           <path d="M100,100 Q90,200 298,256" marker-end="url(#arr-pause)"/>
           <path d="M260,100 L340,248" marker-end="url(#arr-pause)"/>
           <path d="M520,100 L470,248" marker-end="url(#arr-pause)"/>
         </g>
-        <g font-size="11" fill="#0891b2" font-weight="500">
+        <g font-size="11" fill="#5a9277" font-weight="500">
           <text x="92" y="170" text-anchor="start">Return to requester</text>
           <text x="248" y="180" text-anchor="end">Return to requester</text>
           <text x="540" y="180" text-anchor="start">Return to requester</text>
         </g>
 
-        <g stroke="#0891b2" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
+        <g stroke="#5a9277" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
           <path d="M360,250 Q310,180 290,100" marker-end="url(#arr-pause)"/>
           <path d="M490,250 Q500,180 520,100" marker-end="url(#arr-pause)"/>
           <path d="M540,275 Q650,210 740,102" marker-end="url(#arr-pause)"/>
           <path d="M300,275 Q200,210 110,102" marker-end="url(#arr-pause)"/>
         </g>
-        <g font-size="11" fill="#0891b2" font-style="italic">
+        <g font-size="11" fill="#5a9277" font-style="italic">
           <text x="610" y="220" text-anchor="middle">Resume (requester replied)</text>
           <text x="200" y="220" text-anchor="middle">Resume (requester replied)</text>
         </g>
 
-        <path d="M540,300 L678,460" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arr-forward)"/>
-        <text x="640" y="395" font-size="11" fill="#2563eb" text-anchor="middle" font-weight="500">Close as resolved</text>
+        <path d="M540,300 L678,460" stroke="#4e8063" stroke-width="2" fill="none" marker-end="url(#arr-forward)"/>
+        <text x="640" y="395" font-size="11" fill="#4e8063" text-anchor="middle" font-weight="500">Close as resolved</text>
 
-        <path d="M100,100 Q40,280 120,448" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-danger)"/>
-        <g font-size="11" fill="#dc2626" font-style="italic">
+        <path d="M100,100 Q40,280 120,448" stroke="#9c5a52" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-danger)"/>
+        <g font-size="11" fill="#9c5a52" font-style="italic">
           <text x="14" y="285">Cancel — from</text>
           <text x="14" y="299">any open state</text>
         </g>
@@ -8047,7 +8282,7 @@ boot();
   const STEPS = [
     {
       kind: 'modal',
-      title: 'Welcome to the Case Tracker prototype',
+      title: 'Welcome to CommuGround',
       body: 'A click-through demo of the Excel replacement. This tour walks through the main features in about 10 steps. You can skip anytime, and re-launch later from the "Take the tour" link in the sidebar.',
     },
     {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Case Tracker — Prototype</title>
+<title>CommuGround — Case Tracker</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,31 +14,39 @@
 <div id="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-name">Case Tracker</div>
-      <span class="badge">prototype</span>
+      <div class="brand-text">
+        <div class="brand-name">CommuGround</div>
+        <div class="brand-sub">SUPPORT × SRE</div>
+      </div>
     </div>
     <nav class="nav">
       <a href="#/cases" data-route="cases">
-        <span>Picked</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+        <span class="nav-label">Picked</span>
         <span class="count" id="nav-cases-count">—</span>
       </a>
       <a href="#/archive" data-route="archive">
-        <span>Overview</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+        <span class="nav-label">Overview</span>
         <span class="count" id="nav-archive-count">—</span>
       </a>
       <a href="#/shifts" data-route="shifts">
-        <span>Shifts</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+        <span class="nav-label">Shifts</span>
         <span class="count" id="nav-shifts-count">—</span>
       </a>
       <a href="#/owners" data-route="owners">
-        <span>Owners</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></span>
+        <span class="nav-label">Owners</span>
         <span class="count" id="nav-owners-count">—</span>
       </a>
       <a href="#/flow" data-route="flow">
-        <span>Status Flow</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 6a9 9 0 0 1-9 9"/><circle cx="18" cy="6" r="3"/></svg></span>
+        <span class="nav-label">Status Flow</span>
       </a>
       <a href="#/clocks" data-route="clocks">
-        <span>Clock model</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <span class="nav-label">Clock model</span>
       </a>
     </nav>
     <div class="sidebar-clock">
@@ -46,13 +54,20 @@
       <div class="clock-date" id="clock-date">—</div>
     </div>
     <div class="shift-info">
-      <div class="kv">
-        <span class="k">Operator</span>
-        <select id="op-switcher" class="op-switcher"></select>
+      <div class="op-id">
+        <span class="op-avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        <div class="op-id-text">
+          <span class="op-cap">On shift</span>
+          <select id="op-switcher" class="op-switcher"></select>
+        </div>
       </div>
-      <div class="kv"><span class="k">Shift</span><span class="v" id="op-shift">—</span></div>
-      <div class="kv"><span class="k">Ends</span><span class="v" id="op-ends">—</span></div>
-      <div class="kv"><span class="k">Week</span><span class="v" id="op-week">—</span></div>
+      <div class="op-facts">
+        <div class="of"><span class="of-k">Shift</span><span class="of-v" id="op-shift">—</span></div>
+        <div class="of"><span class="of-k">Ends</span><span class="of-v" id="op-ends">—</span></div>
+        <div class="of"><span class="of-k">Week</span><span class="of-v" id="op-week">—</span></div>
+      </div>
     </div>
     <div class="footer-note">
       Click-through prototype.<br>

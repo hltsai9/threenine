@@ -9,7 +9,7 @@
   const STEPS = [
     {
       kind: 'modal',
-      title: 'Welcome to the Case Tracker prototype',
+      title: 'Welcome to CommuGround',
       body: 'A click-through demo of the Excel replacement. This tour walks through the main features in about 10 steps. You can skip anytime, and re-launch later from the "Take the tour" link in the sidebar.',
     },
     {

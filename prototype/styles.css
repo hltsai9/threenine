@@ -109,6 +109,12 @@ html, body {
   min-height: 100vh;
 }
 
+/* Content hyperlinks — forest accent, never the UA blue/purple. :where() keeps
+   zero specificity so .btn / .nav a / .muted links keep their own colors. */
+:where(a) { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+:where(a:visited) { color: var(--accent); }
+:where(a:hover) { text-decoration-color: var(--accent); }
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   background: var(--sidebar);
@@ -137,12 +143,22 @@ html, body {
   box-shadow: 0 4px 12px rgba(47,107,70,.4);
   flex-shrink: 0;
 }
+.brand-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .brand-name {
   font-family: var(--font-serif);
   font-weight: 700;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--text);
-  letter-spacing: -.005em;
+  letter-spacing: -.01em;
+  line-height: 1.15;
+}
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-faint-2);
+  letter-spacing: .08em;
+  margin-top: 1px;
 }
 .badge {
   background: var(--chip-soft);
@@ -165,17 +181,29 @@ html, body {
 }
 .nav a {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 11px 13px;
-  color: #7d7a99;
+  gap: 11px;
+  padding: 10px 13px;
+  color: var(--text-muted);
   text-decoration: none;
   border-radius: 12px;
   font-size: 13.5px;
   font-weight: 600;
   transition: background .12s, color .12s;
 }
+.nav-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  color: var(--text-faint-2);
+  transition: color .12s;
+}
+.nav-icon svg { width: 100%; height: 100%; display: block; }
+.nav-label { flex: 1; min-width: 0; }
 .nav a:hover { background: var(--bg); }
+.nav a:hover .nav-icon { color: var(--text-muted); }
+.nav a.active .nav-icon { color: var(--accent-soft); }
 .nav a.active {
   background: var(--accent-bg);
   color: var(--accent);
@@ -219,18 +247,14 @@ html, body {
   font-weight: 600;
 }
 .shift-info {
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-top: 4px;
+  margin: 4px -4px 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12.5px;
-  background: var(--chip-soft-2);
-  margin: 4px -4px 0;
-  padding: 12px 14px;
-  border-radius: 13px;
+  background: white;
+  padding: 11px 12px;
+  border-radius: 12px;
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-panel);
 }
 .kv { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .kv .k { color: var(--text-faint-2); font-weight: 600; }
@@ -387,7 +411,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
 .kanban-handover-banner strong { color: var(--high); }
 .kanban-live-banner {
   background: var(--accent-bg);
-  border: 1px solid #d8cdf6;
+  border: 1px solid #cfe0d4;
   border-radius: var(--r-md);
   padding: 8px 14px;
   margin-bottom: 12px;
@@ -413,8 +437,9 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   font-weight: 600;
   box-shadow: 0 12px 32px rgba(20,33,26,.36);
 }
-.lookback-ctl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
-.lookback-ctl input { width: 60px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: white; }
+.lookback-ctl { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; background: var(--chip-soft-2); border: 1px solid var(--border); border-radius: 11px; padding: 4px 5px 4px 12px; }
+.lookback-ctl input { width: 48px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-weight: 600; text-align: center; background: white; }
+.lookback-ctl .btn { padding: 7px 12px; }
 .live-spinner {
   width: 14px;
   height: 14px;
@@ -526,7 +551,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
 /* ---------- Buttons ---------- */
 .btn {
   padding: 8px 12px;
-  border: 1px solid #ece9f5;
+  border: 1px solid var(--border);
   background: white;
   border-radius: 10px;
   font-size: 12.5px;
@@ -534,6 +559,7 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   cursor: pointer;
   font-family: inherit;
   color: var(--text-muted);
+  white-space: nowrap;
   transition: background .12s, border-color .12s, color .12s, transform .08s;
 }
 .btn:hover { background: var(--chip-soft-2); color: var(--text); }
@@ -733,7 +759,7 @@ table.case-table {
 .kanban-band { display: flex; flex-direction: column; gap: 8px; }
 .kanban-band-top {
   background: var(--accent-bg);
-  border: 1px solid #d8cdf6;
+  border: 1px solid #cfe0d4;
   border-radius: 10px;
   padding: 8px;
 }
@@ -972,8 +998,8 @@ table.case-table {
 /* Core Team members readout on the Owners page */
 .team-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
   margin-top: 8px;
 }
 .team-card {
@@ -1083,7 +1109,7 @@ table.case-table {
   color: var(--accent);
   font-weight: 700;
 }
-.kanban-cta:hover { background: #e3d9fa; }
+.kanban-cta:hover { background: #d6ebdd; }
 .kanban-cta .prompt-icon { width: 14px; height: 14px; font-size: 9px; line-height: 14px; }
 .kanban-handover-btn {
   border-color: transparent;
@@ -1271,10 +1297,10 @@ table.case-table {
 .tl-key { display: inline-flex; align-items: center; gap: 5px; }
 .tl-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 /* holder colors mapped to CommuGround palette */
-.tl-triage    { background: #cfd5ee; color: var(--col-new-deep); }
-.tl-core       { background: #f8c5dc; color: var(--col-local-deep); }
+.tl-triage    { background: #d2dad2; color: var(--col-new-deep); }
+.tl-core       { background: #cce8d3; color: var(--col-local-deep); }
 .tl-hq        { background: #a7e0d9; color: var(--col-hq-deep); }
-.tl-sanity    { background: #cdc3f4; color: var(--col-sanity-deep); }
+.tl-sanity    { background: #bcdacf; color: var(--col-sanity-deep); }
 .tl-requester { background: #b4e6df; color: var(--col-hq-deep); }
 .tl-done      { background: #c4e2d1; color: var(--col-resolved-deep); }
 .wu-due { font-size: 11px; padding: 2px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); white-space: nowrap; font-weight: 700; }
@@ -1427,18 +1453,122 @@ table.case-table {
 .tz-hint.out-of-hours { background: var(--high-bg); color: var(--high); }
 
 /* ---------- Operator switcher ---------- */
-.op-switcher {
-  background: white;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-family: inherit;
-  font-weight: 600;
-  max-width: 130px;
+.op-id { display: flex; align-items: center; gap: 10px; }
+.op-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--grad-logo);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(47,107,70,.3);
 }
-.op-switcher option { color: var(--text); }
+.op-avatar svg { width: 18px; height: 18px; }
+.op-id-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.op-cap {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-faint-2);
+}
+.op-switcher {
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 1px 18px 1px 0;
+  margin: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: -.01em;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+.op-switcher:hover { color: var(--accent); }
+.op-switcher:focus { outline: none; }
+.op-switcher option { color: var(--text); font-weight: 600; font-family: var(--font-ui); }
+
+/* Themed popup for the operator switcher (matches .ts-picker), trigger stays borderless. */
+@supports (appearance: base-select) {
+  .op-switcher {
+    appearance: base-select;
+    background-image: none;
+    padding: 1px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .op-switcher::picker-icon {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    margin-left: auto;
+    transition: transform .2s ease;
+  }
+  .op-switcher:open::picker-icon { transform: rotate(180deg); }
+  .op-switcher:open { color: var(--accent); }
+  .op-switcher::picker(select) {
+    appearance: base-select;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-modal);
+    padding: 6px;
+    margin-top: 8px;
+    min-width: 200px;
+    font-family: var(--font-ui);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .14s ease, transform .14s ease, overlay .14s allow-discrete, display .14s allow-discrete;
+  }
+  .op-switcher:open::picker(select) { opacity: 1; transform: translateY(0); }
+  @starting-style {
+    .op-switcher:open::picker(select) { opacity: 0; transform: translateY(-4px); }
+  }
+  .op-switcher option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .op-switcher option:hover,
+  .op-switcher option:focus { background: var(--accent-bg); color: var(--accent); outline: none; }
+  .op-switcher option:checked { color: var(--accent); font-weight: 700; }
+  .op-switcher option::checkmark {
+    content: "";
+    order: 99;
+    margin-left: auto;
+    color: var(--accent-soft);
+  }
+}
+.op-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px solid var(--hairline-2);
+}
+.of { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.of-k { flex: 0 0 auto; color: var(--text-faint-2); font-weight: 600; font-size: 11.5px; }
+.of-v { color: var(--text); font-weight: 700; font-size: 11.5px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ---------- Tabs ---------- */
 .tabs {
@@ -1530,6 +1660,7 @@ table.case-table {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 14px;
+  margin-bottom: 16px;
 }
 
 /* ---------- Roster editor (Shifts page) ---------- */
@@ -1596,7 +1727,7 @@ table.case-table {
   font-weight: 600;
   color: var(--text-muted);
 }
-.shift-card .roster .op.is-you { background: var(--accent-bg); border-color: #d8cdf6; color: var(--accent); font-weight: 700; }
+.shift-card .roster .op.is-you { background: var(--accent-bg); border-color: #cfe0d4; color: var(--accent); font-weight: 700; }
 .shift-card .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1664,10 +1795,10 @@ table.case-table {
 .bell-btn:hover { background: var(--chip-soft-2); color: var(--text); }
 .bell-btn.bell-set {
   background: var(--accent-bg);
-  border-color: #d8cdf6;
+  border-color: #cfe0d4;
   color: var(--accent);
 }
-.bell-btn.bell-set:hover { background: #e3d9fa; }
+.bell-btn.bell-set:hover { background: #d6ebdd; }
 .bell-btn.bell-due {
   background: var(--danger-bg);
   border-color: #f1c0c8;
@@ -1950,8 +2081,11 @@ table.case-table {
 .picked-workspace-top {
   /* The hand-off Route Board brings its own band chrome (green band + white
    * card), so this container stays transparent and just provides the scroll
-   * envelope. */
+   * envelope. overflow-x is pinned to hidden — otherwise setting only
+   * overflow-y auto-promotes the X axis to auto and shows a near-empty
+   * horizontal scrollbar from the vertical gutter's few px of overhang. */
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 220px;
 }
 .picked-workspace-bottom {
@@ -2038,14 +2172,90 @@ table.case-table {
 /* --- Track Status picker dropdown --- */
 
 .ts-picker {
-  padding: 6px 10px;
+  padding: 8px 34px 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: white;
+  border-radius: 9px;
+  background-color: white;
+  color: var(--text);
+  font-family: var(--font-ui);
   font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   min-width: 220px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  transition: border-color .12s, box-shadow .12s;
 }
-.ts-picker:focus { outline: 2px solid var(--accent, #3e7050); outline-offset: 1px; }
+.ts-picker:hover { border-color: var(--accent-soft); }
+.ts-picker:focus { outline: none; border-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-bg); }
+.ts-picker option { font-weight: 600; color: var(--text); }
+
+/* Modern stylable select — themes the open popup too (Chrome 135+/supported
+   browsers). Falls back to the themed closed box + native menu elsewhere. */
+@supports (appearance: base-select) {
+  .ts-picker {
+    appearance: base-select;
+    background-image: none;
+    padding-right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ts-picker::picker-icon {
+    content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238a958d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    margin-left: auto;
+    transition: transform .2s ease;
+  }
+  .ts-picker:open::picker-icon { transform: rotate(180deg); }
+  .ts-picker:open { border-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .ts-picker::picker(select) {
+    appearance: base-select;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-modal);
+    padding: 6px;
+    margin-top: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-family: var(--font-ui);
+    /* fade/slide in */
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .14s ease, transform .14s ease, overlay .14s allow-discrete, display .14s allow-discrete;
+  }
+  .ts-picker:open::picker(select) { opacity: 1; transform: translateY(0); }
+  @starting-style {
+    .ts-picker:open::picker(select) { opacity: 0; transform: translateY(-4px); }
+  }
+  .ts-picker option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .ts-picker option:hover,
+  .ts-picker option:focus {
+    background: var(--accent-bg);
+    color: var(--accent);
+    outline: none;
+  }
+  .ts-picker option:checked { color: var(--accent); font-weight: 700; }
+  .ts-picker option::checkmark {
+    content: "";
+    order: 99;
+    margin-left: auto;
+    color: var(--accent-soft);
+  }
+}
 
 /* ============================================================================
  *  Hand-off Route Board (rb-*)
@@ -2057,7 +2267,10 @@ table.case-table {
   background: #234231;
   border-bottom: 4px solid #2E5641;
   padding: 18px 36px;
-  margin: 0 -22px 14px;
+  margin: 0 0 14px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-panel);
   font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
@@ -2163,7 +2376,7 @@ table.case-table {
 
 .rb-row {
   position: absolute;
-  left: 16px; right: 16px;
+  left: 0; right: 0;
   cursor: pointer;
   z-index: 1;
   border-radius: 8px;
@@ -2188,7 +2401,7 @@ table.case-table {
 .rb-row-moving .rb-origin-dot {
   top: 50%;
   width: 16px; height: 16px; border-radius: 50%;
-  background: #33596B;
+  background: #3f6e5e;
   border: 3px solid white;
   transform: translate(-50%, -50%);
   z-index: 3;

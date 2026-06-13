@@ -988,14 +988,21 @@ function _renderMovingRow(c, top, animDelay) {
   const chipCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
 
-  return `
-    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+  // When origin and destination resolve to the same station the travel line has
+  // zero length; drawing the line/arrowhead/track then leaves a detached triangle
+  // stacked on the dot. In that case render only the "at station" marker.
+  const degenerate = Math.abs(widthPct) < 0.5;
+  const travel = degenerate ? '' : `
       <div class="rb-line"            style="left:${originPct}%; width:${widthPct}%; background:${color};"></div>
       <div class="rb-line-arrowhead"  style="left:${destPct}%; border-left-color:${color};"></div>
       <div class="rb-travel-track"    style="left:${originPct}%; width:${widthPct}%;">
         <span class="rb-travel-dot" style="background:${color}; animation-delay:${animDelay}s;"></span>
-      </div>
-      <div class="rb-origin-dot"      style="left:${originPct}%; background:#33596B; box-shadow:0 0 0 1.5px #33596B;"></div>
+      </div>`;
+
+  return `
+    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      ${travel}
+      <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
       <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
@@ -1009,8 +1016,8 @@ function _renderWatchRow(c, top) {
   const def = TRACK_STATUS_BY_ID[ts] || {};
   const station = def.watch || 'HQ';
   const pct = ROUTE_STATION_POS[station] ?? 88;
-  // Dot colour matches the station's square in the header (User #33596B, HQ #8C4A2F).
-  const dotColor = station === 'User' ? '#33596B' : '#8C4A2F';
+  // Dot colour matches the station's square in the header (User #3f6e5e, HQ #8C4A2F).
+  const dotColor = station === 'User' ? '#3f6e5e' : '#8C4A2F';
   // The id sits on whichever side has room — to the right of the dashed ring when
   // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
   const eyeLeftCalc = `calc(${pct}% + 22px)`;
@@ -1141,8 +1148,8 @@ function renderRouteBoardStrip() {
         <div class="rb-guide" style="left:50%;"></div>
         <div class="rb-guide" style="left:88%;"></div>
         <div class="rb-station rb-station-user" style="left:12%; top:${HEADER_TOP}px;">
-          <span class="rb-station-square" style="background:#33596B;"></span>
-          <span class="rb-station-label"  style="color:#33596B;">USER</span>
+          <span class="rb-station-square" style="background:#3f6e5e;"></span>
+          <span class="rb-station-label"  style="color:#3f6e5e;">USER</span>
         </div>
         <div class="rb-station rb-station-core" style="left:50%; top:${HEADER_TOP}px;">
           <span class="rb-station-square" style="background:#8A3434;"></span>
@@ -3174,90 +3181,90 @@ function renderStatusFlow() {
       <svg class="status-flow-svg" viewBox="0 0 980 580" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arr-forward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#4e8063"/>
           </marker>
           <marker id="arr-pause" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#0891b2"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#5a9277"/>
           </marker>
           <marker id="arr-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/>
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9c5a52"/>
           </marker>
         </defs>
 
         <g class="flow-node">
-          <rect x="40" y="40" width="120" height="60" rx="8" fill="#e0e7ff" stroke="#3730a3" stroke-width="2"/>
+          <rect x="40" y="40" width="120" height="60" rx="8" fill="#eef1ee" stroke="#6b756d" stroke-width="2"/>
           <text x="100" y="76" text-anchor="middle" font-weight="600" font-size="13">New</text>
         </g>
         <g class="flow-node">
-          <rect x="220" y="40" width="160" height="60" rx="8" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+          <rect x="220" y="40" width="160" height="60" rx="8" fill="#e9f1ea" stroke="#3e7050" stroke-width="2"/>
           <text x="300" y="76" text-anchor="middle" font-weight="600" font-size="13">With Core Team</text>
         </g>
         <g class="flow-node">
-          <rect x="440" y="40" width="180" height="60" rx="8" fill="#fee2e2" stroke="#991b1b" stroke-width="2"/>
+          <rect x="440" y="40" width="180" height="60" rx="8" fill="#e3ede7" stroke="#2f6147" stroke-width="2"/>
           <text x="530" y="68" text-anchor="middle" font-weight="600" font-size="13">With HQ</text>
           <text x="530" y="86" text-anchor="middle" font-size="11">Product Team</text>
         </g>
         <g class="flow-node">
-          <rect x="680" y="40" width="160" height="60" rx="8" fill="#d1fae5" stroke="#065f46" stroke-width="2"/>
+          <rect x="680" y="40" width="160" height="60" rx="8" fill="#e0ebe7" stroke="#2a5648" stroke-width="2"/>
           <text x="760" y="76" text-anchor="middle" font-weight="600" font-size="13">Sanity Check</text>
         </g>
 
         <g class="flow-node">
-          <rect x="300" y="250" width="240" height="60" rx="8" fill="#cffafe" stroke="#155e75" stroke-width="2"/>
+          <rect x="300" y="250" width="240" height="60" rx="8" fill="#ece4d6" stroke="#97744a" stroke-width="2"/>
           <text x="420" y="278" text-anchor="middle" font-weight="600" font-size="13">Returned to Requester</text>
-          <text x="420" y="296" text-anchor="middle" font-size="11" fill="#155e75">SLA clock paused</text>
+          <text x="420" y="296" text-anchor="middle" font-size="11" fill="#97744a">SLA clock paused</text>
         </g>
 
         <g class="flow-node">
-          <rect x="680" y="450" width="160" height="60" rx="8" fill="#e5e7eb" stroke="#4b5563" stroke-width="2"/>
+          <rect x="680" y="450" width="160" height="60" rx="8" fill="#eef1ee" stroke="#56635b" stroke-width="2"/>
           <text x="760" y="486" text-anchor="middle" font-weight="600" font-size="13">Closed</text>
         </g>
 
         <g class="flow-node">
-          <rect x="40" y="450" width="160" height="60" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="2" stroke-dasharray="4,3"/>
-          <text x="120" y="486" text-anchor="middle" font-weight="600" font-size="13" fill="#6b7280">Cancelled</text>
+          <rect x="40" y="450" width="160" height="60" rx="8" fill="#f1f4f1" stroke="#7c887f" stroke-width="2" stroke-dasharray="4,3"/>
+          <text x="120" y="486" text-anchor="middle" font-weight="600" font-size="13" fill="#7c887f">Cancelled</text>
         </g>
 
-        <g stroke="#2563eb" stroke-width="2" fill="none">
+        <g stroke="#4e8063" stroke-width="2" fill="none">
           <path d="M160,70 L218,70" marker-end="url(#arr-forward)"/>
           <path d="M380,70 L438,70" marker-end="url(#arr-forward)"/>
           <path d="M620,70 L678,70" marker-end="url(#arr-forward)"/>
           <path d="M760,100 L760,448" marker-end="url(#arr-forward)"/>
         </g>
-        <g font-size="11" fill="#2563eb" font-weight="500">
+        <g font-size="11" fill="#4e8063" font-weight="500">
           <text x="189" y="34" text-anchor="middle">Assign Core Team</text>
           <text x="409" y="34" text-anchor="middle">Escalate to HQ</text>
           <text x="649" y="34" text-anchor="middle">Move to Sanity</text>
           <text x="772" y="280" text-anchor="start">Verify &amp; close</text>
         </g>
 
-        <g stroke="#0891b2" stroke-width="2" fill="none">
+        <g stroke="#5a9277" stroke-width="2" fill="none">
           <path d="M100,100 Q90,200 298,256" marker-end="url(#arr-pause)"/>
           <path d="M260,100 L340,248" marker-end="url(#arr-pause)"/>
           <path d="M520,100 L470,248" marker-end="url(#arr-pause)"/>
         </g>
-        <g font-size="11" fill="#0891b2" font-weight="500">
+        <g font-size="11" fill="#5a9277" font-weight="500">
           <text x="92" y="170" text-anchor="start">Return to requester</text>
           <text x="248" y="180" text-anchor="end">Return to requester</text>
           <text x="540" y="180" text-anchor="start">Return to requester</text>
         </g>
 
-        <g stroke="#0891b2" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
+        <g stroke="#5a9277" stroke-width="1.5" fill="none" stroke-dasharray="5,4">
           <path d="M360,250 Q310,180 290,100" marker-end="url(#arr-pause)"/>
           <path d="M490,250 Q500,180 520,100" marker-end="url(#arr-pause)"/>
           <path d="M540,275 Q650,210 740,102" marker-end="url(#arr-pause)"/>
           <path d="M300,275 Q200,210 110,102" marker-end="url(#arr-pause)"/>
         </g>
-        <g font-size="11" fill="#0891b2" font-style="italic">
+        <g font-size="11" fill="#5a9277" font-style="italic">
           <text x="610" y="220" text-anchor="middle">Resume (requester replied)</text>
           <text x="200" y="220" text-anchor="middle">Resume (requester replied)</text>
         </g>
 
-        <path d="M540,300 L678,460" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arr-forward)"/>
-        <text x="640" y="395" font-size="11" fill="#2563eb" text-anchor="middle" font-weight="500">Close as resolved</text>
+        <path d="M540,300 L678,460" stroke="#4e8063" stroke-width="2" fill="none" marker-end="url(#arr-forward)"/>
+        <text x="640" y="395" font-size="11" fill="#4e8063" text-anchor="middle" font-weight="500">Close as resolved</text>
 
-        <path d="M100,100 Q40,280 120,448" stroke="#dc2626" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-danger)"/>
-        <g font-size="11" fill="#dc2626" font-style="italic">
+        <path d="M100,100 Q40,280 120,448" stroke="#9c5a52" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-danger)"/>
+        <g font-size="11" fill="#9c5a52" font-style="italic">
           <text x="14" y="285">Cancel — from</text>
           <text x="14" y="299">any open state</text>
         </g>
