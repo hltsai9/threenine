@@ -4998,10 +4998,27 @@ function setupSignOut() {
   }
 }
 
-function boot() {
+// Decide whether to run against the DB API (server mode). API_MODE is the override:
+//   'server' → force server mode    'demo'/'off' → force demo (never call the API)
+//   ''/unset → AUTO-DETECT: a backend/api.py deployment answers GET /healthz; the file://
+//              demo, GitHub Pages and the serve.py proxy do not — so '' just works everywhere.
+async function isServerMode() {
+  if (window.API_MODE === 'server') return true;
+  if (window.API_MODE === 'demo' || window.API_MODE === 'off') return false;
+  if (!/^https?:$/.test(location.protocol)) return false;   // file:// → demo, no probe
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS);
+    const res = await fetch(apiUrl('healthz'), { signal: ctrl.signal });
+    clearTimeout(t);
+    return res.ok;
+  } catch (e) { return false; }   // no backend (Pages / serve.py) → demo
+}
+
+async function boot() {
   if (!location.hash) location.hash = '#/cases';
-  if (window.API_MODE === 'server' && /^https?:$/.test(location.protocol)) {
-    bootServerLoad();
+  if (await isServerMode()) {
+    await bootServerLoad();
     return;
   }
   if (window.CASES_LIVE_CAPTURE && /^https?:$/.test(location.protocol)) {

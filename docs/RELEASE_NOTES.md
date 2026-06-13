@@ -10,6 +10,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Changed (Server mode auto-detects — no config flip needed)
+
+- **`API_MODE='' ` now auto-detects** the backend: on boot the SPA probes
+  `GET /healthz` and switches to server mode when a DB-backed `backend/api.py`
+  answers. `file://`, GitHub Pages and the `serve.py` proxy have no `/healthz`,
+  so they stay demo/single-user. `'server'` / `'demo'` remain explicit overrides.
+  Removes the manual `config.js` step for a Render/backend deployment.
+
 ### Added (Auth — go-live step 2: shared-token login)
 
 - **The SPA can now authenticate to a token-gated API**, so server mode works

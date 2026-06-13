@@ -13,14 +13,15 @@ window.API_BASE = '';
 
 // How the operator layer (picks / Track Status / handover / reminder) is persisted:
 //
-//   ''        (default) -> single-user / demo. Operator layer is cached in this browser's
-//                          localStorage; the seed (or serve.py's Case Center pull) is the
-//                          case source. No cross-browser sharing.
-//   'server'            -> the API (backend/api.py, DB-backed) is the source of truth. The
-//                          SPA loads ALL cases — including the operator layer — from it on
-//                          boot, does NOT overlay localStorage, and round-trips every edit
-//                          via POST /api/save. This is the multi-operator deployment mode.
+//   ''        (default) -> AUTO-DETECT. On boot the SPA probes GET /healthz; if a DB-backed
+//                          backend (backend/api.py) answers, it switches to server mode by
+//                          itself. The file:// demo, GitHub Pages and the serve.py proxy have
+//                          no /healthz, so they stay single-user/demo. Usually leave this as ''.
+//   'server'            -> force server mode (the DB API is the source of truth): load ALL
+//                          cases + the shared operator layer from it, no localStorage overlay,
+//                          round-trip every edit via POST /api/save. Multi-operator mode.
+//   'demo' / 'off'      -> force single-user/demo; never call the API even if one is present.
 //
-// Set to 'server' only when serving against backend/api.py (whose response advertises
-// operatorLayer:"server"); leave '' for file:// demos and the serve.py single-user proxy.
+// With auto-detect you normally don't need to touch this — a Render/backend deployment just
+// works at '' because it serves /healthz.
 window.API_MODE = '';
