@@ -529,6 +529,34 @@ test('latestProcessType: empty / all-Unknown / missing → "1st  Line"', () => {
   eq(latestProcessType({}), '1st  Line');
 });
 
+/* ---------- caseStation (dot = current CC location) ---------- */
+const caseStation = app.caseStation;
+// Pin the dept lists for deterministic tests.
+app.CC_CORE_DEPARTMENTS = ['Site IT'];
+app.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
+const stationCase = (dept, pt, extra) => Object.assign({
+  assigneeDept: dept,
+  processTimeline: [{ processType: pt, processStartTime: iso(1 * HOUR) }],
+}, extra || {});
+
+test('caseStation: latest processType User wins everything', () =>
+  eq(caseStation(stationCase('HQ Identity', 'User')), 'User'));
+test('caseStation: Core dept + Service Team → Core Team', () =>
+  eq(caseStation(stationCase('Site IT', 'Service Team')), 'Core Team'));
+test('caseStation: Core dept + 1st Line → 1st Line', () =>
+  eq(caseStation(stationCase('Site IT', '1st  Line')), '1st Line'));
+test('caseStation: HQ dept → HQ', () =>
+  eq(caseStation(stationCase('HQ Mobile', 'Service Team')), 'HQ'));
+test('caseStation: unrecognised dept → 1st Line', () =>
+  eq(caseStation(stationCase('Marketing', 'Service Team')), '1st Line'));
+test('caseStation: Unknown is skipped when resolving', () =>
+  eq(caseStation({ assigneeDept: 'Site IT', processTimeline: [
+    { processType: 'Service Team', processStartTime: iso(2 * HOUR) },
+    { processType: 'Unknown', processStartTime: iso(1 * HOUR) },
+  ] }), 'Core Team'));
+test('caseStation: Track Status no longer pins the dot to User', () =>
+  eq(caseStation(stationCase('HQ Identity', 'Service Team', { trackStatus: 'sanity_check' })), 'HQ'));
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

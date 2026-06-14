@@ -1057,13 +1057,24 @@ function latestProcessType(c) {
     .sort((a, b) => new Date(a.processStartTime || 0) - new Date(b.processStartTime || 0));
   return known.length ? known[known.length - 1].processType : '1st  Line';
 }
+const STATION_1ST_LINE = '1st Line';
+function deptInList(dept, list) {
+  if (!dept || !Array.isArray(list)) return false;
+  const d = String(dept).toLowerCase();
+  return list.some(x => String(x).toLowerCase() === d);
+}
+// CURRENT station of a case, from Case Center only (assigneeDept + latest processType).
+// Track Status (the DESIRED location) must NOT influence this — see the design spec.
 function caseStation(c) {
-  const ts = caseTrackStatus(c);
-  // Case Closed and Sanity Check pin the dot to User regardless of CC dept.
-  const def = TRACK_STATUS_BY_ID[ts];
-  if (def?.pinTo) return def.pinTo;
-  const role = deptToRoleRaw(c.assigneeDept) || deptToRoleRaw(c.assignee);
-  return role || 'User';
+  const pt = latestProcessType(c);
+  if (pt === 'User') return 'User';                                  // returned-to-user wins
+  const dept = c && c.assigneeDept;
+  if (deptInList(dept, window.CC_CORE_DEPARTMENTS)) {                // Core side
+    if (pt === 'Service Team') return 'Core Team';
+    return STATION_1ST_LINE;                                         // 1st Line / any other pt
+  }
+  if (deptInList(dept, window.CC_HQ_DEPARTMENTS)) return 'HQ';       // HQ side
+  return STATION_1ST_LINE;                                           // unrecognised → triage
 }
 
 // Find the next dueAt for a scheduled-handoff Track Status. The scheduled hh:mm is
