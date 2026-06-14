@@ -2689,6 +2689,27 @@ table.case-table {
   white-space: nowrap;
 }
 
+/* 1st-Line lane: static dot between User and Core, dashed arrow each way. */
+.rb-row-firstline { height: 56px; }
+.rb-fl-dot {
+  position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%; background: #6b7a72; box-shadow: 0 0 0 1.5px #6b7a72;
+}
+.rb-fl-id {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-faint-2); white-space: nowrap;
+}
+.rb-fl-arrow {
+  position: absolute; top: 50%; height: 0; border-top: 1.5px dashed #9aa8a0;
+  width: 15px; opacity: .9;
+}
+.rb-fl-arrow-left  { margin-top: -0.75px; transform: translateX(-21px); animation: rb-fl-pull-left 1.6s ease-in-out infinite; }
+.rb-fl-arrow-right { margin-top: -0.75px; transform: translateX(6px);   animation: rb-fl-pull-right 1.6s ease-in-out infinite; }
+.rb-fl-arrow-left::before  { content: ''; position: absolute; left: -1px; top: -3px; border: 3px solid transparent; border-right-color: #9aa8a0; }
+.rb-fl-arrow-right::after  { content: ''; position: absolute; right: -1px; top: -3px; border: 3px solid transparent; border-left-color: #9aa8a0; }
+@keyframes rb-fl-pull-left  { 0%,100% { transform: translateX(-21px); } 50% { transform: translateX(-25px); } }
+@keyframes rb-fl-pull-right { 0%,100% { transform: translateX(6px); }   50% { transform: translateX(10px); } }
+
 /* ---- Rota week-picker tabs ---- */
 
 .rota-week-tabs {

@@ -2697,6 +2697,27 @@ table.case-table {
   white-space: nowrap;
 }
 
+/* 1st-Line lane: static dot between User and Core, dashed arrow each way. */
+.rb-row-firstline { height: 56px; }
+.rb-fl-dot {
+  position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%; background: #6b7a72; box-shadow: 0 0 0 1.5px #6b7a72;
+}
+.rb-fl-id {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-faint-2); white-space: nowrap;
+}
+.rb-fl-arrow {
+  position: absolute; top: 50%; height: 0; border-top: 1.5px dashed #9aa8a0;
+  width: 15px; opacity: .9;
+}
+.rb-fl-arrow-left  { margin-top: -0.75px; transform: translateX(-21px); animation: rb-fl-pull-left 1.6s ease-in-out infinite; }
+.rb-fl-arrow-right { margin-top: -0.75px; transform: translateX(6px);   animation: rb-fl-pull-right 1.6s ease-in-out infinite; }
+.rb-fl-arrow-left::before  { content: ''; position: absolute; left: -1px; top: -3px; border: 3px solid transparent; border-right-color: #9aa8a0; }
+.rb-fl-arrow-right::after  { content: ''; position: absolute; right: -1px; top: -3px; border: 3px solid transparent; border-left-color: #9aa8a0; }
+@keyframes rb-fl-pull-left  { 0%,100% { transform: translateX(-21px); } 50% { transform: translateX(-25px); } }
+@keyframes rb-fl-pull-right { 0%,100% { transform: translateX(6px); }   50% { transform: translateX(10px); } }
+
 /* ---- Rota week-picker tabs ---- */
 
 .rota-week-tabs {
@@ -3629,6 +3650,16 @@ window.OWNERS = {
     },
   ],
 };
+
+// ---- Route Board department → station config --------------------------------
+// The dot on the Hand-off Route Board shows where a case CURRENTLY is, derived from the
+// Case Center assignee's DEPARTMENT plus the latest process-timeline processType. Fill these
+// in with your real Case Center department names at go-live (these demo values match data.js).
+//   - A dept in CC_CORE_DEPARTMENTS means Core Team / 1st Line (processType disambiguates).
+//   - A dept in CC_HQ_DEPARTMENTS means HQ. There can be several.
+// Matching is case-insensitive exact match against a case's assigneeDept.
+window.CC_CORE_DEPARTMENTS = ['Site IT'];
+window.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
 
 
 // Case Tracker prototype — single-file SPA.
@@ -4625,16 +4656,17 @@ function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
  *   - 7-value enum, set/cleared by the operator. Never sent to Case Center.
  *   - The first three statuses carry a scheduled handoff rule that drives the
  *     animated Route Board arrows; the next two are "watching" (eyeball icon).
- *   - Case Closed and Sanity Check pin the dot to *User* regardless of CC dept.
+ * NOTE: the dot's station now always comes from caseStation() (the CC location);
+ *   Track Status no longer pins it.
  */
 const TRACK_STATUSES = [
   { id: 'weekend_case',         label: 'Weekend Case',                       short: 'Weekend',     scheduled: { to: 'HQ',        day: 'Sun', shift: 'Day', hh: 17, mm: 30 } },
   { id: 'hq_did_not_handle',    label: 'HQ did not handle',                  short: 'HQ retry',    scheduled: { to: 'HQ',        day: null,  shift: 'Day', hh: 17, mm: 30 } },
   { id: 'escalate_to_core',     label: 'Escalate to Core Team',              short: 'To Core',     scheduled: { to: 'Core Team', day: null,  shift: 'Day', hh:  9, mm:  0 } },
-  { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ',    watch: 'HQ' },
-  { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User',  watch: 'User' },
-  { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed',      pinTo: 'User' },
-  { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      pinTo: 'User', useSubjectTag: true, collapsible: true },
+  { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ' },
+  { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User' },
+  { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed' },
+  { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      useSubjectTag: true, collapsible: true },
 ];
 const TRACK_STATUS_BY_ID = Object.fromEntries(TRACK_STATUSES.map(t => [t.id, t]));
 const TRACK_GROUP_ORDER = [
@@ -4663,29 +4695,35 @@ function caseTrackStatus(c) { return c?.trackStatus || null; }
 function isPicked(c) { return isQueued(c) && !['closed', 'cancelled'].includes(c.status); }
 function pickedCases() { return STATE.cases.filter(c => !c.deletedAt && isPicked(c)); }
 
-// Resolve CC's `assigneeDept` (or fallback fields) to one of the three Route Board
-// stations via the `route_role` field on `owners.js`. Anything we can't resolve →
-// `User` (the case is considered to be sitting with the requester).
-function deptToRoleRaw(dept) {
-  if (!dept) return null;
-  const owners = window.OWNERS || { core: [], hq: [] };
-  const all = [...(owners.core || []), ...(owners.hq || [])];
-  const match = all.find(o => {
-    const fields = [o.name, o.area, o.region].filter(Boolean);
-    return fields.some(f => String(f).toLowerCase() === String(dept).toLowerCase());
-  });
-  if (match && match.route_role) return match.route_role;
-  // Fallback: look for partial inclusion of dept inside the team name.
-  const partial = all.find(o => String(o.name || '').toLowerCase().includes(String(dept).toLowerCase()));
-  return partial ? (partial.route_role || null) : null;
+// The latest process-timeline processType that drives a case's CURRENT station. "Unknown"
+// appears transiently and at creation, so it's skipped. Falls back to "1st  Line" (two
+// spaces — the literal Case Center value) when there's no usable entry.
+function latestProcessType(c) {
+  const tl = Array.isArray(c && c.processTimeline) ? c.processTimeline : [];
+  const known = tl
+    .filter(e => e && e.processType && e.processType !== 'Unknown')
+    .slice()
+    .sort((a, b) => new Date(a.processStartTime || 0) - new Date(b.processStartTime || 0));
+  return known.length ? known[known.length - 1].processType : '1st  Line';
 }
+const STATION_1ST_LINE = '1st Line';
+function deptInList(dept, list) {
+  if (!dept || !Array.isArray(list)) return false;
+  const d = String(dept).toLowerCase();
+  return list.some(x => String(x).toLowerCase() === d);
+}
+// CURRENT station of a case, from Case Center only (assigneeDept + latest processType).
+// Track Status (the DESIRED location) must NOT influence this — see the design spec.
 function caseStation(c) {
-  const ts = caseTrackStatus(c);
-  // Case Closed and Sanity Check pin the dot to User regardless of CC dept.
-  const def = TRACK_STATUS_BY_ID[ts];
-  if (def?.pinTo) return def.pinTo;
-  const role = deptToRoleRaw(c.assigneeDept) || deptToRoleRaw(c.assignee);
-  return role || 'User';
+  const pt = latestProcessType(c);
+  if (pt === 'User') return 'User';                                  // returned-to-user wins
+  const dept = c && c.assigneeDept;
+  if (deptInList(dept, window.CC_CORE_DEPARTMENTS)) {                // Core side
+    if (pt === 'Service Team') return 'Core Team';
+    return STATION_1ST_LINE;                                         // 1st Line / any other pt
+  }
+  if (deptInList(dept, window.CC_HQ_DEPARTMENTS)) return 'HQ';       // HQ side
+  return STATION_1ST_LINE;                                           // unrecognised → triage
 }
 
 // Find the next dueAt for a scheduled-handoff Track Status. The scheduled hh:mm is
@@ -4873,25 +4911,32 @@ function renderTzHint(owner) {
  */
 
 /* ---------- Hand-off Route Board ----------
- * Built to spec (band → card → absolute-positioned rows). Stations at left 12%,
- * 50%, 88% of the white card. Four row types:
+ * Built to spec (band → card → absolute-positioned rows). Stations at left
+ * 12% / 31% / 50% / 88% of the white card (User / 1st Line / Core / HQ).
+ * Five row types:
  *
- *   MOVING (66px)  — scheduled handoff. Solid origin dot at the From station,
- *                    coloured route line to the destination, animated traveling
- *                    dot along the line, hollow ring + arrowhead at the To
- *                    station, deadline chip centered above the line.
- *   WATCH  (60px)  — `escalated_to_hq`. Dot at HQ ringed by a dashed circle,
- *                    amber eye icon and id to the right. No line.
- *   STAY   (48px)  — `case_closed` / `need_to_contact_user` / untracked. Quiet
- *                    dot at User with "<id> · stays". `need_to_contact_user`
- *                    adds an outlined blue-grey eye icon to the dot's left.
- *   SANITY (46px)  — collapsed header row for every `sanity_check` case with a
- *                    +/- toggle; expanded reveals one 38px sub-row per case.
+ *   MOVING   (66px) — scheduled handoff. Solid origin dot at the From station,
+ *                     coloured route line to the destination, animated traveling
+ *                     dot along the line, hollow ring + arrowhead at the To
+ *                     station, deadline chip centered above the line.
+ *   WATCH    (60px) — `escalated_to_hq` or `need_to_contact_user`. Dot at the
+ *                     case's current station (from caseStation()) ringed by a
+ *                     dashed circle, amber eye icon and id to the right.
+ *   STAY     (48px) — `case_closed` / untracked. Quiet dot at the case's
+ *                     current station with "<id> · stays".
+ *   FIRSTLINE(48px) — case sitting at 1st Line with no firm intent. Static dot
+ *                     at the 1st Line station (31%) with a dashed arrow to User
+ *                     on the left and a dashed arrow to Core on the right.
+ *   SANITY   (46px) — collapsed header row for every `sanity_check` case with
+ *                     a +/- toggle; expanded reveals one 38px sub-row per case.
  *
  * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
  */
 
-const ROUTE_STATION_POS = { 'User': 12, 'Core Team': 50, 'HQ': 88 };
+const ROUTE_STATION_POS = { 'User': 12, '1st Line': 31, 'Core Team': 50, 'HQ': 88 };
+window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
+// Dot colour per station — matches the station squares in the band header.
+const STATION_DOT_COLOR = { 'User': '#3f6e5e', '1st Line': '#6b7a72', 'Core Team': '#8A3434', 'HQ': '#8C4A2F' };
 // Midpoint of the route line where the deadline chip sits.
 // Spec is explicit: 31% for Core, 70% for HQ (not the geometric midpoint of
 // 12→88 — biased toward the destination so it doesn't overlap the case id).
@@ -4921,12 +4966,13 @@ function formatDeadlineChip(handoff, phase) {
 function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
-  if (scheduledHandoff(c)) return 'moving';
+  if (scheduledHandoff(c)) return 'moving';   // a desired handoff → directional animation
   // WATCH covers both "watching at HQ" (escalated_to_hq) and "watching at User"
   // (need_to_contact_user) — same row shape, station position derived from the
   // Track Status definition's `watch` field.
   if (ts === 'escalated_to_hq' || ts === 'need_to_contact_user') return 'watch';
-  return 'stay';  // case_closed, untracked
+  if (caseStation(c) === STATION_1ST_LINE) return 'firstline';   // at triage, no firm intent
+  return 'stay';
 }
 
 function _renderMovingRow(c, top, animDelay) {
@@ -4966,12 +5012,10 @@ function _renderMovingRow(c, top, animDelay) {
 
 function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
-  const ts = caseTrackStatus(c);
-  const def = TRACK_STATUS_BY_ID[ts] || {};
-  const station = def.watch || 'HQ';
+  const station = caseStation(c);
   const pct = ROUTE_STATION_POS[station] ?? 88;
-  // Dot colour matches the station's square in the header (User #3f6e5e, HQ #8C4A2F).
-  const dotColor = station === 'User' ? '#3f6e5e' : '#8C4A2F';
+  // Dot colour matches the station's square in the header.
+  const dotColor = STATION_DOT_COLOR[station] || '#8C4A2F';
   // The id sits on whichever side has room — to the right of the dashed ring when
   // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
   const eyeLeftCalc = `calc(${pct}% + 22px)`;
@@ -4997,16 +5041,33 @@ function _renderWatchRow(c, top) {
 
 function _renderStayRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
     <div class="rb-row rb-row-stay${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-stay-dot" style="left:12%;"></div>
-      <div class="rb-stay-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · stays</div>
+      <div class="rb-stay-dot" style="left:${pct}%;"></div>
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays</div>
+    </div>
+  `;
+}
+
+// 1st-Line: the case is at triage — could move to User or to Core. A static dot between the
+// two stations with a dashed animated arrow pointing each way (the "decide where it goes" cue).
+function _renderFirstLineRow(c, top) {
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[STATION_1ST_LINE];
+  return `
+    <div class="rb-row rb-row-firstline${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
+      <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
+      <div class="rb-fl-dot" style="left:${pct}%;"></div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st line</div>
     </div>
   `;
 }
 
 function _renderSanityHeader(count, expanded, top) {
   const sym = expanded ? '−' : '+';
+  // The header dot marks the whole Sanity group (not one case), so it's fixed at the User edge.
   return `
     <div class="rb-row rb-row-sanity-header" style="top:${top}px;" data-action="toggle-sanity">
       <div class="rb-sanity-dot" style="left:12%;"></div>
@@ -5018,10 +5079,11 @@ function _renderSanityHeader(count, expanded, top) {
 
 function _renderSanitySubRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
     <div class="rb-row rb-row-sanity-sub${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-sanity-sub-dot" style="left:12%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
+      <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
     </div>
   `;
 }
@@ -5030,13 +5092,14 @@ function renderRouteBoardStrip() {
   const all = pickedCases();
 
   // Bucket every picked case into one of the four visual row types.
-  const moving = [], watch = [], stay = [], sanity = [];
+  const moving = [], watch = [], stay = [], sanity = [], firstline = [];
   for (const c of all) {
     switch (_classifyRouteRow(c)) {
-      case 'moving': moving.push(c); break;
-      case 'watch':  watch.push(c);  break;
-      case 'stay':   stay.push(c);   break;
-      case 'sanity': sanity.push(c); break;
+      case 'moving':    moving.push(c);    break;
+      case 'watch':     watch.push(c);     break;
+      case 'stay':      stay.push(c);      break;
+      case 'sanity':    sanity.push(c);    break;
+      case 'firstline': firstline.push(c); break;
     }
   }
   // Overdue first inside the moving group; ties broken by soonest dueAt.
@@ -5063,8 +5126,9 @@ function renderRouteBoardStrip() {
     y += 66;
     movingIdx++;
   }
-  for (const c of watch) { segments.push(_renderWatchRow(c, y)); y += 60; }
-  for (const c of stay)  { segments.push(_renderStayRow(c, y));  y += 48; }
+  for (const c of watch)     { segments.push(_renderWatchRow(c, y));     y += 60; }
+  for (const c of firstline) { segments.push(_renderFirstLineRow(c, y)); y += 56; }
+  for (const c of stay)      { segments.push(_renderStayRow(c, y));      y += 48; }
   const sanityExpanded = !!STATE.sanityExpanded;
   if (sanity.length > 0) {
     segments.push(_renderSanityHeader(sanity.length, sanityExpanded, y));
