@@ -992,16 +992,17 @@ function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
  *   - 7-value enum, set/cleared by the operator. Never sent to Case Center.
  *   - The first three statuses carry a scheduled handoff rule that drives the
  *     animated Route Board arrows; the next two are "watching" (eyeball icon).
- *   - Case Closed and Sanity Check pin the dot to *User* regardless of CC dept.
+ * NOTE: the dot's station now always comes from caseStation() (the CC location);
+ *   Track Status no longer pins it.
  */
 const TRACK_STATUSES = [
   { id: 'weekend_case',         label: 'Weekend Case',                       short: 'Weekend',     scheduled: { to: 'HQ',        day: 'Sun', shift: 'Day', hh: 17, mm: 30 } },
   { id: 'hq_did_not_handle',    label: 'HQ did not handle',                  short: 'HQ retry',    scheduled: { to: 'HQ',        day: null,  shift: 'Day', hh: 17, mm: 30 } },
   { id: 'escalate_to_core',     label: 'Escalate to Core Team',              short: 'To Core',     scheduled: { to: 'Core Team', day: null,  shift: 'Day', hh:  9, mm:  0 } },
-  { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ',    watch: 'HQ' },
-  { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User',  watch: 'User' },
-  { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed',      pinTo: 'User' },
-  { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      pinTo: 'User', useSubjectTag: true, collapsible: true },
+  { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ' },
+  { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User' },
+  { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed' },
+  { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      useSubjectTag: true, collapsible: true },
 ];
 const TRACK_STATUS_BY_ID = Object.fromEntries(TRACK_STATUSES.map(t => [t.id, t]));
 const TRACK_GROUP_ORDER = [
@@ -1030,22 +1031,6 @@ function caseTrackStatus(c) { return c?.trackStatus || null; }
 function isPicked(c) { return isQueued(c) && !['closed', 'cancelled'].includes(c.status); }
 function pickedCases() { return STATE.cases.filter(c => !c.deletedAt && isPicked(c)); }
 
-// Resolve CC's `assigneeDept` (or fallback fields) to one of the three Route Board
-// stations via the `route_role` field on `owners.js`. Anything we can't resolve →
-// `User` (the case is considered to be sitting with the requester).
-function deptToRoleRaw(dept) {
-  if (!dept) return null;
-  const owners = window.OWNERS || { core: [], hq: [] };
-  const all = [...(owners.core || []), ...(owners.hq || [])];
-  const match = all.find(o => {
-    const fields = [o.name, o.area, o.region].filter(Boolean);
-    return fields.some(f => String(f).toLowerCase() === String(dept).toLowerCase());
-  });
-  if (match && match.route_role) return match.route_role;
-  // Fallback: look for partial inclusion of dept inside the team name.
-  const partial = all.find(o => String(o.name || '').toLowerCase().includes(String(dept).toLowerCase()));
-  return partial ? (partial.route_role || null) : null;
-}
 // The latest process-timeline processType that drives a case's CURRENT station. "Unknown"
 // appears transiently and at creation, so it's skipped. Falls back to "1st  Line" (two
 // spaces — the literal Case Center value) when there's no usable entry.
@@ -1262,26 +1247,32 @@ function renderTzHint(owner) {
  */
 
 /* ---------- Hand-off Route Board ----------
- * Built to spec (band → card → absolute-positioned rows). Stations at left 12%,
- * 50%, 88% of the white card. Four row types:
+ * Built to spec (band → card → absolute-positioned rows). Stations at left
+ * 12% / 31% / 50% / 88% of the white card (User / 1st Line / Core / HQ).
+ * Five row types:
  *
- *   MOVING (66px)  — scheduled handoff. Solid origin dot at the From station,
- *                    coloured route line to the destination, animated traveling
- *                    dot along the line, hollow ring + arrowhead at the To
- *                    station, deadline chip centered above the line.
- *   WATCH  (60px)  — `escalated_to_hq`. Dot at HQ ringed by a dashed circle,
- *                    amber eye icon and id to the right. No line.
- *   STAY   (48px)  — `case_closed` / `need_to_contact_user` / untracked. Quiet
- *                    dot at User with "<id> · stays". `need_to_contact_user`
- *                    adds an outlined blue-grey eye icon to the dot's left.
- *   SANITY (46px)  — collapsed header row for every `sanity_check` case with a
- *                    +/- toggle; expanded reveals one 38px sub-row per case.
+ *   MOVING   (66px) — scheduled handoff. Solid origin dot at the From station,
+ *                     coloured route line to the destination, animated traveling
+ *                     dot along the line, hollow ring + arrowhead at the To
+ *                     station, deadline chip centered above the line.
+ *   WATCH    (60px) — `escalated_to_hq` or `need_to_contact_user`. Dot at the
+ *                     case's current station (from caseStation()) ringed by a
+ *                     dashed circle, amber eye icon and id to the right.
+ *   STAY     (48px) — `case_closed` / untracked. Quiet dot at the case's
+ *                     current station with "<id> · stays".
+ *   FIRSTLINE(48px) — case sitting at 1st Line with no firm intent. Static dot
+ *                     at the 1st Line station (31%) with a dashed arrow to User
+ *                     on the left and a dashed arrow to Core on the right.
+ *   SANITY   (46px) — collapsed header row for every `sanity_check` case with
+ *                     a +/- toggle; expanded reveals one 38px sub-row per case.
  *
  * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
  */
 
 const ROUTE_STATION_POS = { 'User': 12, '1st Line': 31, 'Core Team': 50, 'HQ': 88 };
 window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
+// Dot colour per station — matches the station squares in the band header.
+const STATION_DOT_COLOR = { 'User': '#3f6e5e', '1st Line': '#6b7a72', 'Core Team': '#8A3434', 'HQ': '#8C4A2F' };
 // Midpoint of the route line where the deadline chip sits.
 // Spec is explicit: 31% for Core, 70% for HQ (not the geometric midpoint of
 // 12→88 — biased toward the destination so it doesn't overlap the case id).
@@ -1359,8 +1350,8 @@ function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
   const station = caseStation(c);
   const pct = ROUTE_STATION_POS[station] ?? 88;
-  // Dot colour matches the station's square in the header (User #3f6e5e, HQ #8C4A2F).
-  const dotColor = station === 'User' ? '#3f6e5e' : '#8C4A2F';
+  // Dot colour matches the station's square in the header.
+  const dotColor = STATION_DOT_COLOR[station] || '#8C4A2F';
   // The id sits on whichever side has room — to the right of the dashed ring when
   // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
   const eyeLeftCalc = `calc(${pct}% + 22px)`;
@@ -1412,6 +1403,7 @@ function _renderFirstLineRow(c, top) {
 
 function _renderSanityHeader(count, expanded, top) {
   const sym = expanded ? '−' : '+';
+  // The header dot marks the whole Sanity group (not one case), so it's fixed at the User edge.
   return `
     <div class="rb-row rb-row-sanity-header" style="top:${top}px;" data-action="toggle-sanity">
       <div class="rb-sanity-dot" style="left:12%;"></div>

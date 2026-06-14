@@ -556,6 +556,10 @@ test('caseStation: Unknown is skipped when resolving', () =>
   ] }), 'Core Team'));
 test('caseStation: Track Status no longer pins the dot to User', () =>
   eq(caseStation(stationCase('HQ Identity', 'Service Team', { trackStatus: 'sanity_check' })), 'HQ'));
+test('caseStation: null/undefined input is safe → 1st Line', () => {
+  eq(app.caseStation(null), '1st Line');
+  eq(app.caseStation(undefined), '1st Line');
+});
 
 /* ---------- Route Board dot positions follow caseStation ---------- */
 test('ROUTE_STATION_POS: 1st Line sits between User and Core', () => {
@@ -580,6 +584,11 @@ test('_classifyRouteRow: 1st-Line case WITH a scheduled desired → moving', () 
     trackStatus: 'escalate_to_core',
     processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
   eq(app._classifyRouteRow(c), 'moving');
+});
+test('_classifyRouteRow: sanity_check beats firstline even at 1st Line', () => {
+  const c = { id: 'C-SFL', subject: 's', assigneeDept: 'Site IT', trackStatus: 'sanity_check',
+    processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
+  eq(app._classifyRouteRow(c), 'sanity');
 });
 test('_renderFirstLineRow: static dot at 1st-Line pct + two dashed arrows', () => {
   const c = { id: 'C-FL', subject: 's', assigneeDept: 'Site IT',
