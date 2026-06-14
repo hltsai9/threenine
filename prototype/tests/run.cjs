@@ -557,6 +557,18 @@ test('caseStation: Unknown is skipped when resolving', () =>
 test('caseStation: Track Status no longer pins the dot to User', () =>
   eq(caseStation(stationCase('HQ Identity', 'Service Team', { trackStatus: 'sanity_check' })), 'HQ'));
 
+/* ---------- Route Board dot positions follow caseStation ---------- */
+test('ROUTE_STATION_POS: 1st Line sits between User and Core', () => {
+  ok(app.ROUTE_STATION_POS['1st Line'] > app.ROUTE_STATION_POS['User'], 'right of User');
+  ok(app.ROUTE_STATION_POS['1st Line'] < app.ROUTE_STATION_POS['Core Team'], 'left of Core');
+});
+test('stay row dot is placed at the case station (HQ), not hard-coded User', () => {
+  const c = { id: 'C-STAY', subject: 's', assigneeDept: 'HQ Identity',
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(HOUR) }] };
+  const html = app._renderStayRow(c, 0);
+  ok(html.includes('left:88%'), 'stay dot at HQ (88%)');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

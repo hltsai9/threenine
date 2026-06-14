@@ -1280,7 +1280,8 @@ function renderTzHint(owner) {
  * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
  */
 
-const ROUTE_STATION_POS = { 'User': 12, 'Core Team': 50, 'HQ': 88 };
+const ROUTE_STATION_POS = { 'User': 12, '1st Line': 31, 'Core Team': 50, 'HQ': 88 };
+window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
 // Midpoint of the route line where the deadline chip sits.
 // Spec is explicit: 31% for Core, 70% for HQ (not the geometric midpoint of
 // 12→88 — biased toward the destination so it doesn't overlap the case id).
@@ -1355,9 +1356,7 @@ function _renderMovingRow(c, top, animDelay) {
 
 function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
-  const ts = caseTrackStatus(c);
-  const def = TRACK_STATUS_BY_ID[ts] || {};
-  const station = def.watch || 'HQ';
+  const station = caseStation(c);
   const pct = ROUTE_STATION_POS[station] ?? 88;
   // Dot colour matches the station's square in the header (User #3f6e5e, HQ #8C4A2F).
   const dotColor = station === 'User' ? '#3f6e5e' : '#8C4A2F';
@@ -1386,10 +1385,11 @@ function _renderWatchRow(c, top) {
 
 function _renderStayRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
     <div class="rb-row rb-row-stay${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-stay-dot" style="left:12%;"></div>
-      <div class="rb-stay-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · stays</div>
+      <div class="rb-stay-dot" style="left:${pct}%;"></div>
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays</div>
     </div>
   `;
 }
@@ -1407,10 +1407,11 @@ function _renderSanityHeader(count, expanded, top) {
 
 function _renderSanitySubRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
     <div class="rb-row rb-row-sanity-sub${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
-      <div class="rb-sanity-sub-dot" style="left:12%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(12% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
+      <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
     </div>
   `;
 }
