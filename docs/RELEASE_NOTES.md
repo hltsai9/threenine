@@ -8,6 +8,30 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-14
+
+### Changed (Route Board — dot shows the real Case Center location)
+
+- The Route Board dot now reflects a case's **current** Case Center location —
+  derived from `assigneeDept` (matched against configurable `CC_CORE_DEPARTMENTS`
+  / `CC_HQ_DEPARTMENTS` lists in `owners.js`) plus the latest non-`Unknown`
+  process-timeline `processType`. Rules: latest `processType` `User` → User;
+  Core dept + `Service Team` → Core Team; Core dept + `1st  Line` (or other) →
+  1st Line; HQ dept → HQ; anything unrecognised → 1st Line.
+- **Track Status is now strictly the *desired* location** — it decorates the case
+  (moving/handoff animation, watch ring, sanity grouping) and sets the animation
+  target, but never moves the dot. The Sanity Check / Case Closed `pinTo` override
+  (and the now-unused `pinTo`/`watch` fields and dead `deptToRoleRaw`) were removed.
+- New **1st Line** position: a static dot between User and Core Team with a dashed
+  animated arrow each way (the "at triage, could go either way" cue). The
+  stay / watch / sanity dots now sit at the case's real CC station, not a fixed spot.
+- **Seed reshaped** to realistic Case Center records: assignee departments use the
+  configurable values (`Site IT`, `HQ Identity`, `HQ Mobile`), process timelines
+  carry real `processType` transitions (incl. `Unknown` at intake and `User` for
+  user-held stages). Picked cases now span all four stations on the board.
+- Spec + plan: `docs/superpowers/specs/2026-06-14-route-board-cc-position-design.md`,
+  `docs/superpowers/plans/2026-06-14-route-board-cc-position.md`.
+
 ## 2026-06-13
 
 ### Changed (Seed data — expanded to 38 cases for realistic testing)
