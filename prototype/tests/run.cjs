@@ -569,6 +569,27 @@ test('stay row dot is placed at the case station (HQ), not hard-coded User', () 
   ok(html.includes('left:88%'), 'stay dot at HQ (88%)');
 });
 
+/* ---------- 1st-Line lane ---------- */
+test('_classifyRouteRow: untracked 1st-Line case → firstline', () => {
+  const c = { id: 'C-FL', subject: 's', assigneeDept: 'Site IT',
+    processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
+  eq(app._classifyRouteRow(c), 'firstline');
+});
+test('_classifyRouteRow: 1st-Line case WITH a scheduled desired → moving', () => {
+  const c = { id: 'C-FLM', subject: 's', assigneeDept: 'Site IT', agentStatus: 'queued',
+    trackStatus: 'escalate_to_core',
+    processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
+  eq(app._classifyRouteRow(c), 'moving');
+});
+test('_renderFirstLineRow: static dot at 1st-Line pct + two dashed arrows', () => {
+  const c = { id: 'C-FL', subject: 's', assigneeDept: 'Site IT',
+    processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
+  const html = app._renderFirstLineRow(c, 0);
+  ok(html.includes('rb-row-firstline'), 'firstline row class');
+  ok(html.includes('left:31%'), 'dot at 1st-Line pct');
+  ok(html.includes('rb-fl-arrow-left') && html.includes('rb-fl-arrow-right'), 'both arrows');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

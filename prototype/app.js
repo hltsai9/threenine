@@ -1311,12 +1311,13 @@ function formatDeadlineChip(handoff, phase) {
 function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
-  if (scheduledHandoff(c)) return 'moving';
+  if (scheduledHandoff(c)) return 'moving';   // a desired handoff → directional animation
   // WATCH covers both "watching at HQ" (escalated_to_hq) and "watching at User"
   // (need_to_contact_user) — same row shape, station position derived from the
   // Track Status definition's `watch` field.
   if (ts === 'escalated_to_hq' || ts === 'need_to_contact_user') return 'watch';
-  return 'stay';  // case_closed, untracked
+  if (caseStation(c) === STATION_1ST_LINE) return 'firstline';   // at triage, no firm intent
+  return 'stay';
 }
 
 function _renderMovingRow(c, top, animDelay) {
@@ -1394,6 +1395,21 @@ function _renderStayRow(c, top) {
   `;
 }
 
+// 1st-Line: the case is at triage — could move to User or to Core. A static dot between the
+// two stations with a dashed animated arrow pointing each way (the "decide where it goes" cue).
+function _renderFirstLineRow(c, top) {
+  const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const pct = ROUTE_STATION_POS[STATION_1ST_LINE];
+  return `
+    <div class="rb-row rb-row-firstline${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
+      <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
+      <div class="rb-fl-dot" style="left:${pct}%;"></div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st line</div>
+    </div>
+  `;
+}
+
 function _renderSanityHeader(count, expanded, top) {
   const sym = expanded ? '−' : '+';
   return `
@@ -1420,13 +1436,14 @@ function renderRouteBoardStrip() {
   const all = pickedCases();
 
   // Bucket every picked case into one of the four visual row types.
-  const moving = [], watch = [], stay = [], sanity = [];
+  const moving = [], watch = [], stay = [], sanity = [], firstline = [];
   for (const c of all) {
     switch (_classifyRouteRow(c)) {
-      case 'moving': moving.push(c); break;
-      case 'watch':  watch.push(c);  break;
-      case 'stay':   stay.push(c);   break;
-      case 'sanity': sanity.push(c); break;
+      case 'moving':    moving.push(c);    break;
+      case 'watch':     watch.push(c);     break;
+      case 'stay':      stay.push(c);      break;
+      case 'sanity':    sanity.push(c);    break;
+      case 'firstline': firstline.push(c); break;
     }
   }
   // Overdue first inside the moving group; ties broken by soonest dueAt.
@@ -1453,8 +1470,9 @@ function renderRouteBoardStrip() {
     y += 66;
     movingIdx++;
   }
-  for (const c of watch) { segments.push(_renderWatchRow(c, y)); y += 60; }
-  for (const c of stay)  { segments.push(_renderStayRow(c, y));  y += 48; }
+  for (const c of watch)     { segments.push(_renderWatchRow(c, y));     y += 60; }
+  for (const c of firstline) { segments.push(_renderFirstLineRow(c, y)); y += 56; }
+  for (const c of stay)      { segments.push(_renderStayRow(c, y));      y += 48; }
   const sanityExpanded = !!STATE.sanityExpanded;
   if (sanity.length > 0) {
     segments.push(_renderSanityHeader(sanity.length, sanityExpanded, y));
