@@ -10,6 +10,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-13
 
+### Changed (Seed data — expanded to 38 cases for realistic testing)
+
+- **`prototype/data.js` grown from 10 → 38 raw Case Center records** so a seeded
+  DB / board looks realistic. The 10 curated records (tricky scenarios) are kept
+  as-is; ~28 more are appended by a small in-file factory (`C-2411…C-2438`),
+  still raw-CC shape (`CASES_RAW_CC`). Spread: 28 in the current week (W24), 10
+  closed/dropped in the prior week (W23 → Weekly Archive). Status mix: 7 new, 8
+  with-core, 7 with-HQ, 3 returned-to-requester, 10 closed, 3 cancelled.
+- **`SEED_AGENT_LAYER` expanded to 13 picked cases** covering every Route Board
+  lane: MOVING (weekend_case / escalate_to_core / hq_did_not_handle), WATCH
+  (escalated_to_hq / need_to_contact_user), SANITY (sanity_check ×4), and STAY
+  (picked-but-untracked). Generated via `node backend/seed_board_json.cjs`-friendly
+  data, verified to map cleanly to board shape.
+
 ### Changed (Server mode auto-detects — no config flip needed)
 
 - **`API_MODE='' ` now auto-detects** the backend: on boot the SPA probes

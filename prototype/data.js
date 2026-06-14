@@ -45,9 +45,10 @@ window.WEEKS = [
 // through mapRawCcRecord() at boot.
 window.CASES_RAW_CC = true;
 
-// ---- 10 raw Case Center records for W24-2026 -----------------------------
+// ---- Curated raw Case Center records (C-2401 … C-2410) -------------------
 //
-// Coverage:
+// These 10 hand-authored records cover the tricky scenarios; ~28 more are
+// appended by the factory below (C-2411…C-2438) to fill out the board. Coverage:
 //   2 × Open / triage (New column)
 //   2 × Service Team (With Core Team)
 //   2 × Wait Resolution (With HQ Product Team)
@@ -380,18 +381,176 @@ window.CASES = [
 
 ];
 
+// ---- Generated bulk cases (C-2411 … C-2438) ---------------------------------
+//
+// The 10 curated records above cover the tricky scenarios (Wait User, Return,
+// Close, Drop, full escalation chains). This block adds ~28 more raw CC records
+// — same shape, built by a small factory — so the board, archive and Route Board
+// look realistic when seeded into a real DB for testing. Most land in the current
+// week (W24); the tail are closed/dropped cases in the prior week (W23) to fill
+// the Weekly Archive. Timestamps are anchored off window.NOW like everything else.
+window.CASES = window.CASES.concat((function () {
+  const base = window.NOW.getTime();
+  const H = 3600e3, D = 24 * H;
+  const iso = msAgo => new Date(base - msAgo).toISOString();
+  const desk = { processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk' };
+  const cores = [
+    { dept: 'Core Team — APAC desk', proc: 'core-apac-eng' },
+    { dept: 'Core Team — EMEA desk', proc: 'core-emea-eng' },
+    { dept: 'Core Team — AMER desk', proc: 'core-amer-eng' },
+  ];
+  const hqs = [
+    { dept: 'HQ Identity Team', proc: 'hq-identity-eng', ptype: 'Escalation' },
+    { dept: 'HQ Data Platform', proc: 'hq-data-eng',     ptype: 'Product fix' },
+    { dept: 'HQ Mobile App',    proc: 'hq-mobile-eng',   ptype: 'Product fix' },
+  ];
+  const users = [
+    { account: 'noah.kim',     name: 'Noah Kim',       dept: 'APAC Sales' },
+    { account: 'yuki.mori',    name: 'Yuki Mori',      dept: 'APAC Engineering' },
+    { account: 'sofia.costa',  name: 'Sofia Costa',    dept: 'EMEA Sales' },
+    { account: 'mateo.garcia', name: 'Mateo García',   dept: 'AMER Sales' },
+    { account: 'fatima.noor',  name: 'Fatima Noor',    dept: 'EMEA Operations' },
+    { account: 'daniel.weiss', name: 'Daniel Weiss',   dept: 'EMEA Finance' },
+    { account: 'grace.lee',    name: 'Grace Lee',      dept: 'APAC Customer Success' },
+    { account: 'oliver.smith', name: 'Oliver Smith',   dept: 'AMER Marketing' },
+    { account: 'aisha.rahman', name: 'Aisha Rahman',   dept: 'EMEA Marketing' },
+    { account: 'lucas.silva',  name: 'Lucas Silva',    dept: 'AMER Operations' },
+    { account: 'mina.takagi',  name: 'Mina Takagi',    dept: 'APAC Finance' },
+    { account: 'emma.brown',   name: 'Emma Brown',     dept: 'AMER Customer Success' },
+    { account: 'raj.patel',    name: 'Raj Patel',      dept: 'APAC IT' },
+    { account: 'nora.haddad',  name: 'Nora Haddad',    dept: 'EMEA Engineering' },
+    { account: 'leo.martin',   name: 'Leo Martin',     dept: 'AMER Engineering' },
+    { account: 'yara.kassab',  name: 'Yara Kassab',    dept: 'EMEA Customer Success' },
+  ];
+
+  let n = 2411;
+  function make(scenario, subject, user, level, type, ago, core, hq) {
+    const id = 'C-' + (n++);
+    const rec = {
+      caseId: id, subject, caseStatus: 'Open', subStatus: { transition: null },
+      caseLevel: level, caseType: type,
+      userAccount: user.account, userName: user.name, userDept: user.dept,
+      reporter: 'helpdesk-tier1', assignee: 'helpdesk-tier1',
+      caseLink: 'https://case-center.example/CC-' + id.slice(2),
+      createDateTime: iso(ago), processTimeline: [],
+    };
+    const open = { ...desk, caseStatus: 'Open', subStatus: { transition: null },
+      processStartTime: iso(ago), processEndTime: iso(ago - 0.5 * H), processMinutes: 30 };
+    if (scenario === 'new_open') {
+      rec.caseStatus = 'Open';
+      rec.processTimeline = [{ ...desk, caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: iso(ago), processEndTime: null, processMinutes: null }];
+    } else if (scenario === 'triage_inprogress') {
+      rec.caseStatus = 'In-Progress';
+      rec.processTimeline = [{ ...desk, caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: iso(ago), processEndTime: null, processMinutes: null }];
+    } else if (scenario === 'with_core') {
+      rec.caseStatus = 'In-Progress'; rec.assignee = core.proc;
+      rec.processTimeline = [open, { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
+        caseStatus: 'In-Progress', subStatus: { transition: null },
+        processStartTime: iso(ago - 0.5 * H), processEndTime: null, processMinutes: null }];
+    } else if (scenario === 'with_hq') {
+      rec.caseStatus = 'Wait Resolution'; rec.assignee = hq.proc;
+      rec.processTimeline = [open,
+        { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
+          caseStatus: 'In-Progress', subStatus: { transition: null },
+          processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 3 * H), processMinutes: 150 },
+        { processType: hq.ptype, processor: hq.proc, processorDeptName: hq.dept,
+          caseStatus: 'Wait Resolution', subStatus: { transition: null },
+          processStartTime: iso(ago - 3 * H), processEndTime: null, processMinutes: null }];
+    } else if (scenario === 'wait_user') {
+      rec.caseStatus = 'In-Progress'; rec.assignee = user.account;
+      rec.subStatus = { transition: 'Wait User', reason: 'Awaiting info from requester',
+        dueAction: 'Requester to reply with details', dueDateTime: iso(ago - 1.5 * D),
+        transitionDateTime: iso(ago - 1 * D), lastProcessor: { assignee: core.proc, handlerType: 'Core Team' } };
+      rec.processTimeline = [open,
+        { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
+          caseStatus: 'In-Progress', subStatus: { transition: null },
+          processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 1 * D), processMinutes: 600 },
+        { processType: 'Wait User', processor: user.account, processorDeptName: user.dept,
+          caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
+          processStartTime: iso(ago - 1 * D), processEndTime: null, processMinutes: null }];
+    } else if (scenario === 'closed') {
+      rec.caseStatus = 'Close'; rec.assignee = (hq || core).proc;
+      rec.processTimeline = [open,
+        { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
+          caseStatus: 'In-Progress', subStatus: { transition: null },
+          processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 4 * H), processMinutes: 210 },
+        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+          caseStatus: 'Close', subStatus: { transition: null },
+          processStartTime: iso(ago - 4 * H), processEndTime: iso(ago - 4.25 * H), processMinutes: 15 }];
+    } else if (scenario === 'dropped') {
+      rec.caseStatus = 'Drop';
+      rec.processTimeline = [open,
+        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+          caseStatus: 'Drop', subStatus: { transition: null },
+          processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 0.6 * H), processMinutes: 10 }];
+    }
+    return rec;
+  }
+
+  // [scenario, subject, level, type, daysAgo, coreIdx, hqIdx]
+  const scen = [
+    ['with_core', 'VPN drops every 30 minutes for AMER field team', 'Normal', 'network', 0.3, 2, 0],
+    ['with_core', 'Shared mailbox not syncing on Outlook desktop', 'Urgent', 'service', 0.5, 1, 1],
+    ['new_open', 'New starter cannot access HR portal', 'Normal', 'access', 0.2, 0, 0],
+    ['with_hq', 'SSO token expiry too aggressive after policy change', 'Urgent', 'access', 1.2, 2, 0],
+    ['with_hq', 'Dashboard widgets blank for Data Platform tenants', 'Normal', 'data', 2.1, 1, 1],
+    ['wait_user', 'Spreadsheet macro fails — need a sample file', 'Normal', 'productivity', 1.0, 1, 0],
+    ['new_open', 'Printer queue stuck across APAC office', 'Urgent', 'network', 0.4, 0, 0],
+    ['with_core', 'Calendar invites arriving one hour off', 'Normal', 'mobile', 1.5, 0, 2],
+    ['with_hq', 'Push notifications delayed on Android 15', 'Normal', 'mobile', 3.0, 0, 2],
+    ['triage_inprogress', 'Requester chasing status on laptop replacement', 'Normal', 'service', 0.6, 0, 0],
+    ['with_core', 'Bulk user import rejects valid CSV rows', 'Urgent', 'data', 0.8, 1, 1],
+    ['with_hq', 'MFA prompts loop on corporate WiFi', 'Urgent', 'access', 2.5, 2, 0],
+    ['wait_user', 'App crash on export — awaiting logs', 'Normal', 'service', 1.3, 2, 2],
+    ['with_core', 'Teams screen-share freezes for EMEA', 'Normal', 'productivity', 2.0, 1, 1],
+    ['new_open', 'Guest WiFi voucher portal returns 500', 'Normal', 'service', 0.25, 0, 0],
+    ['with_hq', 'Report scheduler stopped emailing PDFs', 'Normal', 'data', 3.5, 1, 1],
+    ['closed', 'Email signature template not applying — resolved', 'Normal', 'access', 4.0, 1, 0],
+    ['with_core', 'Badge reader offline at AMER HQ lobby', 'Normal', 'network', 1.1, 2, 0],
+    // ---- prior week (W23) history → Weekly Archive ----
+    ['closed', 'Password reset link expired too quickly', 'Normal', 'access', 7.5, 1, 0],
+    ['closed', 'OneDrive sync conflict on finance share', 'Normal', 'data', 8.2, 1, 1],
+    ['dropped', 'Duplicate ticket for printer outage', 'Normal', 'network', 9.0, 0, 0],
+    ['closed', 'Zoom plugin missing after update', 'Normal', 'productivity', 10.1, 2, 2],
+    ['closed', 'SSO misconfig for new SaaS app', 'Urgent', 'access', 7.8, 2, 0],
+    ['dropped', 'Spam report — no action needed', 'Normal', 'service', 11.0, 0, 0],
+    ['closed', 'Mobile VPN profile expired', 'Normal', 'mobile', 8.9, 0, 2],
+    ['closed', 'Data export encoding garbled', 'Normal', 'data', 12.0, 1, 1],
+    ['closed', 'Meeting room display not detected', 'Normal', 'service', 9.5, 1, 0],
+    ['closed', 'Account lockout after travel', 'Normal', 'access', 10.7, 2, 0],
+  ];
+  return scen.map((s, i) =>
+    make(s[0], s[1], users[i % users.length], s[2], s[3], s[4] * D, cores[s[5]], hqs[s[6]]));
+})());
+
 // ---- Operator-layer overlay --------------------------------------------------
 //
 // Applied AFTER the CC mapping (see applySeedAgentLayer in app.js). Sits outside
 // Case Center: picks (agentStatus = 'queued') and Track Statuses are operator
-// intent, not CC fields. Keep this light — three picked cases, two Track
-// Statuses (Weekend Case + Sanity Check) — so the Route Board demos
-// MOVING + WATCH-ring-pulse + SANITY-collapsible without being overwhelming.
+// intent, not CC fields. Spread across the Route Board lanes so all four demo:
+//   MOVING  = weekend_case · escalate_to_core · hq_did_not_handle (scheduled handoff)
+//   WATCH   = escalated_to_hq · need_to_contact_user (dashed ring pulse)
+//   SANITY  = sanity_check (collapsible group)
+//   STAY    = picked but untracked (parked at its station)
 
 window.SEED_AGENT_LAYER = {
-  // Weekend Case: drives a MOVING lane (User → HQ, scheduled handoff Sun 17:30).
+  // — MOVING lane —
   'C-2402': { agentStatus: 'queued', trackStatus: 'weekend_case' },
-  // Sanity Check: two picks so the collapsible group has more than one row.
+  'C-2417': { agentStatus: 'queued', trackStatus: 'weekend_case' },
+  'C-2420': { agentStatus: 'queued', trackStatus: 'escalate_to_core' },
+  'C-2419': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle' },
+  // — WATCH lane —
+  'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },
+  'C-2422': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },
+  'C-2416': { agentStatus: 'queued', trackStatus: 'need_to_contact_user' },
+  // — SANITY lane —
   'C-2405': { agentStatus: 'queued', trackStatus: 'sanity_check' },
   'C-2406': { agentStatus: 'queued', trackStatus: 'sanity_check' },
+  'C-2415': { agentStatus: 'queued', trackStatus: 'sanity_check' },
+  'C-2426': { agentStatus: 'queued', trackStatus: 'sanity_check' },
+  // — STAY lane (picked, untracked) —
+  'C-2411': { agentStatus: 'queued' },
+  'C-2421': { agentStatus: 'queued' },
 };
