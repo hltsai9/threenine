@@ -559,4 +559,6 @@ window.SEED_AGENT_LAYER = {
   // — STAY lane (picked, untracked) —
   'C-2411': { agentStatus: 'queued' },
   'C-2421': { agentStatus: 'queued' },
+  // 1st-Line lane: picked but untracked → static dot + bidirectional dashed arrows.
+  'C-2401': { agentStatus: 'queued' },
 };

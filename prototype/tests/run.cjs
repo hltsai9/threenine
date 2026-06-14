@@ -528,6 +528,12 @@ test('latestProcessType: empty / all-Unknown / missing → "1st  Line"', () => {
   eq(latestProcessType({ processTimeline: [{ processType: 'Unknown', processStartTime: iso(0) }] }), '1st  Line');
   eq(latestProcessType({}), '1st  Line');
 });
+test('latestProcessType: sorts by startedAt (mapped shape) regardless of array order', () => {
+  eq(latestProcessType({ processTimeline: [
+    { processType: 'Service Team', startedAt: iso(1 * HOUR) },  // more recent, listed first
+    { processType: '1st  Line',    startedAt: iso(3 * HOUR) },  // older, listed second
+  ] }), 'Service Team');
+});
 
 /* ---------- caseStation (dot = current CC location) ---------- */
 const caseStation = app.caseStation;
@@ -560,6 +566,8 @@ test('caseStation: null/undefined input is safe → 1st Line', () => {
   eq(app.caseStation(null), '1st Line');
   eq(app.caseStation(undefined), '1st Line');
 });
+test('caseStation: case_closed Track Status also does not pin the dot', () =>
+  eq(caseStation(stationCase('HQ Identity', 'Service Team', { trackStatus: 'case_closed' })), 'HQ'));
 
 /* ---------- Route Board dot positions follow caseStation ---------- */
 test('ROUTE_STATION_POS: 1st Line sits between User and Core', () => {
@@ -571,6 +579,12 @@ test('stay row dot is placed at the case station (HQ), not hard-coded User', () 
     processTimeline: [{ processType: 'Service Team', processStartTime: iso(HOUR) }] };
   const html = app._renderStayRow(c, 0);
   ok(html.includes('left:88%'), 'stay dot at HQ (88%)');
+});
+test('watch row dot is placed at the case station (HQ)', () => {
+  const c = { id: 'C-WATCH', subject: 's', assigneeDept: 'HQ Identity', trackStatus: 'escalated_to_hq',
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('left:88%'), 'watch dot at HQ (88%)');
 });
 
 /* ---------- 1st-Line lane ---------- */

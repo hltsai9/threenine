@@ -3495,6 +3495,8 @@ window.SEED_AGENT_LAYER = {
   // — STAY lane (picked, untracked) —
   'C-2411': { agentStatus: 'queued' },
   'C-2421': { agentStatus: 'queued' },
+  // 1st-Line lane: picked but untracked → static dot + bidirectional dashed arrows.
+  'C-2401': { agentStatus: 'queued' },
 };
 
 
@@ -4709,7 +4711,7 @@ function latestProcessType(c) {
   const known = tl
     .filter(e => e && e.processType && e.processType !== 'Unknown')
     .slice()
-    .sort((a, b) => new Date(a.processStartTime || 0) - new Date(b.processStartTime || 0));
+    .sort((a, b) => new Date(a.startedAt || a.processStartTime || 0) - new Date(b.startedAt || b.processStartTime || 0));
   return known.length ? known[known.length - 1].processType : '1st  Line';
 }
 const STATION_1ST_LINE = '1st Line';
@@ -4973,9 +4975,7 @@ function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
   if (scheduledHandoff(c)) return 'moving';   // a desired handoff → directional animation
-  // WATCH covers both "watching at HQ" (escalated_to_hq) and "watching at User"
-  // (need_to_contact_user) — same row shape, station position derived from the
-  // Track Status definition's `watch` field.
+  // WATCH covers escalated_to_hq + need_to_contact_user; the dot position comes from caseStation(c).
   if (ts === 'escalated_to_hq' || ts === 'need_to_contact_user') return 'watch';
   if (caseStation(c) === STATION_1ST_LINE) return 'firstline';   // at triage, no firm intent
   return 'stay';
@@ -5066,7 +5066,7 @@ function _renderFirstLineRow(c, top) {
       <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
       <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
       <div class="rb-fl-dot" style="left:${pct}%;"></div>
-      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st line</div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line</div>
     </div>
   `;
 }
