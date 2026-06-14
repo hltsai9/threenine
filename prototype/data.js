@@ -59,7 +59,7 @@ window.CASES_RAW_CC = true;
 
 window.CASES = [
 
-  // -- C-2401 — Open at IT Service Desk (fresh New) --------------------------
+  // -- C-2401 — Open at Site IT (fresh New) --------------------------
   {
     caseId: 'C-2401',
     subject: 'APAC users locked out after MFA reset',
@@ -76,7 +76,7 @@ window.CASES = [
     createDateTime: '2026-06-12T05:12:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-12T05:12:00Z', processEndTime: null, processMinutes: null,
       },
@@ -101,7 +101,7 @@ window.CASES = [
     createDateTime: '2026-06-12T10:30:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-12T10:30:00Z', processEndTime: null, processMinutes: null,
       },
@@ -125,12 +125,18 @@ window.CASES = [
     createDateTime: '2026-06-11T22:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        // Transient "Unknown" stage at intake — skipped by latestProcessType().
+        processType: 'Unknown', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
+        caseStatus: 'Open', subStatus: { transition: null },
+        processStartTime: '2026-06-11T21:55:00Z', processEndTime: '2026-06-11T22:00:00Z', processMinutes: 5,
+      },
+      {
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-11T22:00:00Z', processEndTime: '2026-06-11T22:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-apac-eng', processorDeptName: 'Core Team — APAC desk',
+        processType: 'Service Team', processor: 'core-apac-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-11T22:30:00Z', processEndTime: null, processMinutes: null,
       },
@@ -154,12 +160,12 @@ window.CASES = [
     createDateTime: '2026-06-11T13:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-11T13:00:00Z', processEndTime: '2026-06-11T13:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-11T13:30:00Z', processEndTime: null, processMinutes: null,
       },
@@ -184,17 +190,17 @@ window.CASES = [
     createDateTime: '2026-06-09T15:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-09T15:00:00Z', processEndTime: '2026-06-09T15:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Core Team — AMER desk',
+        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-09T15:30:00Z', processEndTime: '2026-06-10T01:00:00Z', processMinutes: 570,
       },
       {
-        processType: 'Product fix', processor: 'hq-mobile-eng', processorDeptName: 'HQ Mobile App',
+        processType: 'Product fix', processor: 'hq-mobile-eng', processorDeptName: 'HQ Mobile',
         caseStatus: 'Wait Resolution', subStatus: { transition: null },
         processStartTime: '2026-06-10T01:00:00Z', processEndTime: null, processMinutes: null,
       },
@@ -219,17 +225,17 @@ window.CASES = [
     createDateTime: '2026-06-10T17:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-10T17:00:00Z', processEndTime: '2026-06-10T17:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Core Team — AMER desk',
+        processType: 'Service Team', processor: 'core-amer-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-10T17:30:00Z', processEndTime: '2026-06-11T01:00:00Z', processMinutes: 450,
       },
       {
-        processType: 'Escalation', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity Team',
+        processType: 'Escalation', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity',
         caseStatus: 'Wait Resolution', subStatus: { transition: null },
         processStartTime: '2026-06-11T01:00:00Z', processEndTime: null, processMinutes: null,
       },
@@ -260,17 +266,17 @@ window.CASES = [
     createDateTime: '2026-06-09T09:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-09T09:00:00Z', processEndTime: '2026-06-09T09:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-09T09:30:00Z', processEndTime: '2026-06-11T14:00:00Z', processMinutes: 3150,
       },
       {
-        processType: 'Wait User', processor: 'liam.walsh', processorDeptName: 'EMEA Operations',
+        processType: 'User', processor: 'liam.walsh', processorDeptName: 'EMEA Operations',
         caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
         processStartTime: '2026-06-11T14:00:00Z', processEndTime: null, processMinutes: null,
       },
@@ -294,17 +300,17 @@ window.CASES = [
     createDateTime: '2026-06-11T08:30:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-11T08:30:00Z', processEndTime: '2026-06-11T09:00:00Z', processMinutes: 30,
       },
       {
-        processType: 'Wait User', processor: 'elena.rossi', processorDeptName: 'EMEA Finance',
+        processType: 'User', processor: 'elena.rossi', processorDeptName: 'EMEA Finance',
         caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
         processStartTime: '2026-06-11T09:00:00Z', processEndTime: '2026-06-12T11:00:00Z', processMinutes: 1560,
       },
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: 'Return' },
         processStartTime: '2026-06-12T11:00:00Z', processEndTime: null, processMinutes: null,
       },
@@ -328,22 +334,22 @@ window.CASES = [
     createDateTime: '2026-06-08T14:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-08T14:00:00Z', processEndTime: '2026-06-08T14:30:00Z', processMinutes: 30,
       },
       {
-        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Core Team — EMEA desk',
+        processType: 'Service Team', processor: 'core-emea-eng', processorDeptName: 'Site IT',
         caseStatus: 'In-Progress', subStatus: { transition: null },
         processStartTime: '2026-06-08T14:30:00Z', processEndTime: '2026-06-08T19:00:00Z', processMinutes: 270,
       },
       {
-        processType: 'Product fix', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity Team',
+        processType: 'Product fix', processor: 'hq-identity-eng', processorDeptName: 'HQ Identity',
         caseStatus: 'Wait Resolution', subStatus: { transition: null },
         processStartTime: '2026-06-08T19:00:00Z', processEndTime: '2026-06-09T13:00:00Z', processMinutes: 1080,
       },
       {
-        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Close', subStatus: { transition: null },
         processStartTime: '2026-06-09T13:00:00Z', processEndTime: '2026-06-09T13:15:00Z', processMinutes: 15,
       },
@@ -367,12 +373,12 @@ window.CASES = [
     createDateTime: '2026-06-08T11:00:00+00:00',
     processTimeline: [
       {
-        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Open', subStatus: { transition: null },
         processStartTime: '2026-06-08T11:00:00Z', processEndTime: '2026-06-08T12:00:00Z', processMinutes: 60,
       },
       {
-        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
         caseStatus: 'Drop', subStatus: { transition: null },
         processStartTime: '2026-06-08T12:00:00Z', processEndTime: '2026-06-08T12:10:00Z', processMinutes: 10,
       },
@@ -393,16 +399,16 @@ window.CASES = window.CASES.concat((function () {
   const base = window.NOW.getTime();
   const H = 3600e3, D = 24 * H;
   const iso = msAgo => new Date(base - msAgo).toISOString();
-  const desk = { processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk' };
+  const desk = { processType: '1st  Line', processor: 'helpdesk-tier1', processorDeptName: 'Site IT' };
   const cores = [
-    { dept: 'Core Team — APAC desk', proc: 'core-apac-eng' },
-    { dept: 'Core Team — EMEA desk', proc: 'core-emea-eng' },
-    { dept: 'Core Team — AMER desk', proc: 'core-amer-eng' },
+    { dept: 'Site IT', proc: 'core-apac-eng' },
+    { dept: 'Site IT', proc: 'core-emea-eng' },
+    { dept: 'Site IT', proc: 'core-amer-eng' },
   ];
   const hqs = [
-    { dept: 'HQ Identity Team', proc: 'hq-identity-eng', ptype: 'Escalation' },
-    { dept: 'HQ Data Platform', proc: 'hq-data-eng',     ptype: 'Product fix' },
-    { dept: 'HQ Mobile App',    proc: 'hq-mobile-eng',   ptype: 'Product fix' },
+    { dept: 'HQ Identity', proc: 'hq-identity-eng', ptype: 'Escalation' },
+    { dept: 'HQ Identity', proc: 'hq-data-eng',     ptype: 'Product fix' },
+    { dept: 'HQ Mobile',    proc: 'hq-mobile-eng',   ptype: 'Product fix' },
   ];
   const users = [
     { account: 'noah.kim',     name: 'Noah Kim',       dept: 'APAC Sales' },
@@ -467,7 +473,7 @@ window.CASES = window.CASES.concat((function () {
         { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
           caseStatus: 'In-Progress', subStatus: { transition: null },
           processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 1 * D), processMinutes: 600 },
-        { processType: 'Wait User', processor: user.account, processorDeptName: user.dept,
+        { processType: 'User', processor: user.account, processorDeptName: user.dept,
           caseStatus: 'In-Progress', subStatus: { transition: 'Wait User' },
           processStartTime: iso(ago - 1 * D), processEndTime: null, processMinutes: null }];
     } else if (scenario === 'closed') {
@@ -476,13 +482,13 @@ window.CASES = window.CASES.concat((function () {
         { processType: 'Service Team', processor: core.proc, processorDeptName: core.dept,
           caseStatus: 'In-Progress', subStatus: { transition: null },
           processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 4 * H), processMinutes: 210 },
-        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
           caseStatus: 'Close', subStatus: { transition: null },
           processStartTime: iso(ago - 4 * H), processEndTime: iso(ago - 4.25 * H), processMinutes: 15 }];
     } else if (scenario === 'dropped') {
       rec.caseStatus = 'Drop';
       rec.processTimeline = [open,
-        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'IT Service Desk',
+        { processType: 'Closing', processor: 'helpdesk-tier1', processorDeptName: 'Site IT',
           caseStatus: 'Drop', subStatus: { transition: null },
           processStartTime: iso(ago - 0.5 * H), processEndTime: iso(ago - 0.6 * H), processMinutes: 10 }];
     }
