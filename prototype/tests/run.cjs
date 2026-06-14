@@ -253,6 +253,12 @@ test('seed: every case has a non-empty string id', () => {
 test('seed: thresholds present and numeric', () =>
   ok(typeof TH.coreIdleHours === 'number' && typeof TH.hqIdleHours === 'number'));
 
+/* ---------- Route Board dept-list config ---------- */
+test('owners: CC dept lists are non-empty arrays', () => {
+  ok(Array.isArray(app.CC_CORE_DEPARTMENTS) && app.CC_CORE_DEPARTMENTS.length > 0, 'core list');
+  ok(Array.isArray(app.CC_HQ_DEPARTMENTS) && app.CC_HQ_DEPARTMENTS.length > 0, 'hq list');
+});
+
 /* ---------- action handlers (handlePrompt outcomes) ----------
  * handlePrompt opens a modal via showModal(html, onSubmit) then mutates the case on submit.
  * We intercept showModal/render/showToast (sloppy-mode globals are reassignable), drive

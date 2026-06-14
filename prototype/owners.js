@@ -75,3 +75,13 @@ window.OWNERS = {
     },
   ],
 };
+
+// ---- Route Board department → station config --------------------------------
+// The dot on the Hand-off Route Board shows where a case CURRENTLY is, derived from the
+// Case Center assignee's DEPARTMENT plus the latest process-timeline processType. Fill these
+// in with your real Case Center department names at go-live (these demo values match data.js).
+//   - A dept in CC_CORE_DEPARTMENTS means Core Team / 1st Line (processType disambiguates).
+//   - A dept in CC_HQ_DEPARTMENTS means HQ. There can be several.
+// Matching is case-insensitive exact match against a case's assigneeDept.
+window.CC_CORE_DEPARTMENTS = ['Site IT'];
+window.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
