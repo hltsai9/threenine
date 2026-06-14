@@ -2594,6 +2594,23 @@ table.case-table {
   transform: translate(-50%, -50%);
   z-index: 2;
 }
+/* Watch "intent" — the case isn't at its expected station: dashed line + an arrow that pulses
+   toward where it should go (right toward HQ, left toward User). */
+.rb-watch-intent-line {
+  position: absolute; top: 50%; height: 0;
+  border-top: 1.5px dashed #C9A53C; transform: translateY(-50%); opacity: .8; z-index: 1;
+}
+.rb-watch-intent-arrow { position: absolute; top: 50%; width: 0; height: 0; z-index: 3; }
+.rb-wi-right {
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 7px solid #C9A53C;
+  animation: rb-wi-pulse-r 1.4s ease-in-out infinite;
+}
+.rb-wi-left {
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-right: 7px solid #C9A53C;
+  animation: rb-wi-pulse-l 1.4s ease-in-out infinite;
+}
+@keyframes rb-wi-pulse-r { 0%,100% { transform: translate(calc(-100% - 6px), -50%); } 50% { transform: translate(calc(-100% - 1px), -50%); } }
+@keyframes rb-wi-pulse-l { 0%,100% { transform: translate(6px, -50%); } 50% { transform: translate(1px, -50%); } }
 .rb-row-watch .rb-watch-eye {
   top: 50%;
   transform: translateY(-50%);

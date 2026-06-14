@@ -501,16 +501,16 @@ window.CASES = window.CASES.concat((function () {
     ['with_core', 'Shared mailbox not syncing on Outlook desktop', 'Urgent', 'service', 0.5, 1, 1],
     ['new_open', 'New starter cannot access HR portal', 'Normal', 'access', 0.2, 0, 0],
     ['with_hq', 'SSO token expiry too aggressive after policy change', 'Urgent', 'access', 1.2, 2, 0],
-    ['with_hq', 'Dashboard widgets blank for Data Platform tenants', 'Normal', 'data', 2.1, 1, 1],
+    ['wait_user', 'Dashboard widgets blank for Data Platform tenants', 'Normal', 'data', 2.1, 1, 1],
     ['wait_user', 'Spreadsheet macro fails — need a sample file', 'Normal', 'productivity', 1.0, 1, 0],
     ['new_open', 'Printer queue stuck across APAC office', 'Urgent', 'network', 0.4, 0, 0],
     ['with_core', 'Calendar invites arriving one hour off', 'Normal', 'mobile', 1.5, 0, 2],
     ['with_hq', 'Push notifications delayed on Android 15', 'Normal', 'mobile', 3.0, 0, 2],
     ['triage_inprogress', 'Requester chasing status on laptop replacement', 'Normal', 'service', 0.6, 0, 0],
-    ['with_core', 'Bulk user import rejects valid CSV rows', 'Urgent', 'data', 0.8, 1, 1],
+    ['wait_user', 'Bulk user import rejects valid CSV rows', 'Urgent', 'data', 0.8, 1, 1],
     ['with_hq', 'MFA prompts loop on corporate WiFi', 'Urgent', 'access', 2.5, 2, 0],
     ['wait_user', 'App crash on export — awaiting logs', 'Normal', 'service', 1.3, 2, 2],
-    ['with_core', 'Teams screen-share freezes for EMEA', 'Normal', 'productivity', 2.0, 1, 1],
+    ['wait_user', 'Teams screen-share freezes for EMEA', 'Normal', 'productivity', 2.0, 1, 1],
     ['new_open', 'Guest WiFi voucher portal returns 500', 'Normal', 'service', 0.25, 0, 0],
     ['with_hq', 'Report scheduler stopped emailing PDFs', 'Normal', 'data', 3.5, 1, 1],
     ['closed', 'Email signature template not applying — resolved', 'Normal', 'access', 4.0, 1, 0],
@@ -542,23 +542,22 @@ window.CASES = window.CASES.concat((function () {
 //   STAY    = picked but untracked (parked at its station)
 
 window.SEED_AGENT_LAYER = {
-  // — MOVING lane —
-  'C-2402': { agentStatus: 'queued', trackStatus: 'weekend_case' },
-  'C-2417': { agentStatus: 'queued', trackStatus: 'weekend_case' },
-  'C-2420': { agentStatus: 'queued', trackStatus: 'escalate_to_core' },
-  'C-2419': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle' },
-  // — WATCH lane —
-  'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },
-  'C-2422': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },
-  'C-2416': { agentStatus: 'queued', trackStatus: 'need_to_contact_user' },
-  // — SANITY lane —
-  'C-2405': { agentStatus: 'queued', trackStatus: 'sanity_check' },
-  'C-2406': { agentStatus: 'queued', trackStatus: 'sanity_check' },
-  'C-2415': { agentStatus: 'queued', trackStatus: 'sanity_check' },
-  'C-2426': { agentStatus: 'queued', trackStatus: 'sanity_check' },
-  // — STAY lane (picked, untracked) —
-  'C-2411': { agentStatus: 'queued' },
-  'C-2421': { agentStatus: 'queued' },
-  // 1st-Line lane: picked but untracked → static dot + bidirectional dashed arrows.
+  // — MOVING lane (scheduled hand-off) — these sit AT USER and move toward their target —
+  'C-2407': { agentStatus: 'queued', trackStatus: 'weekend_case' },       // User → HQ (Sun 17:30)
+  'C-2416': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle' },  // User → HQ (next 17:30)
+  'C-2423': { agentStatus: 'queued', trackStatus: 'escalate_to_core' },   // User → Core (09:00)
+  // — WATCH: escalated_to_hq (expected HQ) — one settled at HQ, one not yet (intent arrow → HQ) —
+  'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },    // AT HQ → watch ring
+  'C-2412': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },    // at Core → intent arrow → HQ
+  // — WATCH: need_to_contact_user (expected User) — one at User, one not (intent arrow → User) —
+  'C-2421': { agentStatus: 'queued', trackStatus: 'need_to_contact_user' }, // AT User → watch ring
+  'C-2422': { agentStatus: 'queued', trackStatus: 'need_to_contact_user' }, // at HQ → intent arrow → User
+  // — SANITY (mostly at User; one elsewhere shows the fool-proof real-station behaviour) —
+  'C-2415': { agentStatus: 'queued', trackStatus: 'sanity_check' },       // at User
+  'C-2424': { agentStatus: 'queued', trackStatus: 'sanity_check' },       // at User
+  'C-2405': { agentStatus: 'queued', trackStatus: 'sanity_check' },       // at HQ (real location shown)
+  // — 1st-Line lane: picked but untracked → static dot + bidirectional dashed arrows —
   'C-2401': { agentStatus: 'queued' },
+  // — STAY lane: picked, untracked, parked at its real station —
+  'C-2418': { agentStatus: 'queued' },
 };

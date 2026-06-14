@@ -29,6 +29,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   configurable values (`Site IT`, `HQ Identity`, `HQ Mobile`), process timelines
   carry real `processType` transitions (incl. `Unknown` at intake and `User` for
   user-held stages). Picked cases now span all four stations on the board.
+- **Track Status "expected station" + intent arrows.** Each watch Track Status has an
+  expected station (`escalated_to_hq` → HQ, `need_to_contact_user` → User). When the
+  case is there, the settled dashed **watch ring** shows; when it isn't, the dot stays
+  at the **real** CC station and a dashed animated **intent arrow** points toward where
+  it should go (right → HQ, left → User) — the board never hides the true location.
+  Scheduled statuses (Weekend / HQ-did-not-handle / Escalate-to-Core) are seeded **at
+  User** so their arrows read User → target; Sanity Check shows the real station (mostly
+  User). (See the addendum in the design spec.)
 - Spec + plan: `docs/superpowers/specs/2026-06-14-route-board-cc-position-design.md`,
   `docs/superpowers/plans/2026-06-14-route-board-cc-position.md`.
 

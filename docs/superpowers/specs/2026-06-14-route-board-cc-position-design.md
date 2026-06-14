@@ -143,3 +143,47 @@ Stations on the strip: **User · Core Team · HQ** (existing), plus **1st Line**
 - Visual sanity: seed includes at least one case per station incl. a 1st-Line case with the
   bidirectional arrows and a 1st-Line case with a desired Track Status (directional).
 - `node prototype/tests/run.cjs` green; rebundle.
+
+---
+
+## Addendum (2026-06-14) — Track Status "expected station" + intent arrows
+
+Refinement after seeing the board with real data. **The dot's position is still always the
+real CC location** (`caseStation`) — fool-proof, never lies. What changes is how the *watch*
+statuses and the seed behave, via an **expected station per Track Status**:
+
+```
+EXPECTED_STATION = {
+  escalated_to_hq:      'HQ',
+  need_to_contact_user: 'User',
+  weekend_case:         'HQ',        // scheduled (has a deadline)
+  hq_did_not_handle:    'HQ',        // scheduled
+  escalate_to_core:     'Core Team', // scheduled
+  sanity_check:         'User',      // expected, but never forces position
+}
+```
+
+**Lane decision (`_classifyRouteRow`) is unchanged** — `sanity_check` → `sanity`; scheduled
+status → `moving`; `escalated_to_hq` / `need_to_contact_user` → `watch`; `1st Line` →
+`firstline`; else `stay`. The behaviour change lives in the **watch renderer**, not the lanes.
+
+**Watch renderer (`_renderWatchRow`) gains the conditional:**
+- `caseStation(c) === EXPECTED_STATION[ts]` → **settled**: dashed ring + dot + eye at that
+  station (current behaviour).
+- else → **intent**: the dot stays at the real `caseStation`, plus the watch eye, plus a
+  **dashed, animated arrow** drawn from the real station toward `EXPECTED_STATION[ts]`
+  (pointing right toward HQ, or left toward User). This keeps the scheduled "moving" lane
+  (solid traveling dot + deadline chip) visually distinct from a "should be here" nudge.
+
+No change to the moving lane/renderer/sort. New CSS: a dashed intent line + a left- and a
+right-pointing arrowhead variant (e.g. `.rb-watch-intent-line`, `.rb-wi-left` / `.rb-wi-right`).
+
+**Seed (`data.js`) coverage to add:**
+- `weekend_case` / `hq_did_not_handle` / `escalate_to_core` picked cases authored **at User**
+  (latest `processType` `User`), so their scheduled arrow reads User → target.
+- `escalated_to_hq`: one case **at HQ** (watch ring) and one **not at HQ** (intent arrow→HQ).
+- `need_to_contact_user`: one **at User** (watch ring) and one **not at User** (intent arrow→User).
+- `sanity_check`: most picks **at User**; keep ≥1 not-at-User to show the fool-proof real-station behaviour.
+
+**Out of scope still:** Sanity does NOT draw an intent arrow (it just shows the real station in
+its group) — pending a different decision from the operator.

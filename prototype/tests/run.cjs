@@ -587,6 +587,33 @@ test('watch row dot is placed at the case station (HQ)', () => {
   ok(html.includes('left:88%'), 'watch dot at HQ (88%)');
 });
 
+/* ---------- watch row: settled ring (at expected) vs intent arrow (not at expected) ---------- */
+test('watch: escalated_to_hq AT HQ → settled ring, no intent arrow', () => {
+  const c = { id: 'C-EH', subject: 's', trackStatus: 'escalated_to_hq', assigneeDept: 'HQ Identity',
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('rb-watch-ring') && !html.includes('rb-row-watch-intent'), 'settled ring');
+});
+test('watch: escalated_to_hq NOT at HQ (at Core) → intent arrow pointing right (toward HQ)', () => {
+  const c = { id: 'C-EHI', subject: 's', trackStatus: 'escalated_to_hq', assigneeDept: 'Site IT',
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('rb-row-watch-intent'), 'intent row');
+  ok(html.includes('rb-wi-right'), 'arrow points right toward HQ');
+});
+test('watch: need_to_contact_user NOT at User (at HQ) → intent arrow pointing left (toward User)', () => {
+  const c = { id: 'C-NU', subject: 's', trackStatus: 'need_to_contact_user', assigneeDept: 'HQ Identity',
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('rb-row-watch-intent') && html.includes('rb-wi-left'), 'intent arrow toward User');
+});
+test('watch: need_to_contact_user AT User → settled ring', () => {
+  const c = { id: 'C-NUU', subject: 's', trackStatus: 'need_to_contact_user', assigneeDept: 'x',
+    processTimeline: [{ processType: 'User', startedAt: iso(HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('rb-watch-ring') && !html.includes('rb-row-watch-intent'), 'settled ring at User');
+});
+
 /* ---------- 1st-Line lane ---------- */
 test('_classifyRouteRow: untracked 1st-Line case → firstline', () => {
   const c = { id: 'C-FL', subject: 's', assigneeDept: 'Site IT',

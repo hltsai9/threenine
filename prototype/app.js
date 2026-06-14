@@ -1344,31 +1344,53 @@ function _renderMovingRow(c, top, animDelay) {
   `;
 }
 
+// Each watch Track Status has an EXPECTED station. When the case is there, the settled "watch"
+// ring applies; when it isn't, the dot stays at the real CC station and a dashed animated arrow
+// points toward where the operator wants it — the board never lies about the current location.
+const EXPECTED_STATION = { escalated_to_hq: 'HQ', need_to_contact_user: 'User' };
+
 function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
+  const ts = caseTrackStatus(c);
   const station = caseStation(c);
+  const expected = EXPECTED_STATION[ts] || station;
   const pct = ROUTE_STATION_POS[station] ?? 88;
-  // Dot colour matches the station's square in the header.
   const dotColor = STATION_DOT_COLOR[station] || '#8C4A2F';
-  // The id sits on whichever side has room — to the right of the dashed ring when
-  // we're at User (so it doesn't overflow the card on the left), otherwise to the right.
-  const eyeLeftCalc = `calc(${pct}% + 22px)`;
-  // For User position, push the id further right so the eye + id don't collide.
+  const eye = `
+      <div class="rb-watch-eye" style="left:calc(${pct}% + 22px);" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>`;
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
-  // The dashed ring pulses (shrinks to dot size, expands back) until the current
-  // operator has personally handed this case over. Once the latest handover note
-  // is authored by the current operator the ring goes quiet — a visual nudge
-  // for *Watching at HQ / User* cases that still need a hand-off.
-  const handoveredByMe = c.handover && c.handover.author === STATE.operatorId && !c.handover.staleForCurrentShift;
-  const pulseCls = handoveredByMe ? '' : ' rb-watch-ring-pulse';
-  return `
+  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)}</div>`;
+
+  if (station === expected) {
+    // Settled at the expected station — the dashed ring pulses until the current operator has
+    // personally handed this case over (then it goes quiet).
+    const handoveredByMe = c.handover && c.handover.author === STATE.operatorId && !c.handover.staleForCurrentShift;
+    const pulseCls = handoveredByMe ? '' : ' rb-watch-ring-pulse';
+    return `
     <div class="rb-row rb-row-watch${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-watch-ring${pulseCls}" style="left:${pct}%;"></div>
       <div class="rb-watch-dot"  style="left:${pct}%; background:${dotColor};"></div>
-      <div class="rb-watch-eye"  style="left:${eyeLeftCalc};" aria-hidden="true">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      </div>
-      <div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)}</div>
+      ${eye}
+      ${idEl}
+    </div>
+  `;
+  }
+
+  // Intent: the case isn't where this Track Status wants it — show the real station, the eye, and
+  // a dashed animated arrow toward the expected station (right toward HQ, left toward User).
+  const expPct = ROUTE_STATION_POS[expected] ?? pct;
+  const goingRight = expPct > pct;
+  const lineLeft = Math.min(pct, expPct);
+  const lineWidth = Math.abs(expPct - pct);
+  return `
+    <div class="rb-row rb-row-watch rb-row-watch-intent${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+      <div class="rb-watch-intent-line" style="left:${lineLeft}%; width:${lineWidth}%;"></div>
+      <div class="rb-watch-intent-arrow ${goingRight ? 'rb-wi-right' : 'rb-wi-left'}" style="left:${expPct}%;"></div>
+      <div class="rb-watch-dot" style="left:${pct}%; background:${dotColor};"></div>
+      ${eye}
+      ${idEl}
     </div>
   `;
 }
