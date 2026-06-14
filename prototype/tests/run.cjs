@@ -514,6 +514,21 @@ test('nextTimeIso: next future occurrence of a local HH:MM (today or tomorrow)',
   eq([app.nextTimeIso('99:99', base), app.nextTimeIso('', base)], [null, null]);
 });
 
+/* ---------- latestProcessType (skips Unknown) ---------- */
+const latestProcessType = app.latestProcessType;
+test('latestProcessType: returns latest non-Unknown by start time', () => {
+  eq(latestProcessType({ processTimeline: [
+    { processType: '1st  Line', processStartTime: iso(3 * HOUR) },
+    { processType: 'Service Team', processStartTime: iso(1 * HOUR) },
+    { processType: 'Unknown', processStartTime: iso(0) },
+  ] }), 'Service Team');
+});
+test('latestProcessType: empty / all-Unknown / missing → "1st  Line"', () => {
+  eq(latestProcessType({ processTimeline: [] }), '1st  Line');
+  eq(latestProcessType({ processTimeline: [{ processType: 'Unknown', processStartTime: iso(0) }] }), '1st  Line');
+  eq(latestProcessType({}), '1st  Line');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

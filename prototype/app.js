@@ -1046,6 +1046,17 @@ function deptToRoleRaw(dept) {
   const partial = all.find(o => String(o.name || '').toLowerCase().includes(String(dept).toLowerCase()));
   return partial ? (partial.route_role || null) : null;
 }
+// The latest process-timeline processType that drives a case's CURRENT station. "Unknown"
+// appears transiently and at creation, so it's skipped. Falls back to "1st  Line" (two
+// spaces — the literal Case Center value) when there's no usable entry.
+function latestProcessType(c) {
+  const tl = Array.isArray(c && c.processTimeline) ? c.processTimeline : [];
+  const known = tl
+    .filter(e => e && e.processType && e.processType !== 'Unknown')
+    .slice()
+    .sort((a, b) => new Date(a.processStartTime || 0) - new Date(b.processStartTime || 0));
+  return known.length ? known[known.length - 1].processType : '1st  Line';
+}
 function caseStation(c) {
   const ts = caseTrackStatus(c);
   // Case Closed and Sanity Check pin the dot to User regardless of CC dept.
