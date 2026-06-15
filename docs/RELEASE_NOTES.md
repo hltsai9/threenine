@@ -8,6 +8,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-15
+
+### Internal (Seed + promo deck)
+
+- **Seed:** added a sample handover note to `C-2414` so the case-detail handover
+  panel (and the promo-deck screenshot) have real content. No logic change.
+- **Promo deck:** refreshed `slides/` screenshots against the current UI and
+  rebuilt `Case-Tracker-Overview.pptx` (Route Board, current-vs-desired model,
+  deploy story). `slides/` is outside the code dirs, but noting it here for trace.
+
 ## 2026-06-14
 
 ### Changed (Route Board — dot shows the real Case Center location)

@@ -547,7 +547,9 @@ window.SEED_AGENT_LAYER = {
   'C-2416': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle' },  // User → HQ (next 17:30)
   'C-2423': { agentStatus: 'queued', trackStatus: 'escalate_to_core' },   // User → Core (09:00)
   // — WATCH: escalated_to_hq (expected HQ) — one settled at HQ, one not yet (intent arrow → HQ) —
-  'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },    // AT HQ → watch ring
+  'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq',     // AT HQ → watch ring
+    handover: { note: 'Pinged HQ Identity at 09:30 — awaiting a cert-rotation fix ETA. Keep watching; chase if nothing back by noon.',
+      author: 'op-na', from: 'Night', to: 'Day', at: '2026-06-12T07:50:00Z', staleForCurrentShift: false } },
   'C-2412': { agentStatus: 'queued', trackStatus: 'escalated_to_hq' },    // at Core → intent arrow → HQ
   // — WATCH: need_to_contact_user (expected User) — one at User, one not (intent arrow → User) —
   'C-2421': { agentStatus: 'queued', trackStatus: 'need_to_contact_user' }, // AT User → watch ring
