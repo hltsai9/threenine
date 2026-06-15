@@ -1,6 +1,6 @@
 # Promo deck — Case Tracker
 
-`Case-Tracker-Overview.pptx` is an editable 16-slide PowerPoint promoting the Case Tracker
+`Case-Tracker-Overview.pptx` is an editable 17-slide PowerPoint promoting the Case Tracker
 board (adoption pitch). It's generated, not hand-built, so it stays on-brand and reproducible.
 Covers the Hand-off Route Board, the current-vs-desired (Case Center vs Track Status) model,
 clocks/handover/reporting, and the deploy-it-for-your-team story.

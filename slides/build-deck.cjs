@@ -299,6 +299,27 @@ function picture(slide, name, box) {
   s.addText('Step-by-step self-host runbook: docs/SELF-HOST-UBUNTU.md', { x: 0.7, y: 6.25, w: 11.9, h: 0.35, align: 'center', fontFace: FONT, fontSize: 11, italic: true, color: MUTED });
 })();
 
+/* 13c — What it runs on (tech stack) */
+(() => {
+  const s = base(pptx.addSlide());
+  heading(s, 'What it runs on', 'A Python web service + PostgreSQL. Node is build-time only — never needed to run the site.');
+  const row = (y, emoji, fill, label, desc) => {
+    s.addShape(pptx.ShapeType.ellipse, { x: 0.9, y, w: 0.72, h: 0.72, fill: { color: fill }, line: { color: BORDER, width: 1 } });
+    s.addText(emoji, { x: 0.9, y, w: 0.72, h: 0.72, align: 'center', valign: 'middle', fontFace: FONT, fontSize: 26 });
+    s.addText([{ text: label + '\n', options: { bold: true, fontSize: 17, color: CHAR } }, { text: desc, options: { fontSize: 14, color: MUTED } }],
+      { x: 1.95, y: y - 0.06, w: 10.5, h: 0.84, valign: 'middle', fontFace: FONT, lineSpacingMultiple: 1.05 });
+  };
+  row(1.95, '🌐', 'EEF2FF', 'Front end — the web app', 'Plain HTML / CSS / vanilla JavaScript. No framework, no Node in the browser; just static files.');
+  row(2.95, '🐍', 'E8F2EC', 'Back end — web server + API', 'Python · FastAPI · uvicorn. Serves the app and the /api endpoints from one origin.');
+  row(3.95, '🐘', 'EFF6FF', 'Database', 'PostgreSQL — one shared, live board for every operator and device.');
+  row(4.95, '⏱️', 'FFFBEB', 'Data sync', 'A scheduled Python job pulls from Case Center on a timer (systemd / cron).');
+  s.addShape(pptx.ShapeType.roundRect, { x: 0.9, y: 6.0, w: 11.55, h: 0.78, rectRadius: 0.06, fill: { color: LIGHT }, line: { color: BORDER, width: 1 } });
+  s.addText([
+    { text: '🔒 Optional: ', options: { bold: true } }, { text: 'nginx + HTTPS in front.    ', options: {} },
+    { text: '🧰 Node.js is build-time only ', options: { bold: true } }, { text: '(bundler · tests · this deck) — the running site needs only Python + PostgreSQL.', options: {} },
+  ], { x: 1.15, y: 6.0, w: 11.1, h: 0.78, valign: 'middle', fontFace: FONT, fontSize: 12.5, color: TEXT });
+})();
+
 /* 14 — Call to action */
 (() => {
   const s = base(pptx.addSlide(), { footer: false });
