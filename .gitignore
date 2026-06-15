@@ -24,3 +24,6 @@ casetracker.db
 
 # OS / editor cruft
 .DS_Store
+
+# Slide-deck build deps (run: npm install --prefix slides pptxgenjs)
+slides/node_modules/

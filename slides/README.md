@@ -1,17 +1,19 @@
 # Promo deck — Case Tracker
 
-`Case-Tracker-Overview.pptx` is an editable 14-slide PowerPoint promoting the Case Tracker
-board (internal adoption pitch). It's generated, not hand-built, so it stays on-brand and
-reproducible.
+`Case-Tracker-Overview.pptx` is an editable 16-slide PowerPoint promoting the Case Tracker
+board (adoption pitch). It's generated, not hand-built, so it stays on-brand and reproducible.
+Covers the Hand-off Route Board, the current-vs-desired (Case Center vs Track Status) model,
+clocks/handover/reporting, and the deploy-it-for-your-team story.
 
 ## Regenerate
 
 ```bash
-# one-time deps (global; not committed)
-npm install -g pptxgenjs            # deck builder
-# (Playwright/Chromium already available at /opt/node22/lib/node_modules/playwright)
+# one-time deps (installed into slides/node_modules — gitignored):
+npm install --prefix slides pptxgenjs
 
+# screenshots (optional — assets/*.png are committed; needs Playwright + Chromium):
 node slides/capture-screenshots.cjs # → slides/assets/*.png  (renders prototype/standalone.html)
+
 node slides/build-deck.cjs          # → slides/Case-Tracker-Overview.pptx
 ```
 

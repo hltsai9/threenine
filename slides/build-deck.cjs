@@ -2,7 +2,7 @@
 // Run: node slides/build-deck.cjs   (after node slides/capture-screenshots.cjs)
 const path = require('path');
 const fs = require('fs');
-const pptxgen = require('/opt/node22/lib/node_modules/pptxgenjs');
+const pptxgen = require('pptxgenjs');   // installed locally: npm install --prefix slides pptxgenjs
 
 const A = path.join(__dirname, 'assets');
 const img = n => path.join(A, n);
@@ -56,7 +56,7 @@ function picture(slide, name, box) {
   s.addText('Retire the Excel workbook — one live board for the whole case lifecycle',
     { x: 1.5, y: 3.5, w: W - 3, h: 0.7, align: 'center', fontFace: FONT, fontSize: 20, color: MUTED });
   s.addText(URL, { x: 0, y: 4.35, w: W, h: 0.4, align: 'center', fontFace: FONT, fontSize: 15, color: ACCENT });
-  s.addText('Internal prototype · click-through demo', { x: 0, y: 6.7, w: W, h: 0.4, align: 'center', fontFace: FONT, fontSize: 11, color: MUTED });
+  s.addText('Deployable for your team · PostgreSQL-backed · multi-operator · live Case Center sync', { x: 0, y: 6.7, w: W, h: 0.4, align: 'center', fontFace: FONT, fontSize: 11, color: MUTED });
 })();
 
 /* 2 — The problem */
@@ -79,21 +79,52 @@ function picture(slide, name, box) {
   const s = base(pptx.addSlide());
   heading(s, 'One board, live — the workbook, replaced');
   picture(s, 'board.png', { x: 1.5, y: 1.5, w: 10.3, h: 5.0 });
-  s.addText('Columns = where the case really is · top band = what you\'re working · everything happens here.',
+  s.addText('Your Picked workspace + the Hand-off Route Board — where every case is, live from Case Center.',
     { x: 0.6, y: 6.5, w: 12.1, h: 0.4, align: 'center', fontFace: FONT, fontSize: 12, color: MUTED });
+})();
+
+/* 3b — Route Board: where every case is */
+(() => {
+  const s = base(pptx.addSlide());
+  heading(s, 'The Hand-off Route Board', 'See where every case actually is — and where it still needs to go.');
+  bullets(s, [
+    'One strip across User → Core Team → HQ. The dot sits where Case Center says the case is now.',
+    'A dashed "watch" ring = parked there, keeping an eye; a moving arrow = it should move (your intent).',
+    'Scheduled hand-offs (weekend / retry / escalate) carry a deadline; the board never hides the real location.',
+    'At a glance: who holds each case, and exactly where first line still has an action.',
+  ], { x: 0.7, y: 1.85, w: 11.9, h: 2.3 });
+  // mini route-board diagram
+  const ly = 5.35, x0 = 1.6, x1 = 11.8;
+  s.addShape(pptx.ShapeType.line, { x: x0, y: ly, w: x1 - x0, h: 0, line: { color: BORDER, width: 2 } });
+  [['User', 2.4], ['Core Team', 6.65], ['HQ', 10.9]].forEach(([label, cx]) => {
+    s.addShape(pptx.ShapeType.rect, { x: cx - 0.09, y: ly - 0.13, w: 0.18, h: 0.26, fill: { color: MUTED } });
+    s.addText(label, { x: cx - 1.0, y: ly + 0.2, w: 2.0, h: 0.3, align: 'center', fontFace: FONT, fontSize: 12, bold: true, color: CHAR });
+  });
+  // current location (Case Center) — filled dot at Core Team
+  s.addShape(pptx.ShapeType.ellipse, { x: 6.65 - 0.14, y: ly - 0.14, w: 0.28, h: 0.28, fill: { color: ACCENT } });
+  s.addText('current — Case Center', { x: 5.15, y: ly - 0.66, w: 3.0, h: 0.3, align: 'center', fontFace: FONT, fontSize: 10, bold: true, color: ACCENT });
+  // intent (Track Status) — dashed arrow Core Team → HQ
+  s.addShape(pptx.ShapeType.line, { x: 6.95, y: ly, w: 10.9 - 6.95 - 0.18, h: 0, line: { color: WARN, width: 2, dashType: 'dash', endArrowType: 'triangle' } });
+  s.addText('intent — Track Status', { x: 7.0, y: ly + 0.2, w: 3.9, h: 0.3, align: 'center', fontFace: FONT, fontSize: 10, italic: true, color: WARN });
 })();
 
 /* 4 — Two statuses */
 (() => {
   const s = base(pptx.addSlide());
-  heading(s, 'Two statuses per case', 'The real state, and how you\'re handling it — on one board.');
+  heading(s, 'Two assignees per case', 'Where it IS (Case Center) vs where you WANT it (your Track Status).');
   bullets(s, [
-    'Columns = Case Center status (the real, external state).',
-    'Rows = your handling: "My queue" (working now) vs "Backlog".',
-    '+ Queue lifts a card into your top band — your starred work, in context.',
-    'One-click actions and a ⚠ note button live right on each card.',
-  ], { x: 0.7, y: 1.9, w: 7.6, h: 4.6 });
-  picture(s, 'column.png', { x: 8.7, y: 1.7, w: 3.9, h: 4.9 });
+    'Case Center assignee = where the case is now — this places the dot.',
+    'Track Status = where first line wants it next, with a suggested time.',
+    'When the two differ, the board animates an arrow — your cue to act.',
+    'Do the work in Case Center; the board catches up on the next sync.',
+  ], { x: 0.7, y: 1.95, w: 11.9, h: 2.1 });
+  const cw = 5.85, cy = 4.25, ch = 1.95;
+  s.addShape(pptx.ShapeType.roundRect, { x: 0.7, y: cy, w: cw, h: ch, rectRadius: 0.08, fill: { color: 'EFF6FF' }, line: { color: ACCENT, width: 1.25 } });
+  s.addText([{ text: 'Current — Case Center\n', options: { bold: true, fontSize: 15, color: ACCENT } }, { text: 'Site IT + processType → Core / 1st Line · HQ dept → HQ · returned → User', options: { fontSize: 12.5, color: TEXT } }],
+    { x: 0.95, y: cy + 0.2, w: cw - 0.5, h: ch - 0.4, valign: 'top', fontFace: FONT });
+  s.addShape(pptx.ShapeType.roundRect, { x: 6.78, y: cy, w: cw, h: ch, rectRadius: 0.08, fill: { color: 'FFFBEB' }, line: { color: WARN, width: 1.25 } });
+  s.addText([{ text: 'Desired — Track Status\n', options: { bold: true, fontSize: 15, color: WARN } }, { text: 'Escalate to HQ · Need to contact user · Weekend case · Sanity check — each with a suggested action time', options: { fontSize: 12.5, color: TEXT } }],
+    { x: 7.03, y: cy + 0.2, w: cw - 0.5, h: ch - 0.4, valign: 'top', fontFace: FONT });
 })();
 
 /* 5 — Live from Case Center */
@@ -126,9 +157,9 @@ function picture(slide, name, box) {
   const s = base(pptx.addSlide());
   heading(s, 'The next action is on the card', 'Surfaced by status and idle time — the agent never hunts.');
   const rows = [
-    ['A', '6366F1', 'Assign to Local FIT', 'New case with no owner yet.'],
-    ['C', WARN, 'Chase — no response', 'Owner idle past the threshold (FIT 4h / HQ 8h).'],
-    ['E', DANGER, 'Escalate to HQ', 'FIT can\'t resolve — hand to the product team.'],
+    ['A', '6366F1', 'Assign to Core Team', 'New case with no owner yet.'],
+    ['C', WARN, 'Chase — no response', 'Owner idle past the threshold (Core 4h / HQ 8h).'],
+    ['E', DANGER, 'Escalate to HQ', 'Core Team can\'t resolve — hand to the product team.'],
     ['V', GOOD, 'Verify reported fix', 'Sanity-check, then close.'],
   ];
   let y = 2.0;
@@ -149,11 +180,11 @@ function picture(slide, name, box) {
   heading(s, 'Two clocks — and a timeline of who held it');
   bullets(s, [
     'SLA clock = time on us (pauses when returned to the requester).',
-    'Local FIT vs HQ time, tracked separately.',
+    'Core Team vs HQ time, tracked separately.',
     'Ownership timeline shows exactly when a case sat with whom.',
     'Answers "who\'s consuming the time?" at a glance.',
   ], { x: 0.7, y: 1.8, w: 5.3, h: 4.6 });
-  s.addText('Separated FIT / HQ clocks', { x: 6.3, y: 1.7, w: 6.4, h: 0.3, fontFace: FONT, fontSize: 11, bold: true, color: MUTED });
+  s.addText('Separated Core Team / HQ clocks', { x: 6.3, y: 1.7, w: 6.4, h: 0.3, fontFace: FONT, fontSize: 11, bold: true, color: MUTED });
   picture(s, 'clocks.png', { x: 6.3, y: 2.0, w: 6.5, h: 0.75 });
   s.addText('Ownership timeline', { x: 6.3, y: 3.3, w: 6.4, h: 0.3, fontFace: FONT, fontSize: 11, bold: true, color: MUTED });
   picture(s, 'timeline.png', { x: 6.3, y: 3.6, w: 6.5, h: 1.0 });
@@ -212,7 +243,7 @@ function picture(slide, name, box) {
   const s = base(pptx.addSlide());
   heading(s, 'A clear, enforced lifecycle');
   picture(s, 'flow.png', { x: 1.6, y: 1.5, w: 10.1, h: 4.9 });
-  s.addText('New → Local FIT → HQ → Sanity Check → Closed, with pause/return and escalation paths.',
+  s.addText('New → Core Team → HQ → Sanity Check → Closed, with pause/return and escalation paths.',
     { x: 0.6, y: 6.5, w: 12.1, h: 0.4, align: 'center', fontFace: FONT, fontSize: 12, color: MUTED });
 })();
 
@@ -235,23 +266,50 @@ function picture(slide, name, box) {
   bullets(s, [
     'Structured, validated data',
     'A queue that tells you what\'s next',
-    'SLA + separated FIT/HQ time + timeline',
+    'SLA + separated Core/HQ time + timeline',
     'Enforced, auditable shift handover',
-    'Weekly dashboards · live Case Center data · zero-install web app',
+    'Weekly dashboards · live Case Center sync',
+    'Shared across operators · PostgreSQL-backed · deployable (Render or your own server)',
   ], { x: 7.03, y: y0 + 0.7, w: colW - 0.5, h: h - 0.9, fontSize: 14, color: TEXT });
+})();
+
+/* 13b — Deploy it for your team */
+(() => {
+  const s = base(pptx.addSlide());
+  heading(s, 'Deploy it for your team', 'From single-laptop demo to a shared, always-on board.');
+  bullets(s, [
+    'PostgreSQL-backed: every operator signs in and sees the same live board, from any device.',
+    'Secured: a token login gate in front of the API — case data is never left wide open.',
+    'Periodic Case Center sync: a scheduled job pulls new cases into the DB automatically (systemd timer / cron).',
+    'Host it your way: your own Ubuntu server, or a managed platform like Render.',
+  ], { x: 0.7, y: 1.9, w: 11.9, h: 2.5 });
+  // flow: Case Center -> ingest (timer) -> Postgres -> API/SPA -> operators
+  const fy = 4.95, bw = 2.15, bh = 0.95, gap = 0.30; let fx = 0.8;
+  const fbox = (label, fill, line, color) => {
+    s.addShape(pptx.ShapeType.roundRect, { x: fx, y: fy, w: bw, h: bh, rectRadius: 0.08, fill: { color: fill }, line: { color: line, width: 1.25 } });
+    s.addText(label, { x: fx, y: fy, w: bw, h: bh, align: 'center', valign: 'middle', fontFace: FONT, fontSize: 12, bold: true, color });
+    fx += bw;
+  };
+  const farrow = () => { s.addShape(pptx.ShapeType.line, { x: fx + 0.02, y: fy + bh / 2, w: gap - 0.04, h: 0, line: { color: MUTED, width: 1.75, endArrowType: 'triangle' } }); fx += gap; };
+  fbox('Case Center', LIGHT, BORDER, CHAR); farrow();
+  fbox('Ingest (timer)', 'FFFBEB', WARN, CHAR); farrow();
+  fbox('PostgreSQL', 'EFF6FF', ACCENT, CHAR); farrow();
+  fbox('API + SPA', 'EFF6FF', ACCENT, CHAR); farrow();
+  fbox('Operators', LIGHT, BORDER, CHAR);
+  s.addText('Step-by-step self-host runbook: docs/SELF-HOST-UBUNTU.md', { x: 0.7, y: 6.25, w: 11.9, h: 0.35, align: 'center', fontFace: FONT, fontSize: 11, italic: true, color: MUTED });
 })();
 
 /* 14 — Call to action */
 (() => {
   const s = base(pptx.addSlide(), { footer: false });
   s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.28, fill: { color: ACCENT } });
-  s.addText('Try it now', { x: 0, y: 1.7, w: W, h: 0.8, align: 'center', fontFace: FONT, fontSize: 36, bold: true, color: CHAR });
+  s.addText('See it. Deploy it.', { x: 0, y: 1.7, w: W, h: 0.8, align: 'center', fontFace: FONT, fontSize: 36, bold: true, color: CHAR });
   s.addText(URL, { x: 0, y: 2.7, w: W, h: 0.5, align: 'center', fontFace: FONT, fontSize: 20, color: ACCENT });
   bullets(s, [
-    'Open the link — take the built-in guided tour; your changes persist in the browser.',
-    'For live data: run python3 local/serve.py on your laptop and open localhost.',
-    'Feedback welcome — this is a working prototype, not a mockup.',
-  ], { x: 2.4, y: 3.7, w: 8.5, h: 2.4, fontSize: 16 });
+    'Try the live demo — open the link and take the built-in guided tour.',
+    'Deploy for your team — Postgres + token login + periodic Case Center sync, on Render or your own Ubuntu server.',
+    'Step-by-step runbook: docs/SELF-HOST-UBUNTU.md. Feedback welcome — it\'s a working tool, not a mockup.',
+  ], { x: 2.2, y: 3.7, w: 8.9, h: 2.4, fontSize: 16 });
 })();
 
 const out = path.join(__dirname, 'Case-Tracker-Overview.pptx');
