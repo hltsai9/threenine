@@ -7,6 +7,7 @@ and every environment variable.** Other docs link here instead of repeating this
 - Prototype overview & feature tour → [`README.md`](../README.md)
 - Single-user live proxy (`serve.py`) → [`local/README.md`](../local/README.md)
 - Decoupled DB backend (ingest → DB → API) → [`backend/README.md`](../backend/README.md)
+- **Self-host the full stack on an Ubuntu server (step by step)** → [`SELF-HOST-UBUNTU.md`](SELF-HOST-UBUNTU.md)
 
 ---
 
