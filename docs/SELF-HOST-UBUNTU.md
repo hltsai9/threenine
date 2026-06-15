@@ -218,17 +218,81 @@ sudo certbot --nginx -d your-host.example.com
 ```
 Open `https://your-host.example.com/`, sign in, done.
 
-## 13. (Optional) Real Case Center ingestion instead of the demo seed
+## 13. Periodic ingestion from Case Center (replaces the demo seed)
 
-The Step 9 seeder loads demo data. For live cases, wire `local/casecenter.py` `fetch_raw()` +
-credentials per **[`SETUP.md`](SETUP.md)**, then run the ingest pipeline on a schedule:
+The Step 9 seeder loads demo data once. For **live cases flowing into the DB on a schedule**, use
+the ingest script — `backend/ingest.py`. It fetches from Case Center and upserts **only
+CC-owned fields**, so operator work (picks / Track Status / handover) is preserved
+(`merge.upsert_cc`). It's a **one-shot** run; a systemd timer makes it periodic.
+
+**13a. Wire your Case Center request + credentials (one-time).**
+`local/casecenter.py` `fetch_raw()` ships as a **stub** — paste your real Case Center request
+there (`return x_json["data"]`) per **[`SETUP.md`](SETUP.md)**. Add the credentials to the env
+file (they stay on the ingest side only):
 ```bash
-# one-off:
-cd /opt/threenine && set -a; source .env.casetracker; set +a
-.venv/bin/python -m backend.ingest
+cat >> /opt/threenine/.env.casetracker <<'EOF'
+CASE_CENTER_API_KEY=...
+CASE_CENTER_COOKIE=...
+CASE_CENTER_BASE_URL=https://case-center.your-org.example
+EOF
 ```
-Schedule it with a systemd timer or cron (e.g. every few minutes). Credentials live **only** on
-the ingest side — the read API stays credential-free.
+
+**13b. One-off test:**
+```bash
+cd /opt/threenine && set -a; source .env.casetracker; set +a
+.venv/bin/python -m backend.ingest --hours 1 --no-create     # fetch cases created in the last hour
+```
+Re-running is safe — upsert dedups by case id, so overlapping windows can't duplicate cases.
+
+**13c. Run it every 5 minutes with a systemd timer:**
+```bash
+sudo tee /etc/systemd/system/casetracker-ingest.service >/dev/null <<'UNIT'
+[Unit]
+Description=Case Tracker — ingest from Case Center
+After=network-online.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/threenine
+EnvironmentFile=/opt/threenine/.env.casetracker
+# --hours should be >= the timer interval (+ margin) so nothing is missed; --no-create skips
+# table creation (the API already created the schema).
+ExecStart=/opt/threenine/.venv/bin/python -m backend.ingest --hours 1 --no-create
+User=www-data
+UNIT
+
+sudo tee /etc/systemd/system/casetracker-ingest.timer >/dev/null <<'UNIT'
+[Unit]
+Description=Run Case Tracker ingest periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now casetracker-ingest.timer
+systemctl list-timers casetracker-ingest.timer --no-pager      # see next run
+journalctl -u casetracker-ingest.service -n 50 --no-pager      # see last run's output
+```
+
+**Cron alternative** (if you'd rather not use a timer):
+```bash
+# crontab -e  (as the service user)
+*/5 * * * * cd /opt/threenine && set -a && . ./.env.casetracker && set +a && \
+  .venv/bin/python -m backend.ingest --hours 1 --no-create >> /var/log/casetracker-ingest.log 2>&1
+```
+
+Notes:
+- Tune `--hours` to your cadence (here a 1-hour window polled every 5 min — lots of safe overlap).
+  Use `--hours A --to-hours B` for a created-between band, or `--id C-1234` for a single case.
+- The timer runs `ingest_live`, which holds the Case Center credentials; the API service
+  (Step 11) never sees them.
 
 ---
 
