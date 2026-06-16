@@ -1,5 +1,7 @@
 # Case Tracker — Code Review & Improvement Plan
 
+> **Status (2026-06-15):** 20 items marked done (8 pre-existing `[x]` in §4 + 12 annotated this pass), 2 marked unapplicable, ~16 still open. Most-shipped: the auth/sanitization/CSS-sectioning hardening (§1), the slides recapture + dependency fixes (§3), and the live Case-Center mapping via `processTimeline` + the Route Board / `CC_CORE_DEPARTMENTS` model (§5). Still open: the §0/§1 refactors (module split, event delegation, `renderCaseList` split) and most of the §2 tour redesign (spotlight, a11y, selector resilience).
+
 This document is a roadmap. It captures (1) a code-review of the current prototype with
 prioritized fixes, (2) a redesign spec for the guided site tour, (3) an improvement +
 regeneration spec for the promo slide deck, and (4) a backlog of requested features (refresh
@@ -33,8 +35,8 @@ the rendering layer to catch breakage:
   cost and the manual scroll-restore hack.
 
 Smaller back-end items noted but not done (prototype-acceptable for now): default
-`AUTO_CREATE=0` for prod with a migration assertion; DB connection-pool tuning + fuller
-structured logging; making `POST /api/save` non-blocking.
+`AUTO_CREATE=0` for prod with a migration assertion — ✅ **done** (Alembic now ships with `0001_init.py`; `AUTO_CREATE` is documented as `0` for prod with `alembic upgrade head`, and `api.py:70` warns when AUTO_CREATE would mask a schema drift); DB connection-pool tuning + fuller
+structured logging — _still open_; making `POST /api/save` non-blocking — ✅ **done** (the API is now FastAPI with an async `save()` handler under an `asynccontextmanager` lifespan, `api.py:62,129`).
 
 ---
 
@@ -97,7 +99,7 @@ headers.
   existing `// === CONFIG ===` block at the top of `app.js`. Still to do: layout magics such as
   `grid-template-columns: 240px 1fr` (`styles.css:34`).
 - **`styles.css` has no section structure** — add banner comments (`/* ---- Kanban ---- */`) or
-  split into logical partials; group sidebar / nav / buttons / kanban / modals / tour.
+  split into logical partials; group sidebar / nav / buttons / kanban / modals / tour. — ✅ **done** (`styles.css` now carries ~37 section banners: `/* ---------- Sidebar ---------- */`, `Main`, `Cards`, `Queue`, `Buttons`, an `Accessibility base` block, etc.)
 
 #### P2 — Tooling / safety net
 
@@ -112,7 +114,7 @@ headers.
   on. Next: extend coverage to office-hours/owner checks (`app.js:314–331`) and `fmtRelative`.
 - **XSS audit of hand-built modal HTML** — `app.js:1414–1420` concatenates conditional HTML.
   `escapeHtml()` (`app.js:308`) is used widely and correctly; confirm every interpolation in these
-  modal strings is escaped.
+  modal strings is escaped. — ✅ **done** (hardened beyond a one-off audit: `safeId()` strips markup/attribute-breakout chars and `safeUrl()` rejects `javascript:`/`data:` schemes (`app.js:760–772`), and `sanitizeCaseIdentity()` is applied at every boundary where a case enters STATE (`app.js:227`, `app.js:4798`) so id/`caseLink` sinks are closed regardless of per-call escaping; `escapeHtml` is used ~190×.)
 - **Python backend writes `data.js` without schema validation** — `local/persist.py`,
   `local/serve.py`. Backups exist (`.orig`, timestamped `.bak`) but recovery is manual. Add a
   shape check before writing; keep a rolling backup.
@@ -151,7 +153,7 @@ both the UX *and* the robustness/accessibility.
   broken selector.
 - **Remove the hard `C-1044` dependency.** Steps 6–7 navigate to `#/cases/C-1044`
   (`tour.js:57,65`); if seed data changes, those steps break. Resolve a target case dynamically
-  (e.g. first open/escalated case) and build the route from it.
+  (e.g. first open/escalated case) and build the route from it. — ✅ **done** (the tour was rewritten around the Picked workspace / Route Board; steps now target route-level hashes (`#/cases`, `#/archive`, `#/shifts`, `#/owners`) plus class selectors — no `#/cases/C-1044` deep-link or hardcoded case id remains.)
 - **Fix HTML escaping.** `escape()` (`tour.js:107`) omits `'`. Align it with the app's
   `escapeHtml()` (`app.js:308`) — or reuse that function in the bundle.
 - **Fix the keydown listener leak.** `keyHandler` is added in `renderStep()` (`tour.js:229`) but
@@ -189,7 +191,7 @@ Direction: improve the fragile parts and regenerate; **stay on `.pptx`.**
   (`require('/opt/node22/lib/node_modules/pptxgenjs')`) and the Playwright path in
   `capture-screenshots.cjs` break if Node/global installs move. Resolve via `require.resolve`,
   `NODE_PATH`, or a small `slides/package.json`, and **throw a clear error** if a dependency is
-  absent.
+  absent. — ✅ **done** (both scripts now use a plain `require('pptxgenjs')` / `require('playwright')` resolved from a local `npm install --prefix slides`; the `/opt/node22/...` absolute paths are gone.)
 - **Fail loudly on missing screenshots.** `picture()` (`build-deck.cjs:45–48`) emits a red
   `[name missing]` placeholder and continues. Fix: validate every expected asset exists up front
   and exit non-zero if any are missing.
@@ -200,14 +202,14 @@ Direction: improve the fragile parts and regenerate; **stay on `.pptx`.**
   derive crops from element bounding boxes rather than fixed pixels.
 - **Recapture after the tour redesign** so the deck's visuals match the new UI; refresh stale
   hand-built copy — action thresholds on slide 6 (`build-deck.cjs:128–141`) and the architecture
-  diagram on slide 5 (`build-deck.cjs:109–121`).
+  diagram on slide 5 (`build-deck.cjs:109–121`). — ✅ **done** (commits "slides: refresh screenshots against current UI + rebuild deck" and "refresh promo deck for the deployable tool"; assets recaptured against the Picked workspace + Route Board UI (`board.png`, `routeboard.png`, …), the architecture diagram and the thresholds copy ("Core 4h / HQ 8h", `build-deck.cjs:161`) were refreshed to the Core Team model, and a "What it runs on" tech-stack slide was added.)
 - **Expand `slides/README.md`** with regeneration + troubleshooting notes (deps, run order,
-  common failures).
+  common failures). — ✅ **done** (`slides/README.md` now documents the local-install deps, the capture→build run order, and the `npm install --prefix slides` workflow.)
 
 ### Slides verification
 
 1. `node slides/capture-screenshots.cjs` → expected PNGs in `slides/assets/`; spot-check
-   `board.png` shows the four columns + MY QUEUE/BACKLOG bands + sidebar clock.
+   `board.png` shows the four columns + MY QUEUE/BACKLOG bands + sidebar clock. — _unapplicable: the status-kanban with MY QUEUE/BACKLOG bands was replaced by the Picked workspace + Hand-off Route Board (`app.js:1241` "replaces the old kanban-by-CC-status board"; capture now grabs `.route-band`/`routeboard.png`). `board.png` should show the Picked workspace + Route Board instead._
 2. `node slides/build-deck.cjs` → writes `Case-Tracker-Overview.pptx`; the script exits non-zero
    if any asset is missing.
 3. `unzip -l slides/Case-Tracker-Overview.pptx` lists `ppt/slides/slide1.xml … slide14.xml`.
@@ -244,9 +246,9 @@ Tracked todo list — each item has a concrete plan below.
   calculated. *(Done: `renderClockModel()` on route `#/clocks`, wired into nav/router; explains
   each clock's start/pause/bank and renders a worked example via the real `renderOwnershipTimeline`
   so it can't drift from the calculation.)*
-- [ ] **4.7** On live refresh, if a case's Case Center **assignee maps to a Local FIT desk or HQ
+- [ ] ~~**4.7** On live refresh, if a case's Case Center **assignee maps to a Local FIT desk or HQ
   Product Team**, auto-move the case to the matching status (`with_fit` / `with_hq`) and log a
-  history note of the change.
+  history note of the change.~~ — _unapplicable: superseded by the Route Board model. Station is now derived live from `assigneeDept` via `caseStation(c)` (`app.js:1058`) + the configurable `window.CC_CORE_DEPARTMENTS` / `window.CC_HQ_DEPARTMENTS` (`owners.js`) and `route_role`, so there is no separate "auto-move status + log history" step to build (and "Local FIT" is now "Core Team")._
 - [x] **4.8** Clock model: count **Sanity Check time as requester time**, not first-line time.
   *(Done: `ownershipSegments` classifies Sanity Check as `requester`; First-line clock is now
   triage-only; clock-model table/example updated; option (a) — SLA keeps running through Sanity
@@ -592,16 +594,16 @@ departments in `map_record()`, case link (`BASE_URL` / `build_case_link()`), and
   log, map it in `map_record()` into a `history` array of `{ at, who, kind, detail }` that
   `ownershipSegments()` (`app.js`) understands (`created` → first line · `assigned` → Local FIT ·
   `escalated` (detail `FIT → HQ …`) → HQ · `status` (detail contains `Sanity Check`) → sanity ·
-  `returned` → with requester · `resumed` · `closed`/`cancelled`). Also populates the History list.
+  `returned` → with requester · `resumed` · `closed`/`cancelled`). Also populates the History list. — ✅ **done** (Case Center's `processTimeline` is the audit log; `map_process_timeline()` (`casecenter.py:220`) normalizes each stage — processType / processor / dept / cc+board status / start-end / minutes — into the board's Process timeline component, which now drives the per-station clocks. Superseded the literal `history[]` shape with the richer processTimeline model.)
 - **8. Owner / routing (FIT vs HQ attribution).** Live cases set no `fitId`/`hqId`/`currentOwner`.
   Decide how `assignee.accountId`/team maps to the board owner model (see §4.7's alias-table plan)
-  and set `currentOwner` to `'fit'`/`'hq'` so the active-owner clock/column are correct.
+  and set `currentOwner` to `'fit'`/`'hq'` so the active-owner clock/column are correct. — ✅ **done** (resolved by the Route Board model rather than the alias table: `dept_from_timeline()` (`casecenter.py:267`) resolves an account id → dept; `caseStation(c)` (`app.js:1058`) maps `assigneeDept` through the configurable `CC_CORE_DEPARTMENTS`/`CC_HQ_DEPARTMENTS` (`owners.js`) to a Core Team / HQ / User station.)
 - **9. SLA accuracy for live cases.** `caseSlaMs()` runs from `createDateTime` with no pauses
   (no transitions). If Case Center reports real on-us/pause windows, map them
-  (`slaAccumulatedMs`/`slaPaused`, or derive from the #7 audit log).
+  (`slaAccumulatedMs`/`slaPaused`, or derive from the #7 audit log). — ✅ **done (partial)** (the `("In-Progress", "Wait User")` substatus now maps to `returned_to_requester` (the SLA-paused state) and `map_wait_user()` (`casecenter.py:248`) surfaces the parked-on-user block; pause windows derive from processTimeline. Note: fine-grained `slaAccumulatedMs` reconstruction across multiple pauses is not separately computed.)
 - **10. Weekly Archive bucketing.** `normalizeLiveCase()` defaults every live case's `weekId` to
   the current week. Derive `weekId` from `createDateTime` against `window.WEEKS` for past-week
-  bucketing.
+  bucketing. — ✅ **done** (`normalizeLiveCase` now sets `c.weekId = weekIdFor(c.createdAt)` when unset (`app.js:178`), bucketing each live case by its created date instead of always the current week.)
 - **11. Refresh cadence & cookie expiry (nice-to-have).** Data pulls on load/refresh only. Optional:
   auto-refresh interval or manual button; surface a clear banner when `/api/cases` fails (cookie
   expired → 500) instead of silently falling back to seed.

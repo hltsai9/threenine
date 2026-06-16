@@ -23,6 +23,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   control and the "Refresh Existing" button, behind a new `SHOW_LIVE_FETCH_CONTROLS`
   flag in `app.js` (default `false`). The per-case refresh and "+ Import case by ID"
   are unchanged. Code retained behind the flag.
+- **"Live · N cases from Case Center · M picked" banner hidden** on the Picked workspace
+  (per request). The render is stubbed to empty in `app.js`.
+
+### Fixed (UI)
+
+- **Shift-ending handover banner now counts PICKED cases**, not every open case.
+  `handoverPendingCases()` filters `pickedCases()` (the workspace you're actively working
+  this shift) instead of all of `STATE.cases`, and the banner reads "N picked case(s) …".
 
 ### Added (config)
 
@@ -59,6 +67,12 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Route Board CC-position plan marked complete** — all checkboxes in
   `docs/superpowers/plans/2026-06-14-route-board-cc-position.md` set to `[x]` with a
   "shipped" status banner (the feature is live).
+- **Backlog/plan files reconciled with reality.** `docs/improvement-plan.md`,
+  `docs/case-center-overview-plan.md`, and `docs/promo-slides-plan.md` had their items
+  audited against the code: shipped items marked done (`[x]`), out-dated items struck and
+  annotated `unapplicable: <reason>` (e.g. the retired status-kanban "My queue/Backlog"
+  bands, auto-status-from-assignee superseded by the Route Board model). Each file got a
+  status banner with done/unapplicable/open counts.
 
 ## 2026-06-15
 

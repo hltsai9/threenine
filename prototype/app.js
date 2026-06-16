@@ -1195,7 +1195,9 @@ function handoverPendingCases() {
     (new Date(window.CURRENT_SHIFT.endsAtUtc).getTime() - NOW.getTime()) <
     window.THRESHOLDS.shiftEndingSoonMinutes * 60 * 1000;
   if (!shiftEndsSoon) return [];
-  return STATE.cases.filter(needsHandoverNote);
+  // Only the operator's PICKED cases — the banner is about wrapping up the workspace you're
+  // actively working this shift, not every open case in Case Center.
+  return pickedCases().filter(needsHandoverNote);
 }
 
 function renderWatchlists(sla, escalated) {
@@ -1632,7 +1634,7 @@ function renderCaseList() {
   const handoverPending = handoverPendingCases();
   const handoverBanner = handoverPending.length > 0 ? `
     <div class="kanban-handover-banner">
-      <strong>Shift ending:</strong> ${handoverPending.length} open case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note.
+      <strong>Shift ending:</strong> ${handoverPending.length} picked case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note.
     </div>
   ` : '';
 
@@ -1664,10 +1666,9 @@ function renderCaseList() {
 
   const watchlist = renderWatchlists(approachingSlaCases(), actionDueCases().concat(actionOverdueCases()));
 
-  const liveBanner = window.__LIVE__ ? (() => {
-    const total = STATE.cases.length;
-    return `<div class="kanban-live-banner">Live · ${total} case${total === 1 ? '' : 's'} from Case Center · ${all.length} picked.</div>`;
-  })() : '';
+  // Live "N cases from Case Center · M picked" banner intentionally hidden (per request).
+  // To restore: render the strip below where ${liveBanner} used to sit.
+  const liveBanner = '';
 
   return `
     <div class="picked-page">

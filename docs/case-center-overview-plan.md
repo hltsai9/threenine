@@ -1,5 +1,7 @@
 # Plan: Make the SPA a read-only Case Center overview + pick-for-follow-up + analytics
 
+> **Status (2026-06-15):** 7 done, 1 unapplicable, 2 open.
+
 ## Context
 
 Today the SPA looks like a parallel case-management tool: operators can change status, route to Core/HQ desks, escalate, chase owners, verify fixes, create new cases, etc. In reality, operators do all of that work in **Case Center** — re-doing it here is double bookkeeping with no payoff. The reason the platform exists is to add value *on top of* Case Center: surface cases that need more attention, let operators *pick* those for follow-up, and analyze the picked subset.
@@ -19,7 +21,7 @@ Read-only is already supported end-to-end: `local/serve.py`, `local/casecenter.p
 
 ## Recommended approach
 
-### 1. New Picked workspace layout
+### 1. New Picked workspace layout — ✅ **done** (`renderCasesView`/`renderPickedList`/`renderRouteBoardStrip` in `app.js`; `#/cases` is default Picked workspace, two-zone strip + list/detail split, empty-state points to Overview)
 
 `#/cases` (Picked) is the default landing route. It is rewritten from the existing kanban-by-CC-status into a **single-screen two-zone layout** rendering only `agentStatus === 'queued'` cases:
 
@@ -35,7 +37,7 @@ Read-only is already supported end-to-end: `local/serve.py`, `local/casecenter.p
 
 Critical files: `prototype/app.js` (rewrite `renderCasesView` for the two-zone layout, new `renderRouteBoardStrip` / `renderPickedList` / reuse the existing detail panel), `renderArchiveIndex`, `renderArchiveWeek`, the sidebar nav block.
 
-### 2. Make picking the central interaction
+### 2. Make picking the central interaction — ✅ **done** (`isPicked`/`pickedCases`/`renderQueueToggleButton` reuse `agentStatus:'queued'`; UI says "Pick / Picked", Pick button in `renderArchiveWeek` table)
 
 - Reuse the existing `agentStatus: 'queued' | 'unqueued'` flag and `toggleQueue` (in `app.js`) as the pick mechanism — no new field. Rename UI affordances from "Queue / Queued" to **"Pick / Picked"** so the operator-facing language matches the user's mental model.
 - Add a `[Pick] / [Picked ✓]` button to every card in the archive week-detail table (`renderArchiveWeek`). Clicking pick is the *only* card-level mutation in archive view.
@@ -44,7 +46,7 @@ Critical files: `prototype/app.js` (rewrite `renderCasesView` for the two-zone l
 
 Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive table renderer).
 
-### 3. Track Status — the operator's intent on each picked case (the core value-add)
+### 3. Track Status — the operator's intent on each picked case (the core value-add) — ✅ **done** (`TRACK_STATUSES`, `c.trackStatus` in `agent-v1` (un)packing, `trackStatusPhase`/`actionDueCases`/`actionOverdueCases`, scheduled-handoff computation, 7-item picker + Clear with preconditions at `renderDetailActions` + clear-confirm at line ~4274)
 
 - Add a single new operator-layer field to each case: **`trackStatus`** (enum, stored in the operator layer (`agent-v1` localStorage + `POST /api/save`), never sent to Case Center). Default = `null` (picked but not yet categorised).
 - **Track Status values** (fixed list; this is what the operator chooses from the existing action surface):
@@ -71,14 +73,14 @@ Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive tab
     - *Case Closed* → CC `status` is `closed` or `cancelled`.
     - *Escalated to HQ — keep an eye / Need to contact user / Sanity Check* → no machine check; operator judgment.
   - **Passed to the next shift** — a fresh handover note exists targeting the incoming shift.
-- Watchlists: keep the existing **Approaching SLA (N)** and **Stale handover (N)** banners; replace today's "Escalated — keep an eye" banner with two new ones:
-  - **Action due this shift (N)** — picked cases whose `scheduledHandoff.dueShift` matches the current operator's shift.
-  - **Action overdue (N)** — `dueAt` is in the past and CC still shows the old assignee.
+- Watchlists: keep the existing **Approaching SLA (N)** and **Stale handover (N)** banners; replace today's "Escalated — keep an eye" banner with two new ones: — ✅ **done** (mechanism: `renderWatchlists` is fed `actionDueCases().concat(actionOverdueCases())` at line ~1667; note: the second section's header text still literally reads "Escalated — keep an eye" at line ~1224 — cosmetic relabel outstanding)
+  - **Action due this shift (N)** — picked cases whose `scheduledHandoff.dueShift` matches the current operator's shift. — ✅ **done** (`actionDueCases`)
+  - **Action overdue (N)** — `dueAt` is in the past and CC still shows the old assignee. — ✅ **done** (`actionOverdueCases`)
 - This and the route-board (section 6) are the only new state shapes; everything else reuses existing operator-layer machinery.
 
 Critical files: `prototype/app.js` (the 7-item Track Status picker on the detail panel, the watchlist banners, `agent-v1` (un)packing for `trackStatus`, the shift-aware scheduled-handoff computation).
 
-### 4. Remove CC-shaped actions; the only operator mutation is Track Status
+### 4. Remove CC-shaped actions; the only operator mutation is Track Status — ✅ **done** (`renderDetailActions` exposes only the Track Status picker + Clear + helper affordances; no CC-shaped action surface renders; `flags[]` is gone from the model. Caveat: `derivePromptsForCase`/`PROMPT_DEFS` and their `assign_core`/`escalate_to_hq`/`chase_*`/`verify_fix` handlers (lines ~3919-4005) still exist as unreferenced dead code — never wired to any rendered button)
 
 The existing CC-shaped action surface (status-transition dropdown, per-status buttons like *Assign to Core*, *Escalate to HQ*, *Chase owner*, *Verify fix*, *Return to requester*, *Move to sanity check*, *Close*, *Cancel*, *Reopen*) is **removed** — operators do all that work in Case Center. The only operator-driven mutation on a picked case is **Track Status** (via the 7-item picker, section 3).
 
@@ -91,7 +93,7 @@ The existing CC-shaped action surface (status-transition dropdown, per-status bu
 
 The case detail panel keeps the full read-only display of CC-owned fields (subject, priority, user/dept, CC status label, process timeline, wait-user detail, ownership timeline, SLA / hold clocks). Per-case affordances on the detail panel: **Track Status picker (7 options)**, **Clear Track Status** (with preconditions, section 3), **Pick / Unpick**, **Handover note**, **Set reminder**, **[Open in Case Center]** (the existing `caseLink`, prominent when the case is action-due / overdue).
 
-### 5. Auto-refresh toggle for picked cases
+### 5. Auto-refresh toggle for picked cases — ⬜ **open** (not implemented: no Auto-refresh toolbar toggle / interval picker / "Last refreshed" state, and neither `local/serve.py` nor `backend/api.py` accepts `?ids=` for scoped refresh — they support single `id=` only. A per-case manual ⟳ `refresh-case` button exists, but the auto-refresh loop is still pending)
 
 The operator needs the Case Center state on picked cases to stay reasonably fresh so the Route Board's "current assignee" and the action-due / overdue highlight track reality.
 
@@ -106,7 +108,7 @@ The operator needs the Case Center state on picked cases to stay reasonably fres
 
 Critical files: `prototype/app.js` (toolbar control, interval loop, scoped refresh call), `local/serve.py` (accept `?ids=`), `backend/api.py` (accept `?ids=`).
 
-### 6. Aggregate Route Board — three stations, one row per picked case
+### 6. Aggregate Route Board — three stations, one row per picked case — ✅ **done** (`renderRouteBoardStrip`: three stations User·Core Team·HQ, per-case lanes, dot from `assigneeDept`→`route_role`, arrow/travelling-dot/eyeball per Track Status, Sanity Check collapsible group, action-due/overdue amber/red. Caveat: the detail-panel single-case "Next stop" mirror bullet below is not implemented)
 
 The top zone of the Picked workspace is a clean visualisation with minimal text: three station columns and one row per picked case.
 
@@ -133,13 +135,13 @@ The top zone of the Picked workspace is a clean visualisation with minimal text:
 - **Sanity Check group.** *Sanity Check* tends to be the largest Track Status bucket; render those lanes in a collapsible group pinned to the **bottom** of the strip with a header *"Sanity Check (N) ▸"* (collapsed by default). Expanding shows the individual lanes; collapsing hides them so the urgent lanes above stay glanceable. Selection still works inside the expanded group.
 - **Strip scroll.** Above the Sanity Check group, lanes scroll vertically inside the strip's 1/3-height zone when they overflow; the bottom list + detail zone stays fixed.
 - **Selection.** Clicking a lane selects that case (loads it into the detail panel below; highlights the matching row in the list). Selection is global to the page.
-- **Detail panel mirror.** The right pane (case detail) also renders a single-case version of this Route Board at the top of the detail content, with a "Next stop" label and the *From / To / Time / Owning shift* spelled out in words for clarity.
+- **Detail panel mirror.** The right pane (case detail) also renders a single-case version of this Route Board at the top of the detail content, with a "Next stop" label and the *From / To / Time / Owning shift* spelled out in words for clarity. — ⬜ **open** (no `renderRouteBoardSingle` / "Next stop" mirror in the detail pane today; `renderReadingPanel` shows the Track Status pill but not the spelled-out single-case board)
 - **Computation.** Pure function of `(trackStatus, assigneeDept, now, ROTA, OWNERS)`. No new persisted state — `scheduledHandoff = { from, to, dueAt, dueShift }` is derived on the fly each render. Reuse existing rota / shift helpers so the "next Day shift at 17:30" lookup honours the actual schedule.
 - **Zero-dependency.** Stations + dots + arrows + animation are CSS / SVG inline; no chart library.
 
 Critical files: `prototype/app.js` (`renderRouteBoardStrip` for the aggregate view, single-case version inside the detail panel, scheduled-handoff computation, dept→role lookup), `prototype/owners.js` (per-dept `route_role` field surfaced as a small dropdown in the Owners editor), `prototype/styles.css` (stations grid, dot, arrow, travelling-dot animation, eyeball, amber/red action-due treatment).
 
-### 7. Analytics: split picked vs unpicked + time-on-us trend
+### 7. Analytics: split picked vs unpicked + time-on-us trend — ⬜ **open** (not implemented: `weekStats` returns single un-split totals; `renderArchiveIndex`/`renderArchiveWeek` show one stat row with no Picked-vs-Unpicked split and no time-on-us histogram)
 
 Augment the existing `weekStats` function and its renderers in `prototype/app.js`:
 
@@ -149,28 +151,28 @@ Augment the existing `weekStats` function and its renderers in `prototype/app.js
   - Add a simple **time-on-us histogram** (CSS-only bar buckets: 0–4h, 4–12h, 12–24h, 1–3d, 3d+) stacked picked vs unpicked. The data is already in `slaAccumulatedMs`; no new computation library is needed.
 - No charting dependency — keep it CSS bars to stay zero-dependency per repo convention.
 
-### 8. Keep operator-helper features intact
+### 8. Keep operator-helper features intact — ✅ **done** (handover notes + reminders retained on detail panel; `#/shifts` + `#/owners` intact; each Core/HQ row in `owners.js` carries a `route_role` of `Core Team`/`HQ`/`User`)
 
 - **Handover notes** and **reminders** — keep as-is on the case detail panel; both are operator-layer state already.
 - **Shifts + rota editor** (`#/shifts`) — unchanged.
 - **Owners editor** (`#/owners`) — keep, and reframe as a **contact reference + dept→role mapping**. Each Core Team desk and HQ Product Team row gains a `route_role` field (one of `Core Team` / `HQ` / `User`) used by the Route Board's From-chip derivation (section 6). Remove any "assign this case to desk X" action that lives here; the editor itself stays.
 
-### 9. Wording / branding pass
+### 9. Wording / branding pass — ✅ **done** (sidebar nav reads **Picked** / **Overview** in `index.html`; card buttons say Pick/Picked; `tour.js` rewritten for the Picked-workspace + Route Board flow. Minor residue: `renderArchiveIndex` H1 still reads "Weekly Archive" rather than "Overview")
 
 - Sidebar nav: rename **Board → Picked** (or **My Picks**), **Archive → Overview**. Empty-state copy on Picked should tell a new operator: "Open Overview to find cases to pick — they'll show up here."
 - Drop the language of "queue" from card buttons, banners, watchlists.
 - Update `prototype/index.html` and `prototype/standalone.html` titles/headers to match.
 
-### 10. Release-note + bundle ritual (per `CLAUDE.md`)
+### 10. Release-note + bundle ritual (per `CLAUDE.md`) — _recurring process item, applied per change as the reframe shipped_
 
 - Add a single dated entry under **Changed** in `docs/RELEASE_NOTES.md` summarizing the reframe (overview/picked/analytics + removed CC-duplicating actions).
 - Run `node prototype/bundle.mjs` to regenerate `standalone.html`. The PostToolUse hook does this automatically on edit, but verify before commit.
-- Develop on branch `claude/vigilant-knuth-slap60`.
+- ~~Develop on branch `claude/vigilant-knuth-slap60`.~~ — _unapplicable: that specific branch name is from the original plan run; the reframe has since landed on other branches_
 
 ## Files to modify (most of the work concentrates here)
 
 - `prototype/app.js` — rewrite `renderCasesView` for the two-zone layout (aggregate Route Board strip on top, list + detail split 1:2 below). Add `renderRouteBoardStrip` (aggregate) and `renderRouteBoardSingle` (detail mirror). Add 7-item Track Status picker + Clear with preconditions. Delete the CC-shaped action handlers, drag-between-columns, two-band split, and validTransitions / state-machine guards. Add scheduled-handoff computation and dept→role lookup. Add archive renderers' picked-vs-unpicked split, `weekStats`. Auto-refresh toolbar + interval loop. `agent-v1` (un)packing for `trackStatus`. `+ New case` stays.
-- `local/serve.py`, `backend/api.py` — accept `?ids=` on `GET /api/cases` for scoped refresh of picked cases.
+- `local/serve.py`, `backend/api.py` — accept `?ids=` on `GET /api/cases` for scoped refresh of picked cases. — ⬜ **open** (only single `id=` is accepted today; `?ids=` multi-case scope is part of the still-open section 5)
 - `prototype/index.html` — sidebar nav labels, page title.
 - `prototype/styles.css` — Picked workspace two-zone grid (top strip / bottom 1:2 split). Three-station Route Board styling (stations, dot, arrow, travelling-dot keyframe animation, eyeball, amber / red action-due treatment, ✓ delivered marker). Track Status pill colours. Histogram bars, picked-vs-unpicked split rows.
 - `prototype/tour.js` — refresh the product tour steps so they describe the new flow ("browse Overview → Pick → analyze in Picked view").
