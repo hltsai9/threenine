@@ -2498,6 +2498,12 @@ table.case-table {
 .rb-row:hover { background: rgba(46, 86, 65, 0.06); }
 .rb-row-selected { background: rgba(46, 86, 65, 0.09); }
 
+/* IT process time over the limit: highlight the whole case row + redden the time chip. */
+.rb-row-over { background: var(--danger-bg); box-shadow: inset 3px 0 0 var(--danger); }
+.rb-row-over:hover { background: var(--danger-bg); }
+.rb-it-time { font-size: 11px; color: var(--text-faint-2, #8a948f); }
+.rb-it-over { color: var(--danger); font-weight: 600; }
+
 /* The percentage-positioned children inside a row are positioned against the
  * row's own left/right padding, which is the same band the stations occupy. */
 .rb-row > * {
@@ -2986,6 +2992,7 @@ window.THRESHOLDS = {
   hqIdleHours: 8,
   approachingSlaHours: 20,
   shiftEndingSoonMinutes: 60,
+  itProcessHours: 15,   // IT process time (1st Line + Service Team + 2nd Line + Unknown) over this → highlight
 };
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '2026-06-12' };
@@ -5049,11 +5056,11 @@ function _renderMovingRow(c, top, animDelay) {
       </div>`;
 
   return `
-    <div class="rb-row rb-row-moving${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-moving${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       ${travel}
       <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
-      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)}</div>
+      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
     </div>
   `;
@@ -5076,7 +5083,8 @@ function _renderWatchRow(c, top) {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>`;
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
-  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)}</div>`;
+  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>`;
+  const overCls = itProcessOver(c) ? ' rb-row-over' : '';
 
   if (station === expected) {
     // Settled at the expected station — the dashed ring pulses until the current operator has
@@ -5084,7 +5092,7 @@ function _renderWatchRow(c, top) {
     const handoveredByMe = c.handover && c.handover.author === STATE.operatorId && !c.handover.staleForCurrentShift;
     const pulseCls = handoveredByMe ? '' : ' rb-watch-ring-pulse';
     return `
-    <div class="rb-row rb-row-watch${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-watch${sel}${overCls}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-watch-ring${pulseCls}" style="left:${pct}%;"></div>
       <div class="rb-watch-dot"  style="left:${pct}%; background:${dotColor};"></div>
       ${eye}
@@ -5100,7 +5108,7 @@ function _renderWatchRow(c, top) {
   const lineLeft = Math.min(pct, expPct);
   const lineWidth = Math.abs(expPct - pct);
   return `
-    <div class="rb-row rb-row-watch rb-row-watch-intent${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-watch rb-row-watch-intent${sel}${overCls}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-watch-intent-line" style="left:${lineLeft}%; width:${lineWidth}%;"></div>
       <div class="rb-watch-intent-arrow ${goingRight ? 'rb-wi-right' : 'rb-wi-left'}" style="left:${expPct}%;"></div>
       <div class="rb-watch-dot" style="left:${pct}%; background:${dotColor};"></div>
@@ -5114,9 +5122,9 @@ function _renderStayRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
   const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
-    <div class="rb-row rb-row-stay${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-stay${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-stay-dot" style="left:${pct}%;"></div>
-      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays</div>
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -5127,11 +5135,11 @@ function _renderFirstLineRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
   const pct = ROUTE_STATION_POS[STATION_1ST_LINE];
   return `
-    <div class="rb-row rb-row-firstline${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-firstline${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
       <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
       <div class="rb-fl-dot" style="left:${pct}%;"></div>
-      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line</div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -5152,9 +5160,9 @@ function _renderSanitySubRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
   const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
   return `
-    <div class="rb-row rb-row-sanity-sub${sel}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
+    <div class="rb-row rb-row-sanity-sub${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${escapeHtml(c.subject)}</div>
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -5606,13 +5614,30 @@ function processSegments(c) {
   });
 }
 
-// Total time a case has spent in the Case Center "1st Line" processing stage, summed across
-// every 1st-line segment of its process timeline. Whitespace-normalised so the literal CC value
-// "1st  Line" (two spaces) and a single-space variant both match.
-function firstLineMs(c) {
+// "IT process time": total time a case has been actively handled by IT, summed across every
+// process-timeline segment whose stage is one of these IT-side processTypes (everything except
+// the requester "User"). Whitespace-normalised + lower-cased so the literal CC values (incl.
+// "1st  Line" with two spaces) match regardless of spacing/case.
+const IT_PROCESS_TYPES = new Set(['1st line', 'service team', '2nd line', 'unknown']);
+function itProcessMs(c) {
   return processSegments(c)
-    .filter(s => String(s.processType || '').replace(/\s+/g, ' ').trim() === '1st Line')
+    .filter(s => IT_PROCESS_TYPES.has(String(s.processType || '').replace(/\s+/g, ' ').trim().toLowerCase()))
     .reduce((sum, s) => sum + (s.ms || 0), 0);
+}
+// The IT-process-time limit (hours) past which a case is "over" and gets highlighted. Configurable
+// via THRESHOLDS.itProcessHours in data.js; falls back to this default.
+const IT_PROCESS_HOURS_DEFAULT = 15;
+function itProcessLimitHours() {
+  const v = window.THRESHOLDS && window.THRESHOLDS.itProcessHours;
+  return typeof v === 'number' && isFinite(v) ? v : IT_PROCESS_HOURS_DEFAULT;
+}
+function itProcessOver(c) {
+  return itProcessMs(c) > itProcessLimitHours() * HOUR;
+}
+// Small Route-Board / table label for a case's IT process time (red when over the limit).
+function itTimeLabel(c) {
+  const over = itProcessOver(c);
+  return `<span class="rb-it-time${over ? ' rb-it-over' : ''}" title="IT process time${over ? ` — over ${itProcessLimitHours()}h limit` : ''}">${fmtDuration(itProcessMs(c))}</span>`;
 }
 
 function renderProcessTimeline(c) {
@@ -6066,7 +6091,7 @@ function renderArchiveWeek(weekId) {
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${trackStatusPill(c)}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
-        <td>${(() => { const ms = firstLineMs(c); return ms > 0 ? fmtDuration(ms) : '<span class="muted">—</span>'; })()}</td>
+        <td>${itProcessMs(c) > 0 ? itTimeLabel(c) : '<span class="muted">—</span>'}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
         <td class="col-actions">
           ${renderQueueToggleButton(c, 'tiny')}
@@ -6116,7 +6141,7 @@ function renderArchiveWeek(weekId) {
             <th>HQ Product Team</th>
             <th>Status</th>
             <th>Process Time</th>
-            <th title="Total time spent in the Case Center 1st Line stage">1st-line time</th>
+            <th title="Total IT-side process time: 1st Line + Service Team + 2nd Line + Unknown">IT process time</th>
             <th>${week.isCurrent ? 'Created' : 'Closed'}</th>
             <th></th>
           </tr>

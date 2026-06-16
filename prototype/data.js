@@ -27,6 +27,7 @@ window.THRESHOLDS = {
   hqIdleHours: 8,
   approachingSlaHours: 20,
   shiftEndingSoonMinutes: 60,
+  itProcessHours: 15,   // IT process time (1st Line + Service Team + 2nd Line + Unknown) over this → highlight
 };
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '2026-06-12' };

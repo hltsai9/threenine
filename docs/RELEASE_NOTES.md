@@ -26,14 +26,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **"Live · N cases from Case Center · M picked" banner hidden** on the Picked workspace
   (per request). The render is stubbed to empty in `app.js`.
 
-### Added (Overview archive list — Assignee + 1st-line time)
+### Added (IT process time — Overview + Route Board, with over-limit highlight)
 
-- The per-week case table in **Overview** now has an **Assignee** column (the Case Center
-  assignee, with the department in a tooltip) and a **1st-line time** column — the total time
-  the case has spent in the Case Center "1st Line" stage, summed across every 1st-line segment
-  of its process timeline (new `firstLineMs()` helper; whitespace-normalised so the literal
-  "1st  Line" two-space value and a single-space variant both match; an open current 1st-line
-  stage counts up to now).
+- New **"IT process time"** metric: the total time a case has been actively handled by IT,
+  summed across every process-timeline segment whose stage is **1st Line, Service Team, 2nd Line,
+  or Unknown** (everything except the requester "User"). New `itProcessMs()` helper —
+  whitespace/case-normalised so the literal CC values (incl. "1st  Line" with two spaces) match.
+- Shown in two places: the **Overview** per-week table (new **IT process time** column, replacing
+  the earlier 1st-line-only column) and on every **Hand-off Route Board** row (next to the case id).
+- **Over-limit highlight:** when a case's IT process time exceeds `THRESHOLDS.itProcessHours`
+  (new, **default 15h**, configurable in `data.js`), the Route Board row and the Overview cell are
+  highlighted (red accent + red time) so long-running cases stand out.
+- The per-week table also has an **Assignee** column (the Case Center assignee, department in a
+  tooltip).
 
 ### Fixed (sidebar)
 
