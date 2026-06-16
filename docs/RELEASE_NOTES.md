@@ -19,9 +19,11 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Fixed (process timeline)
 
-- The **current/open process-timeline stage** (no `endedAt`) now shows its elapsed
-  duration **up to now** instead of zero — `processSegments` defaults a missing end
-  to `NOW`, so the in-progress stage accrues time like the live clocks.
+- The **current/last process-timeline stage** now runs **to now**. Case Center freezes
+  the open stage's `endedAt` at its start time (it only advances when the next stage
+  opens), so the in-progress stage read as ~0 duration. `processSegments` now overrides
+  the last segment's end to `NOW` (ignoring its stale `endedAt`/`minutes`); earlier
+  stages keep their real `endedAt`. So the current stage accrues time like the live clocks.
 
 ## 2026-06-15
 

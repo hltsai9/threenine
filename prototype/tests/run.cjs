@@ -173,19 +173,23 @@ test('processSegments: empty / missing → []', () => {
   eq(processSegments({}), []);
   eq(processSegments({ processTimeline: [] }), []);
 });
-test('processSegments: orders by start time and uses minutes for duration', () => {
+test('processSegments: orders by start; non-last uses minutes, last runs to now', () => {
   const segs = processSegments({ processTimeline: [
     { processType: 'B', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR), minutes: 60 },
-    { processType: 'A', startedAt: iso(4 * HOUR), endedAt: iso(2 * HOUR), minutes: 120 },
+    { processType: 'A', startedAt: iso(4 * HOUR), endedAt: iso(2 * HOUR), minutes: 90 },
   ] });
   eq(segs.map(s => s.processType), ['A', 'B']);   // re-sorted oldest-first
-  eq(segs.map(s => s.ms), [120 * 60000, 60 * 60000]);
+  // A is not the current stage → uses its minutes (90m). B is the current/last stage →
+  // its frozen endedAt is overridden to now (start 2h ago → 2h elapsed), minutes ignored.
+  eq(segs.map(s => s.ms), [90 * 60000, 120 * 60000]);
 });
-test('processSegments: falls back to end − start when minutes absent', () => {
+test('processSegments: non-last with no minutes falls back to end − start', () => {
   const segs = processSegments({ processTimeline: [
-    { startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },
+    { startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },   // non-last → end−start = 2h
+    { startedAt: iso(1 * HOUR), endedAt: iso(1 * HOUR) },   // last → forced to now = 1h
   ] });
   eq(segs[0].ms, 2 * HOUR);
+  eq(segs[1].ms, 1 * HOUR);
 });
 test('processSegments: non-objects are dropped', () => {
   eq(processSegments({ processTimeline: [null, 0, { startedAt: iso(HOUR), minutes: 0 }] }).length, 1);
@@ -196,6 +200,27 @@ test('processSegments: open stage (no endedAt) runs to now', () => {
   ] });
   eq(segs[0].ms, 2 * HOUR);   // start 2h ago → now = 2h elapsed
   eq(segs[0].end, FIXED);     // end defaulted to NOW (the frozen clock)
+});
+
+test('processSegments: last stage runs to now even with a stale endedAt', () => {
+  const segs = processSegments({ processTimeline: [
+    { processType: '1st  Line', startedAt: iso(5 * HOUR), endedAt: iso(4 * HOUR) },  // closed earlier stage
+    { processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(3 * HOUR) }, // current: endedAt frozen at start
+  ] });
+  // Earlier stage keeps its real endedAt window (5h ago → 4h ago = 1h).
+  eq(segs[0].ms, 1 * HOUR);
+  eq(segs[0].end, FIXED - 4 * HOUR);
+  // Last stage's frozen endedAt is overridden to NOW (start 3h ago → now = 3h elapsed).
+  eq(segs[1].end, FIXED);
+  eq(segs[1].ms, 3 * HOUR);
+});
+
+test('processSegments: last stage ignores stale minutes, recomputes to now', () => {
+  const segs = processSegments({ processTimeline: [
+    { processType: 'Service Team', startedAt: iso(2 * HOUR), endedAt: iso(2 * HOUR), minutes: 1 },
+  ] });
+  eq(segs[0].end, FIXED);
+  eq(segs[0].ms, 2 * HOUR);   // not 1 minute — last stage recomputes start→now
 });
 
 /* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
