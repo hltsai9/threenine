@@ -1874,16 +1874,17 @@ function processSegments(c) {
   items.sort((a, b) => new Date(a.startedAt || a.endedAt || 0) - new Date(b.startedAt || b.endedAt || 0));
   const nowMs = NOW.getTime();
   const lastIdx = items.length - 1;
+  // A closed/cancelled/resolved case has a real, final endedAt on its last stage — keep it.
+  // An OPEN case keeps the current stage's endedAt frozen at its start time (Case Center only
+  // stamps it when the next stage opens), so it reads as ~0 duration; for those, run the last
+  // stage to "now" so its elapsed time keeps ticking like the live clocks.
+  const terminal = ['resolved', 'closed', 'cancelled'].includes(c.status);
   return items.map((it, i) => {
     const start = it.startedAt ? new Date(it.startedAt).getTime() : null;
-    // The latest (current/in-progress) stage keeps a frozen endedAt — Case Center only stamps
-    // it when the NEXT stage opens, so until then it equals startedAt and reads as ~0 duration.
-    // Force the last stage to end at "now" so its elapsed time keeps ticking; earlier stages
-    // use their real endedAt (falling back to "now" only if one is genuinely missing).
-    const isLast = i === lastIdx;
+    const runToNow = (i === lastIdx) && !terminal;
     const rawEnd = it.endedAt ? new Date(it.endedAt).getTime() : null;
-    const end = isLast ? nowMs : (rawEnd != null ? rawEnd : nowMs);
-    const ms = (!isLast && typeof it.minutes === 'number' && isFinite(it.minutes))
+    const end = runToNow ? nowMs : (rawEnd != null ? rawEnd : nowMs);
+    const ms = (!runToNow && typeof it.minutes === 'number' && isFinite(it.minutes))
       ? Math.max(0, it.minutes) * 60000
       : (start != null ? Math.max(0, end - start) : 0);
     return { ...it, start, end, ms };

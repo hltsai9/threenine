@@ -223,6 +223,14 @@ test('processSegments: last stage ignores stale minutes, recomputes to now', () 
   eq(segs[0].ms, 2 * HOUR);   // not 1 minute — last stage recomputes start→now
 });
 
+test('processSegments: closed case keeps its real final endedAt (not now)', () => {
+  const segs = processSegments({ status: 'closed', processTimeline: [
+    { processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },  // resolved 1h ago
+  ] });
+  eq(segs[0].end, FIXED - 1 * HOUR);   // real completion time, NOT now
+  eq(segs[0].ms, 2 * HOUR);            // 3h ago → 1h ago = 2h
+});
+
 /* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
  * waitUserDueMs returns signed ms to the Wait User due time (NOW-based): positive = due in the
  * future, negative = overdue, null = no waitUser/due date. */

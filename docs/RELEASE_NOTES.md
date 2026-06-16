@@ -19,11 +19,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Fixed (process timeline)
 
-- The **current/last process-timeline stage** now runs **to now**. Case Center freezes
-  the open stage's `endedAt` at its start time (it only advances when the next stage
-  opens), so the in-progress stage read as ~0 duration. `processSegments` now overrides
-  the last segment's end to `NOW` (ignoring its stale `endedAt`/`minutes`); earlier
-  stages keep their real `endedAt`. So the current stage accrues time like the live clocks.
+- The **current/last process-timeline stage of an OPEN case** now runs **to now**. Case
+  Center freezes the open stage's `endedAt` at its start time (it only advances when the
+  next stage opens), so the in-progress stage read as ~0 duration. `processSegments` now
+  overrides the last segment's end to `NOW` (ignoring its stale `endedAt`/`minutes`) **only
+  when the case isn't terminal** (`closed`/`cancelled`/`resolved`) — a closed case keeps its
+  real final `endedAt`. Earlier stages always keep their real `endedAt`. So the current
+  stage of an open case accrues time like the live clocks.
 
 ## 2026-06-15
 
