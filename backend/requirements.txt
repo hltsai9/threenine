@@ -5,7 +5,8 @@ SQLAlchemy>=2.0
 alembic>=1.13
 
 # Production database drivers.
-# psycopg ships as a prebuilt wheel (no native build), so installing it is harmless for the
-# SQLite demo; it's only USED when DATABASE_URL points at Postgres. Required for Render.
+# Both are pure-Python / prebuilt wheels (no native build), so installing them is harmless for
+# the SQLite demo; each is only USED when DATABASE_URL points at its backend. psycopg is also
+# required for Render (Postgres).
 psycopg[binary]>=3.1     # PostgreSQL  (postgresql+psycopg://...)
-# PyMySQL>=1.1           # MySQL/MariaDB (mysql+pymysql://...) — uncomment if you use MySQL
+PyMySQL>=1.1             # MySQL/MariaDB (mysql+pymysql://...)

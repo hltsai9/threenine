@@ -2,14 +2,19 @@
 
 A step-by-step runbook to stand up the **full stack** on your own Ubuntu box:
 the FastAPI API (`backend/`) serving the vanilla-JS SPA (`prototype/`) **same-origin**,
-backed by **PostgreSQL**, with the shared-token login.
+backed by **MySQL**, with the shared-token login.
 
 > Env-var meanings are documented once in **[`SETUP.md`](SETUP.md)** — this runbook tells you
 > *which* to set on a server and *how* to wire the machine; it links there instead of repeating
 > the table. Architecture overview: **[`../backend/README.md`](../backend/README.md)**.
 
 What you get at the end: `https://your-host/` shows the board behind a login; `https://your-host/api/*`
-is the auth-gated API; data lives in Postgres and is shared across operators/devices.
+is the auth-gated API; data lives in MySQL and is shared across operators/devices.
+
+> **Using PostgreSQL or SQLite instead?** The only differences are Steps 1, 3 and the
+> `DATABASE_URL` you put in the env file — the app picks the backend from that URL alone
+> (`backend/db.py`). For Postgres use `postgresql+psycopg://…` and `sudo apt install postgresql`;
+> for a quick demo, omit `DATABASE_URL` entirely and it falls back to a SQLite file in the repo.
 
 ---
 
@@ -20,8 +25,13 @@ is the auth-gated API; data lives in Postgres and is shared across operators/dev
 - **Node ≥ 18.** The DB seeder (`backend/seed_board_json.cjs`) and the bundler use
   `structuredClone`, which needs Node 17+. **Ubuntu's default `nodejs` apt package is too old** —
   install Node 20 from NodeSource (Step 1).
-- **`DATABASE_URL` must use the `postgresql+psycopg://` scheme** (the app also auto-normalises a
-  plain `postgres://`/`postgresql://`, but prefer the explicit form).
+- **`DATABASE_URL` must use the `mysql+pymysql://` scheme** and end with `?charset=utf8mb4`.
+  The driver is **PyMySQL** (pure-Python, no build step), already in `backend/requirements.txt`.
+- **Create the database as `utf8mb4`.** Cases are stored as a JSON `payload` that can hold
+  non-ASCII subjects and emoji; `utf8mb4` avoids encoding errors. MySQL **8.0+** (native `JSON`
+  column type) is recommended; MariaDB 10.5+ also works (it stores JSON as `LONGTEXT`).
+- If your DB password contains URL-special characters (`@ : / ? # %`), either pick a password
+  without them or percent-encode them in the `DATABASE_URL` (e.g. `@` → `%40`).
 - Run the API **from the repo root** as `backend.api:app` (it uses package-relative imports and
   serves `prototype/` from the repo root). Don't `cd backend` to launch it.
 
@@ -33,7 +43,7 @@ Throughout, replace placeholders like `<STRONG_DB_PASSWORD>` and `<API_TOKEN>`.
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip postgresql git curl
+sudo apt install -y python3 python3-venv python3-pip mysql-server git curl
 
 # Node 20 (NodeSource) — the apt 'nodejs' is too old for the tooling:
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -41,6 +51,14 @@ sudo apt install -y nodejs
 
 python3 --version   # expect >= 3.10
 node --version      # expect >= 18
+mysql --version     # expect 8.0+ (or MariaDB 10.5+)
+```
+
+Optional but recommended on a fresh install — lock down the MySQL root account and remove the
+anonymous/test defaults:
+
+```bash
+sudo mysql_secure_installation
 ```
 
 ## 2. Get the code
@@ -53,22 +71,28 @@ cd threenine
 git checkout worktree-implement-review-fixes      # or 'main' once the branch is merged
 ```
 
-## 3. Create the PostgreSQL database
+## 3. Create the MySQL database
+
+On Ubuntu the `root` MySQL user authenticates via the unix socket, so `sudo mysql` gets you in
+without a password:
 
 ```bash
-sudo -u postgres psql <<'SQL'
-CREATE DATABASE casetracker;
-CREATE USER casetracker WITH PASSWORD '<STRONG_DB_PASSWORD>';
-GRANT ALL PRIVILEGES ON DATABASE casetracker TO casetracker;
+sudo mysql <<'SQL'
+CREATE DATABASE casetracker CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'casetracker'@'localhost' IDENTIFIED BY '<STRONG_DB_PASSWORD>';
+GRANT ALL PRIVILEGES ON casetracker.* TO 'casetracker'@'localhost';
+FLUSH PRIVILEGES;
 SQL
+```
 
-# Postgres 15+ also needs schema-level grants:
-sudo -u postgres psql -d casetracker -c "GRANT ALL ON SCHEMA public TO casetracker;"
+Verify the app user can log in and see the database:
+```bash
+mysql -u casetracker -p -e 'SHOW DATABASES;'      # enter <STRONG_DB_PASSWORD>; expect 'casetracker' listed
 ```
 
 Your connection string (used as `DATABASE_URL`):
 ```
-postgresql+psycopg://casetracker:<STRONG_DB_PASSWORD>@localhost:5432/casetracker
+mysql+pymysql://casetracker:<STRONG_DB_PASSWORD>@localhost:3306/casetracker?charset=utf8mb4
 ```
 
 ## 4. Python environment
@@ -78,7 +102,7 @@ cd /opt/threenine
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -r backend/requirements.txt     # includes psycopg (PostgreSQL driver)
+pip install -r backend/requirements.txt     # includes PyMySQL (MySQL driver)
 ```
 
 ## 5. Configure the environment
@@ -87,7 +111,7 @@ Create `/opt/threenine/.env.casetracker` (root-readable only):
 
 ```bash
 cat > /opt/threenine/.env.casetracker <<EOF
-DATABASE_URL=postgresql+psycopg://casetracker:<STRONG_DB_PASSWORD>@localhost:5432/casetracker
+DATABASE_URL=mysql+pymysql://casetracker:<STRONG_DB_PASSWORD>@localhost:3306/casetracker?charset=utf8mb4
 API_AUTH_TOKEN=$(openssl rand -hex 32)
 SERVE_STATIC=1
 AUTO_CREATE=1
@@ -107,7 +131,7 @@ created from the model on first boot (Step 8).
 **Option B — migrations (recommended for production).** Set `AUTO_CREATE=0` in the env file, then:
 ```bash
 cd /opt/threenine/backend
-DATABASE_URL='postgresql+psycopg://casetracker:<STRONG_DB_PASSWORD>@localhost:5432/casetracker' \
+DATABASE_URL='mysql+pymysql://casetracker:<STRONG_DB_PASSWORD>@localhost:3306/casetracker?charset=utf8mb4' \
   ../.venv/bin/alembic upgrade head
 cd /opt/threenine
 ```
@@ -118,6 +142,8 @@ Edit `prototype/config.js`:
 - `window.API_BASE = ''` — same-origin (the API serves the SPA), no CORS.
 - `window.API_MODE = ''` — leave empty; the SPA **auto-detects** the backend by probing
   `/healthz` and switches to server mode (shared login + DB persistence). Set `'server'` to force it.
+- `window.TOUR_AUTOSTART = false` — the onboarding tour stays off (operators can still launch it
+  from the sidebar "Take the tour" link). It's already `false` by default.
 
 Edit `prototype/owners.js` — set the department lists to your **real Case Center** department
 names so the Route Board places dots correctly:
@@ -170,7 +196,7 @@ Pick a case in one browser, refresh a second browser (sign in) → the pick pers
 sudo tee /etc/systemd/system/casetracker.service >/dev/null <<'UNIT'
 [Unit]
 Description=Case Tracker API + SPA
-After=network.target postgresql.service
+After=network.target mysql.service
 
 [Service]
 WorkingDirectory=/opt/threenine
@@ -240,7 +266,7 @@ EOF
 **13b. One-off test:**
 ```bash
 cd /opt/threenine && set -a; source .env.casetracker; set +a
-.venv/bin/python -m backend.ingest --hours 1 --no-create     # fetch cases created in the last hour
+.venv/bin/python -m backend.ingest --hours 1 --no-create     # fetch cases updated in the last hour
 ```
 Re-running is safe — upsert dedups by case id, so overlapping windows can't duplicate cases.
 
@@ -249,7 +275,7 @@ Re-running is safe — upsert dedups by case id, so overlapping windows can't du
 sudo tee /etc/systemd/system/casetracker-ingest.service >/dev/null <<'UNIT'
 [Unit]
 Description=Case Tracker — ingest from Case Center
-After=network-online.target postgresql.service
+After=network-online.target mysql.service
 
 [Service]
 Type=oneshot
@@ -290,7 +316,7 @@ journalctl -u casetracker-ingest.service -n 50 --no-pager      # see last run's 
 
 Notes:
 - Tune `--hours` to your cadence (here a 1-hour window polled every 5 min — lots of safe overlap).
-  Use `--hours A --to-hours B` for a created-between band, or `--id C-1234` for a single case.
+  Use `--hours A --to-hours B` for a band, or `--id C-1234` for a single case.
 - The timer runs `ingest_live`, which holds the Case Center credentials; the API service
   (Step 11) never sees them.
 
@@ -300,11 +326,13 @@ Notes:
 
 | Symptom | Cause / fix |
 | --- | --- |
-| `relation "cases" does not exist` on save | Schema not created → `AUTO_CREATE=1` (Step 5) or run Alembic (Step 6B). |
+| `Table 'casetracker.cases' doesn't exist` on save | Schema not created → `AUTO_CREATE=1` (Step 5) or run Alembic (Step 6B). |
+| `ModuleNotFoundError: No module named 'pymysql'` / "can't load plugin mysql.pymysql" | The driver isn't installed → `pip install -r backend/requirements.txt` in the venv (Step 4), and `DATABASE_URL` must start with `mysql+pymysql://` (Step 3). |
+| `Access denied for user 'casetracker'@'localhost'` | Wrong password or grants → re-run the `CREATE USER` / `GRANT` in Step 3; check the password in `DATABASE_URL` (URL-encode special chars). |
+| Garbled non-ASCII subjects / `Incorrect string value` | Database isn't `utf8mb4` → recreate it with `CHARACTER SET utf8mb4` (Step 3) and add `?charset=utf8mb4` to `DATABASE_URL`. |
 | Browser board shows the **login screen** but rejects the token | The entered token must equal `API_AUTH_TOKEN`. Re-check the env file; restart the service after changing it. |
-| Board loads but **every case sits at "1st Line"** | `owners.js` `CC_CORE_DEPARTMENTS`/`CC_HQ_DEPARTMENTS` don't match your cases' `assigneeDept`. Set them to your real CC department names (Step 7). |
+| Board loads but **every case sits at "1st Line"** | `owners.js` `CC_CORE_DEPARTMENTS`/`CC_HQ_DEPARTMENTS` don't match your cases' `assigneeDept`. Set them to your real CC department names (Step 7). To list the real values: `mysql -u casetracker -p casetracker -e "SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(payload,'$.assigneeDept')) FROM cases;"` |
 | `TypeError: unsupported operand` / `str | None` on startup | Python < 3.10. Use 3.10+ (Step 0). |
-| SQLAlchemy "can't load plugin postgresql.psycopg2" | `DATABASE_URL` must be `postgresql+psycopg://…` (psycopg v3), which Step 3 uses. |
 | `structuredClone is not defined` running the seeder | Node < 17. Install Node 20 (Step 1). |
 | Board ignores the API and shows seed data | `config.js` `API_MODE` is forced to `'demo'`/`'off'`, or `/healthz` isn't reachable from the browser origin. Leave `API_MODE=''` and ensure the API is served same-origin. |
 | `npm`/`node` not found in the systemd context | Run the seeder (Step 9) as your shell user, not from the `www-data` service. |

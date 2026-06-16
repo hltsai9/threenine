@@ -27,7 +27,7 @@ window.API_BASE = '';
 window.API_MODE = '';
 
 // Guided tour: whether it auto-starts on a visitor's first load.
-//   true  (default) -> auto-start once per browser (preserves the demo/Pages experience).
-//   false           -> never auto-start; the sidebar "Take the tour" link still works.
-// Set to false for an internal deployment where operators don't need the onboarding tour.
-window.TOUR_AUTOSTART = true;
+//   false (default) -> never auto-start; the sidebar "Take the tour" link still works.
+//   true            -> auto-start once per browser (the demo/Pages onboarding experience).
+// Disabled by default — internal operators don't need the onboarding tour on every fresh browser.
+window.TOUR_AUTOSTART = false;

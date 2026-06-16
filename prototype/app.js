@@ -21,6 +21,11 @@ const LIVE_FETCH_TIMEOUT_MS = (() => {
   return 300000;  // default: 300 seconds (5 minutes)  ← edit this number to change the default
 })();
 
+// ---- UI feature flags ----
+// Hide chrome without deleting the code behind it (may return later). Flip to true to restore.
+const SHOW_OWNERSHIP_TIMELINE = false;   // "Ownership timeline" section in case detail
+const SHOW_LIVE_FETCH_CONTROLS = false;  // toolbar "Created between … Load New" + "Refresh Existing"
+
 // Polling cadences (ms). Kept here so all timing lives in one place.
 const REMINDER_POLL_MS = 10000;        // how often to sweep for due reminders
 const REMINDER_FIRST_RUN_MS = 200;     // first reminder sweep shortly after boot
@@ -1672,7 +1677,7 @@ function renderCaseList() {
           <div class="subtitle">${all.length} picked · ${actionDueCases().length} due this shift · ${actionOverdueCases().length} overdue. Pick more from <a href="#/archive">Overview</a>.</div>
         </div>
         <div class="toolbar">
-          ${/^https?:$/.test(location.protocol) ? `
+          ${SHOW_LIVE_FETCH_CONTROLS && /^https?:$/.test(location.protocol) ? `
           <label class="lookback-ctl">Created between
             <input type="number" id="lookback-input" min="1" step="1" value="${STATE.lookbackHours}">
             and
@@ -1680,7 +1685,8 @@ function renderCaseList() {
             h ago
             <button class="btn" id="lookback-load">Load New</button>
           </label>` : ''}
-          <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>
+          ${SHOW_LIVE_FETCH_CONTROLS ? `
+          <button class="btn" id="refresh-existing" title="Re-pull every case already on the board from Case Center">Refresh Existing</button>` : ''}
           <button class="btn" data-action="prompt" data-kind="new_case" title="Manually import a single case by Case Center ID (for older cases outside the look-back window)">+ Import case by ID</button>
         </div>
       </div>
@@ -2067,10 +2073,11 @@ function renderCaseDetailBody(c) {
               </div>
             </div>
           </div>
+          ${SHOW_OWNERSHIP_TIMELINE ? `
           <div class="detail-section">
             <h3>Ownership timeline</h3>
             ${renderOwnershipTimeline(c)}
-          </div>
+          </div>` : ''}
           ${(c.processTimeline && c.processTimeline.length) ? `
           <div class="detail-section">
             <h3>Process timeline <span class="muted tiny" style="font-weight:400">· from Case Center</span></h3>

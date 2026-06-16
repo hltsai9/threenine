@@ -1,6 +1,11 @@
 # Route Board CC-Position Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: ✅ Implemented & shipped (2026-06-14).** All eight tasks landed — `caseStation`
+> derives the current station from Case Center fields (no Track-Status pin), the 1st-Line lane
+> and bidirectional arrows render, and the seed was reshaped. Checkboxes below are marked `[x]`.
+> Kept for historical reference. No unapplicable items — the plan shipped in full.
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make the Route Board dot show a case's real Case Center location (from `assigneeDept` + latest `processType`), with Track Status only decorating/animating toward the *desired* location — never moving the dot.
 
@@ -29,7 +34,7 @@
 - Modify: `prototype/owners.js` (append after the `window.OWNERS = {...}` block)
 - Test: `prototype/tests/run.cjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add near the seed-sanity tests in `run.cjs`:
 
@@ -41,12 +46,12 @@ test('owners: CC dept lists are non-empty arrays', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node prototype/tests/run.cjs`
 Expected: FAIL — `core list` (CC_CORE_DEPARTMENTS undefined).
 
-- [ ] **Step 3: Add the config to `owners.js`**
+- [x] **Step 3: Add the config to `owners.js`**
 
 Append to the end of `prototype/owners.js`:
 
@@ -62,12 +67,12 @@ window.CC_CORE_DEPARTMENTS = ['Site IT'];
 window.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node prototype/tests/run.cjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prototype/owners.js prototype/tests/run.cjs
@@ -82,7 +87,7 @@ git commit -m "feat(route-board): configurable CC department lists in owners.js"
 - Modify: `prototype/app.js` (add near `caseStation`, before it)
 - Test: `prototype/tests/run.cjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 /* ---------- latestProcessType (skips Unknown) ---------- */
@@ -101,12 +106,12 @@ test('latestProcessType: empty / all-Unknown / missing → "1st  Line"', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node prototype/tests/run.cjs`
 Expected: FAIL — `app.latestProcessType is not a function`.
 
-- [ ] **Step 3: Implement the helper**
+- [x] **Step 3: Implement the helper**
 
 Add to `prototype/app.js` immediately before `function caseStation(c)`:
 
@@ -124,12 +129,12 @@ function latestProcessType(c) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node prototype/tests/run.cjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prototype/app.js prototype/tests/run.cjs
@@ -144,7 +149,7 @@ git commit -m "feat(route-board): latestProcessType helper (skips Unknown)"
 - Modify: `prototype/app.js` (`caseStation` body; add `deptInList` + `STATION_1ST_LINE` constant)
 - Test: `prototype/tests/run.cjs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 /* ---------- caseStation (dot = current CC location) ---------- */
@@ -176,12 +181,12 @@ test('caseStation: Track Status no longer pins the dot to User', () =>
   eq(caseStation(stationCase('HQ Identity', 'Service Team', { trackStatus: 'sanity_check' })), 'HQ'));
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node prototype/tests/run.cjs`
 Expected: FAIL — current `caseStation` returns `User` for the sanity_check case (pinTo) and uses team-name matching.
 
-- [ ] **Step 3: Rewrite `caseStation` and add `deptInList`**
+- [x] **Step 3: Rewrite `caseStation` and add `deptInList`**
 
 Replace the existing `function caseStation(c) {...}` in `prototype/app.js` with:
 
@@ -209,12 +214,12 @@ function caseStation(c) {
 
 Note: leave the existing `deptToRoleRaw()` function in place — it is still used by the owner directory / assignment UI; only `caseStation` stops calling it.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node prototype/tests/run.cjs`
 Expected: PASS (all caseStation tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prototype/app.js prototype/tests/run.cjs
@@ -229,7 +234,7 @@ git commit -m "feat(route-board): caseStation derives current station from CC, d
 - Modify: `prototype/app.js` (`ROUTE_STATION_POS`; `_renderStayRow`, `_renderWatchRow`, `_renderSanitySubRow`)
 - Test: `prototype/tests/run.cjs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 /* ---------- Route Board dot positions follow caseStation ---------- */
@@ -245,12 +250,12 @@ test('stay row dot is placed at the case station (HQ), not hard-coded User', () 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node prototype/tests/run.cjs`
 Expected: FAIL — `ROUTE_STATION_POS['1st Line']` undefined; stay row still hard-codes `left:12%`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `prototype/app.js`, change `ROUTE_STATION_POS`:
 
@@ -297,12 +302,12 @@ function _renderSanitySubRow(c, top) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node prototype/tests/run.cjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prototype/app.js prototype/tests/run.cjs
@@ -317,7 +322,7 @@ git commit -m "feat(route-board): position stay/watch/sanity dots at the CC stat
 - Modify: `prototype/app.js` (`_classifyRouteRow`, new `_renderFirstLineRow`, `renderRouteBoardStrip`)
 - Test: `prototype/tests/run.cjs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 /* ---------- 1st-Line lane ---------- */
@@ -342,12 +347,12 @@ test('_renderFirstLineRow: static dot at 1st-Line pct + two dashed arrows', () =
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node prototype/tests/run.cjs`
 Expected: FAIL — `_classifyRouteRow` returns `stay` for the firstline case; `app._renderFirstLineRow is not a function`.
 
-- [ ] **Step 3: Implement classification + renderer + bucket**
+- [x] **Step 3: Implement classification + renderer + bucket**
 
 Replace `_classifyRouteRow` in `prototype/app.js`:
 
@@ -399,12 +404,12 @@ And lay the firstline rows out after the `watch` loop and before `stay` (row hei
   for (const c of firstline) { segments.push(_renderFirstLineRow(c, y)); y += 56; }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node prototype/tests/run.cjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add prototype/app.js prototype/tests/run.cjs
@@ -418,7 +423,7 @@ git commit -m "feat(route-board): 1st-Line lane — static dot + bidirectional d
 **Files:**
 - Modify: `prototype/styles.css` (near the other `.rb-*` rules)
 
-- [ ] **Step 1: Add the styles**
+- [x] **Step 1: Add the styles**
 
 Append after the existing `.rb-stay-*` rules in `prototype/styles.css`:
 
@@ -447,12 +452,12 @@ Append after the existing `.rb-stay-*` rules in `prototype/styles.css`:
 
 (The global `@media (prefers-reduced-motion: reduce)` rule already neutralises these animations.)
 
-- [ ] **Step 2: Rebundle and eyeball**
+- [x] **Step 2: Rebundle and eyeball**
 
 Run: `node prototype/bundle.mjs`
 Then open `prototype/index.html` (or `standalone.html`) and confirm a 1st-Line case shows a grey dot ~⅓ across with a dashed arrow pulsing toward User and toward Core.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add prototype/styles.css prototype/standalone.html
@@ -466,11 +471,11 @@ git commit -m "style(route-board): 1st-Line dot + dashed bidirectional arrows"
 **Files:**
 - Modify: `prototype/data.js` (regenerate via the `generate-data-js` skill — do NOT hand-edit)
 
-- [ ] **Step 1: Invoke the seed skill**
+- [x] **Step 1: Invoke the seed skill**
 
 Use the `generate-data-js` skill with this intent: keep raw-CC shape (`CASES_RAW_CC`) and ~38 cases, but make each case's assignee department one of the configured demo values (`Site IT` for Core/1st-line cases; `HQ Identity` / `HQ Mobile` for HQ cases), set `processTimeline` processTypes to realistic transitions — **`Unknown` at creation**, then `1st  Line` (two spaces) / `Service Team` / `User` — ending on the type that reflects the case's current station. Ensure coverage includes: at least 3 cases that resolve to **1st Line** (one untracked → bidirectional arrows, one with a `escalate_to_core` Track Status → directional moving), cases at User / Core Team / HQ, and the existing watch + sanity Track Status picks in `SEED_AGENT_LAYER`.
 
-- [ ] **Step 2: Verify the seed maps to the expected stations**
+- [x] **Step 2: Verify the seed maps to the expected stations**
 
 Run:
 
@@ -487,11 +492,11 @@ console.log("station tally:", JSON.stringify(tally));
 
 Expected: a spread including `"1st Line"`, `"Core Team"`, `"HQ"`, and `"User"` — non-zero each (confirms the dept + processType data drives positions).
 
-- [ ] **Step 3: Run tests + rebundle**
+- [x] **Step 3: Run tests + rebundle**
 
 Run: `node prototype/tests/run.cjs` (Expected: PASS) then `node prototype/bundle.mjs`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add prototype/data.js prototype/standalone.html
@@ -505,7 +510,7 @@ git commit -m "data: reshape seed with realistic CC departments + processType tr
 **Files:**
 - Modify: `docs/RELEASE_NOTES.md`
 
-- [ ] **Step 1: Add the release note** under today's date in `docs/RELEASE_NOTES.md`:
+- [x] **Step 1: Add the release note** under today's date in `docs/RELEASE_NOTES.md`:
 
 ```markdown
 ### Changed (Route Board — dot shows the real Case Center location)
@@ -519,7 +524,7 @@ git commit -m "data: reshape seed with realistic CC departments + processType tr
   animated arrow each way. Stay/watch/sanity dots now sit at the case's real station.
 ```
 
-- [ ] **Step 2: Full test + bundle sync check**
+- [x] **Step 2: Full test + bundle sync check**
 
 Run:
 ```bash
@@ -528,7 +533,7 @@ node prototype/bundle.mjs           # rebuild standalone
 git diff --quiet prototype/standalone.html && echo "bundle in sync" || echo "standalone changed — staged below"
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/RELEASE_NOTES.md prototype/standalone.html

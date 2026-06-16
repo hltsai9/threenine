@@ -10,12 +10,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-16
 
+### Changed (UI — hide chrome behind flags; tour off by default)
+
+- **Guided tour is now OFF by default.** `window.TOUR_AUTOSTART` in `config.js`
+  defaults to `false` — internal operators don't get the onboarding tour on every
+  fresh browser. Set it `true` for a demo; the sidebar "Take the tour" link always
+  works regardless.
+- **Ownership timeline hidden** in the case-detail panel, behind a new
+  `SHOW_OWNERSHIP_TIMELINE` flag in `app.js` (default `false`). Code retained — flip
+  the flag to restore it.
+- **Live-fetch controls hidden** — the "Created between … h ago / Load New" look-back
+  control and the "Refresh Existing" button, behind a new `SHOW_LIVE_FETCH_CONTROLS`
+  flag in `app.js` (default `false`). The per-case refresh and "+ Import case by ID"
+  are unchanged. Code retained behind the flag.
+
 ### Added (config)
 
-- **`window.TOUR_AUTOSTART` toggle** in `config.js`. `true` (default) keeps the
-  first-visit guided tour; set it `false` to stop the tour auto-starting (the
-  sidebar "Take the tour" link still works). For internal deployments that don't
-  want onboarding.
+- **`window.TOUR_AUTOSTART` toggle** in `config.js` — see the default-off change above.
 
 ### Fixed (process timeline)
 
@@ -26,6 +37,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   when the case isn't terminal** (`closed`/`cancelled`/`resolved`) — a closed case keeps its
   real final `endedAt`. Earlier stages always keep their real `endedAt`. So the current
   stage of an open case accrues time like the live clocks.
+
+### Changed (backend)
+
+- **PyMySQL is now installed by default** (`backend/requirements.txt` — uncommented).
+  Both `psycopg` (Postgres) and `PyMySQL` (MySQL) are pure-Python/wheel installs and only
+  used when `DATABASE_URL` points at their backend, so a `mysql+pymysql://…` URL works
+  straight after `pip install -r backend/requirements.txt`, no extra step.
+
+### Docs
+
+- **README rewritten for the current app.** Corrected stale claims (the main view is the
+  Picked workspace + Hand-off Route Board, not a status kanban; auth + backend now exist;
+  real operators are Mia/Kai/Ren/Yui; demo anchor is 2026-06-12 / W24). Documented the
+  two-status model, the current-vs-desired Route Board, Track Statuses, the help pages,
+  the tour toggle, and a production section; refreshed the repo-layout tree.
+- **`SELF-HOST-UBUNTU.md` converted to MySQL** — `mysql-server` install, `utf8mb4`
+  database + user creation, `mysql+pymysql://…?charset=utf8mb4` `DATABASE_URL`, MySQL
+  troubleshooting rows, and `After=mysql.service` in the units. A callout notes Postgres/
+  SQLite still work by swapping the driver + URL.
+- **Route Board CC-position plan marked complete** — all checkboxes in
+  `docs/superpowers/plans/2026-06-14-route-board-cc-position.md` set to `[x]` with a
+  "shipped" status banner (the feature is live).
 
 ## 2026-06-15
 

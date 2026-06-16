@@ -465,18 +465,20 @@ test('mergeLiveCase: refresh updates CC fields (incl. status) but preserves oper
   eq([c.coreId, c.currentOwner, c.agentStatus, c.notes, c.slaAccumulatedMs, c.holdMs.core, c.history.length, c.handover.note],
      ['core-apac', 'core', 'queued', 'operator notes', 3 * HOUR, HOUR, 1, 'keep me']);
 });
-test('toolbar (http): Load New + Refresh Existing + per-case refresh all render', () => {
+test('toolbar (http): live-fetch controls hidden by flag; per-case refresh still renders', () => {
+  // SHOW_LIVE_FETCH_CONTROLS is false — "Created between … Load New" and "Refresh Existing"
+  // are hidden in the UI (code retained behind the flag). Per-case refresh on cards stays.
   app.location.protocol = 'https:'; app.__LIVE__ = true;
   const html = app.renderCaseList();
-  ok(html.includes('>Load New<'), 'Load New label');
-  ok(html.includes('id="refresh-existing"'), 'Refresh Existing button');
+  ok(!html.includes('>Load New<'), 'Load New hidden by flag');
+  ok(!html.includes('id="refresh-existing"'), 'Refresh Existing hidden by flag');
   ok(html.includes('data-action="refresh-case"'), 'per-case refresh on cards');
 });
-test('toolbar (file://): refresh buttons always show; Load New stays http-only', () => {
+test('toolbar (file://): live-fetch controls hidden by flag; per-case refresh still renders', () => {
   app.location.protocol = 'file:'; app.__LIVE__ = false;
   const html = app.renderCaseList();
-  ok(!html.includes('id="lookback-load"'), 'no look-back "Load New" control on file://');
-  ok(html.includes('id="refresh-existing"'), 'Refresh Existing shown even on file://');
+  ok(!html.includes('id="lookback-load"'), 'no look-back "Load New" control');
+  ok(!html.includes('id="refresh-existing"'), 'Refresh Existing hidden by flag');
   ok(html.includes('data-action="refresh-case"'), 'per-case refresh shown even on file://');
 });
 

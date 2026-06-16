@@ -1,138 +1,208 @@
-# threenine — Case Tracker (Excel replacement)
+# threenine — CommuGround (Case Tracker)
 
-This repo holds the **User Requirements Document** and a **click-through web prototype** for replacing the team's shared Excel case-tracking workbook.
+**CommuGround** is a case-tracking tool for first-line IT operators — it replaces the team's
+shared Excel workbook and makes the hand-off between the **requester (User)**, **1st Line**, the
+**Core Team**, and **HQ** visible at a glance. This repo holds the requirements, a zero-build web
+app, and an optional Python backend that turns the prototype into a real multi-operator service.
 
 - **URD**: [`docs/URD.md`](docs/URD.md) — the authoritative spec.
-- **Prototype**: [`prototype/`](prototype/) — a static, no-build web app (HTML / CSS / JS) that demos the URD concepts against seeded mock data. Auto-deployed to GitHub Pages on every push to this branch.
+- **Prototype**: [`prototype/`](prototype/) — a static, no-build SPA (vanilla HTML / CSS / JS)
+  that runs the whole UI against seeded mock data. Auto-deployed to GitHub Pages on every push.
+- **Backend** (optional): [`backend/`](backend/README.md) — a decoupled **ingest → DB → API**
+  pipeline so the front end needs **no API key/cookie**. An ingestion script (the only holder of
+  Case Center credentials) writes cases to a database; a FastAPI service + the static SPA read
+  from it behind a shared-token login. **SQLite for demos, MySQL/PostgreSQL for production**,
+  selected by `DATABASE_URL`. (A simpler single-user live proxy, [`local/serve.py`](local/README.md),
+  also exists.)
 
-> The prototype is for design review, not production. There's no auth, no backend, and reloading the page resets all state.
-
-- **Back end** (new): [`backend/`](backend/README.md) — a decoupled pipeline that loads cases into a database so the front end needs **no API key / cookie**. An ingestion script (the only holder of Case Center credentials) writes cases to a DB; a FastAPI service + the static SPA read from it. **SQLite for demos, PostgreSQL/MySQL for production on Kubernetes** (`deploy/`), selected by `DATABASE_URL`. This supersedes the per-user `local/serve.py` live-proxy (which is still fine for a single-user local run).
+> The static prototype is for design review and demos: no auth, no server, state lives in the
+> browser. The **backend** adds the auth, shared database, and live Case Center ingestion that a
+> deployment needs — see **[Going to production](#going-to-production)**.
 
 ## Run it
 
 Quickest look: open `prototype/standalone.html` via `file://` (self-contained, no server).
-For editing modular sources, the deployed Pages site, the local-setup checklist after a pull,
-Case Center credentials, and the full environment-variable table, see **[`docs/SETUP.md`](docs/SETUP.md)**
-— the single source of truth for running and configuring the app.
-
-## Take the interactive tour
-
-The prototype ships with a built-in guided tour: ~10 stepped tooltips that walk through every screen. It launches automatically the first time you load the app, and you can re-launch any time via **Take the tour →** in the sidebar footer. Use **← / →** keys to step, **Esc** to skip.
+For editing the modular sources, the deployed Pages site, the local-setup checklist after a pull,
+Case Center credentials, and the full environment-variable table, see
+**[`docs/SETUP.md`](docs/SETUP.md)** — the single source of truth for running and configuring the
+app. To self-host the full stack (API + DB + login) on your own box, follow
+**[`docs/SELF-HOST-UBUNTU.md`](docs/SELF-HOST-UBUNTU.md)**.
 
 ## Demo anchor — what "now" means
 
-To keep the demo stable, the prototype freezes time:
+To keep the demo stable, the prototype freezes time (`prototype/data.js`):
 
-- **NOW** = `2026-05-08 13:00 UTC` (Friday afternoon UTC)
-- **Current week** = `W19 · May 4 – 10, 2026`
-- **Current operator** = Alex Chen (Day shift). Switch to Sam Patel (Night) or Jordan Kim (Day) anytime via the **Operator** dropdown in the sidebar.
+- **NOW** = `2026-06-12 13:00 UTC` (Friday afternoon UTC)
+- **Current week** = `W24 · June 7 – 13, 2026`
+- **Current operator** = **Mia** (Day shift). Switch to **Kai** (Day), **Ren** (Night), or
+  **Yui** (Night) anytime via the **Operator** dropdown in the sidebar. Everything re-derives
+  from the chosen operator's shift.
 
-Because NOW sits just past the configured Day-shift cutoff, the board's handover banner and per-card ⚠ Note buttons light up — the demo is intentionally calibrated to exercise the handover flow.
+Because NOW sits late in the Day shift, the handover banner and per-card ⚠ Note prompts light up —
+the demo is calibrated to exercise the shift-handover flow.
+
+## The core idea — two statuses per case
+
+Every case carries two independent statuses, and keeping them apart is the whole point:
+
+- **Case Center status** (`c.status`) — the real, external status owned by the Case Center system
+  (`new`, `with_core`, `with_hq`, `returned_to_requester`, `closed`, …). The operator never edits
+  it; ingestion refreshes it. It, plus the assignee's **department**, decides where a case **is**.
+- **Operator layer** — what the first-line operator does *about* the case this shift: which cases
+  they **pick** into their workspace, the **Track Status** (their *intent* — where the case
+  *should* go next), the **handover note** they leave a teammate, and any **reminder**. This layer
+  is theirs; Case Center never sees it.
+
+The **Hand-off Route Board** is where these two meet visually (below).
 
 ## Feature tour
 
-The sidebar has four top-level views. Counts next to each are live.
+The sidebar has the operator switcher and the views below. Counts next to each are live.
 
-### 1. Board (`#/cases`)
+### Picked workspace + Hand-off Route Board (`#/cases`)
 
-The home screen and the single workspace where the first-line agent does everything. Each case now carries **two statuses**:
+The home screen and the single workspace where the operator works. Two parts:
 
-- **Case Center status** — the real, external case status (sourced from the Case Center system; a future API will supply it). This drives the four kanban **columns**: New → With Local FIT → With HQ Product Team → Sanity Check / With Requester.
-- **Agent status** — how the first-line agent is handling the case. This drives the **top/bottom split** inside each column. The **top band ("My queue")** holds the cases the agent has pulled in to work right now; the **bottom band ("Backlog")** holds the rest. Clicking **+ Queue** on a card lifts it into the top band of its column (★); clicking **✓ Queued** drops it back.
+- **Hand-off Route Board** — one strip showing where every picked case sits across four stations:
+  **User → 1st Line → Core Team → HQ**. A case's **dot** marks its *current* Case Center location
+  (derived from the assignee's department + latest process-timeline `processType`, via the
+  configurable `CC_CORE_DEPARTMENTS` / `CC_HQ_DEPARTMENTS` lists in `owners.js`). The operator's
+  **Track Status** is the *desired* location — so when current ≠ desired, the row draws an
+  **intent arrow / animation** pulling toward the target (e.g. a case still on the User while you
+  need HQ to pick it up shows a watch ring + arrow). A 1st-Line case shows a dashed arrow each way
+  ("decide where it goes"). The legend pairs each colour with a shape so it reads under pressure.
+- **Picked list + reading panel** — the cases you've pulled in to work this shift, with a detail
+  panel beside them. From the panel you set the **Track Status**, write a **handover note**
+  addressed to a teammate, set a **reminder**, and jump out to Case Center — without leaving the
+  page. The panel also shows the case's clocks (SLA "time on us", plus Core vs HQ hold totals) and
+  its Case Center process timeline.
 
-Each card surfaces a **one-click action** when one applies, so the old standalone Action Queue is unnecessary:
+**Track Status values** (operator intent, set from the panel): Weekend Case, HQ did not handle,
+Escalate to Core Team, Escalated to HQ — keep an eye, Need to contact user, Case Closed, Sanity
+Check. The first three schedule a hand-off at a fixed time; the "keep an eye" ones draw a watch
+ring until you've authored the handover.
 
-| Action on card                 | Fires when                                                                    |
-| ------------------------------ | ----------------------------------------------------------------------------- |
-| **Assign to Local FIT**        | Status = New and no FIT contact yet.                                          |
-| **Chase Local FIT — no resp.** | Status = With FIT and last contact > 4h ago.                                  |
-| **Escalate to HQ Product Team**| FIT explicitly cannot resolve.                                                |
-| **Chase HQ — no response**     | Status = With HQ and last contact > 8h ago.                                   |
-| **Verify reported fix**        | Status = Sanity Check (owner says it's fixed).                                |
+**Handover, folded in.** There is no separate handover screen. When the shift is ending, a banner
+reports how many picked cases still need a fresh note for this shift, and each one offers a
+**⚠ Note** button.
 
-Thresholds are configurable in `prototype/data.js → THRESHOLDS`. Click any card to open the **reading panel** below, where you can change status, send reminders, set a bell, and **write the handover note** — without leaving the board. The contextual modals are unchanged:
-- **Assign to Local FIT** → pick an FIT desk.
-- **Escalate to HQ** → pick an HQ team and add a reason. FIT clock stops, HQ clock starts.
-- **Send reminder** → records contact + channel, resets the idle timer.
-- **Verify & close** → close with resolution code and note.
-- **Return to requester** → pauses the SLA clock.
-- **Write handover note** → fresh note labelled `Day → Night` (or vice versa).
+### Overview (`#/archive`)
 
-**Handover, folded into the board.** There is no separate handover screen. When the shift is ending, a banner above the board reports how many open cases still need a fresh note for this shift, and every card needing one shows a **⚠ Note** button — write each straight from the board. Below the board, watchlists flag cases approaching SLA or carrying the Escalated flag. State updates everywhere instantly: counters, status pills, history.
+The triage inbox: every case by week (past weekly workbooks through the current week). Scan a
+week's table and hit **+ Pick** to lift a case into your Picked workspace. Cards show totals,
+carry-overs (rolled over from the previous week), bounces (returned to requester), and median
+time-on-us. Past weeks read-only-feeling; you can still drill into any case.
 
-### 2. Case Detail (`#/cases/<id>`)
+### Shifts (`#/shifts`)
 
-Everything about one case:
+Side-by-side Day vs Night coverage. Each shift card shows hours, roster (with "you" highlighted),
+and handover stats. Click into a shift for its detail, where **"View as &lt;operator&gt;"** lets
+you see exactly what the other shift sees without switching operator.
 
-- **Two clocks**: SLA clock (time on us — running or paused) and per-owner hold time (FIT vs HQ accumulators).
-- **Handover panel** — latest note, with `Day → Night` style shift label. Yellow background if the note is stale for the current shift.
-- **Routing** — Local FIT contact, HQ Product Team contact, current owner pointer (FIT or HQ), last-contact timestamp + channel, owner office-hours chip.
-- **History** — full audit trail of state changes, assignments, escalations, handovers, comments.
-- **Action buttons** in the header that match the case's current state (e.g. With FIT → "Escalate to HQ", "Send reminder", "Write handover note").
+### Owners (`#/owners`)
 
-### 3. Shifts (`#/shifts`)
+The Core Team desks and HQ Product Teams a case can route to, plus the Route Board department
+lists. Edit them here for the session; paste the snippet into `owners.js` to keep them.
 
-Side-by-side coverage map. Each shift card shows hours, roster (with "you" highlighted), and handover stats (handed-to, notes by shift, missing for shift). Click a shift for the detail page.
+### Help pages — Status Flow (`#/flow`) and Clock model (`#/clocks`)
 
-**Per-shift detail** (`#/shifts/Day`, `#/shifts/Night`) has:
-- Tabs to switch between Day and Night.
-- Summary bar (handed to / handed from / authored by / missing for this shift).
-- **Roster** with a **"View as <name>"** button that re-renders the whole app from that operator's perspective. The fastest way to see how Sam (Night) experiences the same data.
-- Three case sections: handed to this shift, missing-a-note for this shift, recent handover activity authored by this shift.
+Reference views that explain how Case Center statuses map to the board and how the SLA / Core /
+HQ clocks are reconstructed from case history (so the numbers always reconcile).
 
-### 4. Weekly Archive (`#/archive`)
+### Operator switcher (sidebar)
 
-Browse past weekly workbooks (W16 through current W19). Each archive card shows total cases, open / closed / cancelled counts, **carried-in** count (cases that rolled over from the previous week), bounces (cases returned to requester at least once), and median time-on-us for closed cases.
+Switch between **Mia** (Day), **Kai** (Day), **Ren** (Night), **Yui** (Night) instantly.
+Everything re-derives from that operator's perspective: the Picked workspace, suggested Track
+Statuses, the handover banner, and the "you" tag in the shift roster.
 
-**Per-week detail** (`#/archive/W18-2026`, etc.) shows the case table for that week with the same Excel-column layout, plus a `↩ Wxx` chip on cases that carried in. Past weeks are read-only-feeling but you can still drill into individual case detail.
+## The guided tour
 
-The current week is badged **Current** and offers a one-click jump back to the live board.
+CommuGround ships a built-in tour (stepped tooltips walking each view). It is **config-gated**:
+`window.TOUR_AUTOSTART` in `prototype/config.js` controls auto-start, **default `false`** (internal
+operators don't need onboarding on every fresh browser). Set it to `true` to auto-start once per
+browser for a demo. Either way, anyone can launch it from **Take the tour →** in the sidebar
+footer. Use **← / →** to step, **Esc** to skip.
 
-### 5. Operator switcher (sidebar)
+## Going to production
 
-The **Operator** row in the sidebar is a dropdown — switch between Mia (Day), Kai (Day), Ren (Night), Yui (Night) instantly. Everything re-derives from that operator's perspective: the board's queue and one-click actions re-prioritize, the handover banner and ⚠ Note buttons target the new shift, and the "you" tag in the shift roster moves.
+The static prototype has no auth and no shared state. The backend supplies both:
+
+- **Credentials stay on the ingest side.** Only `backend/ingest.py` (via `local/casecenter.py`)
+  holds the Case Center API key + cookie; it writes cases into the database. The read API and the
+  SPA need no credentials.
+- **Shared-token login.** Set `API_AUTH_TOKEN` and the API gates `/api/cases` + `/api/save` behind
+  a bearer token; the SPA shows a login screen and stores the token in `sessionStorage`. The SPA
+  auto-detects the backend by probing `/healthz` — leave `API_MODE=''` and it switches to server
+  mode by itself.
+- **One DB switch.** `DATABASE_URL` selects SQLite (demo) / MySQL / PostgreSQL with no code change
+  (`backend/db.py`). Each case is stored as a board-shaped JSON `payload`.
+- **Live ingestion.** A systemd timer (or cron) runs `backend.ingest` on a schedule, upserting
+  **only** Case-Center-owned fields so operator work is preserved.
+
+Full step-by-step: **[`docs/SELF-HOST-UBUNTU.md`](docs/SELF-HOST-UBUNTU.md)** (MySQL) and
+**[`backend/README.md`](backend/README.md)** (architecture). Kubernetes manifests live in
+[`deploy/`](deploy/).
 
 ## How the prototype maps to the URD
 
-| URD section              | Prototype surface                                                              |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| §4.1 Case Record         | Case Detail panel, board cards + reading panel                                 |
-| §4.2 Lifecycle           | Case Center status drives the kanban columns; state-driven action buttons      |
-| §4.2.1 Process Time      | Two-clock panel; SLA clock = computed from state transitions                   |
-| §4.2.2 Flags             | Weekend / Escalated / Scheduled OOC chips on cards                             |
-| §4.3 Routing & Handoff   | Assign / Escalate / Return-to-requester modals; FIT-then-HQ flow               |
-| §4.4 Action Queue        | Per-column **top band** ("My queue") + one-click actions on cards              |
-| §4.5 Shifts & Handover   | Handover banner + ⚠ Note buttons on the board + Shifts pages                   |
-| §4.8 Reporting & Insights| Archive index per-week stats; FIT vs HQ hold split on case detail              |
-| §4.10 Weekly Workbook    | Weekly Archive views; `carriedFrom` chip on rolled-over cases                  |
-| §4.11 Import / Export    | Out of scope for prototype; column map documented in URD                       |
+| URD section               | Prototype surface                                                          |
+| ------------------------- | -------------------------------------------------------------------------- |
+| §4.1 Case Record          | Reading panel in the Picked workspace; case clocks + history               |
+| §4.2 Lifecycle            | Case Center status drives station placement; Track Status drives intent    |
+| §4.2.1 Process Time       | SLA / Core / HQ clocks + the Case Center process timeline panel             |
+| §4.2.2 Flags              | Weekend / Escalated / scheduled-handoff chips on Route Board rows           |
+| §4.3 Routing & Hand-off   | Hand-off Route Board (User → 1st Line → Core Team → HQ) + Track Status      |
+| §4.4 Action Queue         | The Picked workspace (pick cases to work this shift)                        |
+| §4.5 Shifts & Handover    | Handover banner + ⚠ Note prompts + the Shifts pages                        |
+| §4.8 Reporting & Insights | Overview per-week stats; Core vs HQ hold split on the case panel            |
+| §4.10 Weekly Workbook     | Overview week views; `carriedFrom` chip on rolled-over cases               |
+| §4.11 Import / Export      | Live Case Center ingestion (backend) + `+ Import case by ID`               |
 
 ## What's mocked and what's not
 
-- **Mocked**: all data (operators, owner directory, cases, history). Persistence — state is in-memory only and resets on reload. Notifications, email, Slack. Authentication. The Case Center status is seeded locally; v2 will source the real status (and Process Time) from the case-center API while the agent status stays local.
-- **Real**: the lifecycle rules, the two-status model (Case Center status vs agent status), the one-click action thresholds, FIT-then-HQ flow, two-clock arithmetic, and handover awareness. These are the design decisions worth reviewing.
+- **Mocked (static prototype):** all seed data (operators, owner directory, cases, history). With
+  no backend, state lives in the browser and resets on **Reset to seed**. The Case Center status
+  is seeded locally.
+- **Real (with the backend):** shared multi-operator persistence in a database, shared-token auth,
+  and live Case Center ingestion — the seed becomes a fallback.
+- **Real design decisions worth reviewing either way:** the two-status model (Case Center status
+  vs operator intent), the current-vs-desired Route Board, the station/department mapping,
+  the Track-Status hand-off scheduling, the clock arithmetic, and the shift-handover awareness.
 
 ## Persistence and resetting
 
-Your changes (assignments, status moves, handover notes, operator switches) are saved to the browser's `localStorage` and survive reload. To start fresh, click **Reset to seed** in the sidebar footer — it clears the saved state and restores the original seed data. Storage is scoped per file path / origin, so opening `standalone.html` from a different folder gets its own state.
+In the static prototype, your changes (picks, Track Status, handover notes, operator switches)
+are saved to the browser's `localStorage` and survive reload; **Reset to seed** in the sidebar
+footer clears them. With the backend, edits round-trip to the database instead and are shared
+across operators and devices.
 
 ## Repo layout
 
 ```
 .
 ├── docs/
-│   └── URD.md                   # User Requirements Document (v3)
-├── prototype/
+│   ├── URD.md                   # User Requirements Document (authoritative spec)
+│   ├── SETUP.md                 # how to run / credentials / every env var (single source)
+│   ├── SELF-HOST-UBUNTU.md      # full-stack self-host runbook (MySQL)
+│   ├── RELEASE_NOTES.md         # newest-first change log (required per change)
+│   └── improvement-plan.md      # the one TODO / backlog home
+├── prototype/                   # the zero-build SPA
 │   ├── index.html               # SPA shell (modular dev entry point)
 │   ├── styles.css               # all styles
 │   ├── app.js                   # router + render + handlers
-│   ├── data.js                  # seed: weeks, cases, thresholds, clock
-│   ├── shifts.js                # roster: operators, shifts, default operator (edit here)
-│   ├── owners.js                # FIT desks & HQ teams (edit here / via the Owners page)
+│   ├── config.js                # API_BASE / API_MODE / TOUR_AUTOSTART (front-end config)
+│   ├── data.js                  # seed: weeks, cases, thresholds, frozen clock
+│   ├── shifts.js                # operators + shifts + default operator
+│   ├── owners.js                # Core Team desks, HQ teams, CC department lists
 │   ├── tour.js                  # interactive guided tour
-│   ├── bundle.mjs               # build script: produces standalone.html
+│   ├── bundle.mjs               # build script → standalone.html
 │   ├── standalone.html          # self-contained single-file build (file://-safe)
-│   └── .nojekyll                # disables Jekyll on Pages
+│   ├── favicon.svg
+│   ├── .nojekyll                # disables Jekyll on Pages
+│   └── tests/                   # zero-dependency test harness (node run.cjs)
+├── local/                       # single-user live proxy (serve.py + casecenter.py + persist.py)
+├── backend/                     # ingest → DB → API pipeline (FastAPI + SQLAlchemy)
+├── deploy/                      # Dockerfiles + Kubernetes manifests
+├── slides/                      # promo deck (pptxgenjs) + screenshot capture
 └── .github/workflows/pages.yml  # deploys prototype/ to GitHub Pages
 ```
