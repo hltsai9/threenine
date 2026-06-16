@@ -231,6 +231,31 @@ test('processSegments: closed case keeps its real final endedAt (not now)', () =
   eq(segs[0].ms, 2 * HOUR);            // 3h ago → 1h ago = 2h
 });
 
+/* ---------- firstLineMs (total time in the CC "1st Line" stage; archive list column) ---------- */
+test('firstLineMs: sums only the 1st-line segments, ignores others', () => {
+  const ms = app.firstLineMs({ status: 'closed', processTimeline: [
+    { processType: '1st  Line',   startedAt: iso(5 * HOUR), endedAt: iso(4 * HOUR) },  // 1h
+    { processType: 'Service Team', startedAt: iso(4 * HOUR), endedAt: iso(3 * HOUR) }, // ignored
+    { processType: '1st  Line',   startedAt: iso(3 * HOUR), endedAt: iso(2 * HOUR) },  // 1h
+  ] });
+  eq(ms, 2 * HOUR);
+});
+test('firstLineMs: whitespace-normalised — single-space "1st Line" also matches', () => {
+  eq(app.firstLineMs({ status: 'closed', processTimeline: [
+    { processType: '1st Line', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR) },
+  ] }), 1 * HOUR);
+});
+test('firstLineMs: open current 1st-line segment counts up to now', () => {
+  eq(app.firstLineMs({ status: 'new', processTimeline: [
+    { processType: '1st  Line', startedAt: iso(2 * HOUR) },   // open → runs to now
+  ] }), 2 * HOUR);
+});
+test('firstLineMs: no 1st-line stage → 0', () => {
+  eq(app.firstLineMs({ status: 'closed', processTimeline: [
+    { processType: 'Service Team', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR) },
+  ] }), 0);
+});
+
 /* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
  * waitUserDueMs returns signed ms to the Wait User due time (NOW-based): positive = due in the
  * future, negative = overdue, null = no waitUser/due date. */

@@ -26,6 +26,21 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **"Live · N cases from Case Center · M picked" banner hidden** on the Picked workspace
   (per request). The render is stubbed to empty in `app.js`.
 
+### Added (Overview archive list — Assignee + 1st-line time)
+
+- The per-week case table in **Overview** now has an **Assignee** column (the Case Center
+  assignee, with the department in a tooltip) and a **1st-line time** column — the total time
+  the case has spent in the Case Center "1st Line" stage, summed across every 1st-line segment
+  of its process timeline (new `firstLineMs()` helper; whitespace-normalised so the literal
+  "1st  Line" two-space value and a single-space variant both match; an open current 1st-line
+  stage counts up to now).
+
+### Fixed (sidebar)
+
+- **The "Picked" sidebar badge now shows the picked-case count** (`pickedCases().length`),
+  matching the Picked workspace. It previously showed the number of open cases in the current
+  week, which is unrelated (hence the wrong "Picked 25").
+
 ### Fixed (Route Board — moving cases can now go overdue)
 
 - **A "moving" case (scheduled hand-off) now actually turns overdue at its deadline.**

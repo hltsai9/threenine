@@ -971,8 +971,9 @@ function renderSidebar() {
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
   updateClock();
 
-  document.getElementById('nav-cases-count').textContent =
-    STATE.cases.filter(c => !c.deletedAt && !['closed', 'cancelled'].includes(c.status) && c.weekId === window.CURRENT_WEEK.id).length;
+  // The "Picked" nav badge must match the Picked workspace — i.e. the cases the operator has
+  // actually picked, not every open case in the current week.
+  document.getElementById('nav-cases-count').textContent = pickedCases().length;
   const navShifts = document.getElementById('nav-shifts-count');
   if (navShifts) navShifts.textContent = window.SHIFTS.length;
   const navOwners = document.getElementById('nav-owners-count');
@@ -1909,6 +1910,15 @@ function processSegments(c) {
   });
 }
 
+// Total time a case has spent in the Case Center "1st Line" processing stage, summed across
+// every 1st-line segment of its process timeline. Whitespace-normalised so the literal CC value
+// "1st  Line" (two spaces) and a single-space variant both match.
+function firstLineMs(c) {
+  return processSegments(c)
+    .filter(s => String(s.processType || '').replace(/\s+/g, ' ').trim() === '1st Line')
+    .reduce((sum, s) => sum + (s.ms || 0), 0);
+}
+
 function renderProcessTimeline(c) {
   const segs = processSegments(c);
   if (segs.length === 0) {
@@ -2355,10 +2365,12 @@ function renderArchiveWeek(weekId) {
           <div><a class="link-inline" href="${escapeHtml(caseHref(c))}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">case-center ↗</a></div>
         </td>
         <td>${escapeHtml(c.user)}</td>
+        <td>${c.assignee ? `<span title="${c.assigneeDept ? escapeHtml(c.assigneeDept) : ''}">${escapeHtml(c.assignee)}</span>` : '<span class="muted">—</span>'}</td>
         <td>${core ? escapeHtml(core.name) : '<span class="muted">—</span>'}</td>
         <td>${hq ? escapeHtml(hq.name) : '<span class="muted">—</span>'}</td>
         <td><span class="pill pill-${c.status}">${escapeHtml(displayStatus(c))}</span> ${trackStatusPill(c)}${carry}</td>
         <td>${fmtDuration(caseSlaMs(c))}${c.slaPaused ? ' <span class="muted tiny">(paused)</span>' : ''}</td>
+        <td>${(() => { const ms = firstLineMs(c); return ms > 0 ? fmtDuration(ms) : '<span class="muted">—</span>'; })()}</td>
         <td class="muted tiny">${c.closedAt ? fmtRelative(c.closedAt) : fmtRelative(c.createdAt)}</td>
         <td class="col-actions">
           ${renderQueueToggleButton(c, 'tiny')}
@@ -2403,10 +2415,12 @@ function renderArchiveWeek(weekId) {
             <th>ID</th>
             <th>Subject / Case Link</th>
             <th>User</th>
+            <th>Assignee</th>
             <th>Core Team</th>
             <th>HQ Product Team</th>
             <th>Status</th>
             <th>Process Time</th>
+            <th title="Total time spent in the Case Center 1st Line stage">1st-line time</th>
             <th>${week.isCurrent ? 'Created' : 'Closed'}</th>
             <th></th>
           </tr>
