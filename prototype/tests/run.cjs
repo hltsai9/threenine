@@ -682,6 +682,47 @@ test('_renderFirstLineRow: static dot at 1st-Line pct + two dashed arrows', () =
   ok(html.includes('rb-fl-arrow-left') && html.includes('rb-fl-arrow-right'), 'both arrows');
 });
 
+/* ---------- moving-case overdue: deadline anchors on trackStatusAt and STICKS ---------- */
+// weekend_case schedules a hand-off to HQ at Sun 17:30 MST. The deadline is the first such
+// occurrence after the commit time (trackStatusAt) — once it passes with the case not yet at HQ,
+// the case is overdue against that date (it does NOT roll forward to the next Sunday).
+test('scheduledHandoff: no anchor falls back to now → next future deadline (legacy behaviour)', () => {
+  const c = { id: 'C-NA', subject: 's', assigneeDept: 'Site IT', trackStatus: 'weekend_case',
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(HOUR) }] };
+  const h = app.scheduledHandoff(c);
+  ok(h && Date.parse(h.dueAt) > FIXED, 'unanchored → deadline in the future');
+});
+test('trackStatusPhase: freshly committed moving case is NOT overdue (anchor = now)', () => {
+  const c = { id: 'C-FRESH', subject: 's', assigneeDept: 'Site IT',
+    trackStatus: 'weekend_case', trackStatusAt: iso(0),  // committed at frozen now
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(HOUR) }] };
+  ok(Date.parse(app.scheduledHandoff(c).dueAt) > FIXED, 'deadline in the future');
+  ok(app.trackStatusPhase(c) !== 'overdue', 'not overdue right after committing');
+});
+test('trackStatusPhase: moving case goes overdue once its anchored deadline passes', () => {
+  const c = { id: 'C-OD', subject: 's', assigneeDept: 'Site IT',
+    trackStatus: 'weekend_case', trackStatusAt: iso(6 * 24 * HOUR),  // committed ~6 days ago
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(7 * 24 * HOUR) }] };
+  const h = app.scheduledHandoff(c);
+  ok(h && Date.parse(h.dueAt) < FIXED, 'the committed deadline is now in the past');
+  eq(app.caseStation(c), 'Core Team');           // not yet at HQ (the destination)
+  eq(app.trackStatusPhase(c), 'overdue');        // → overdue (was previously unreachable)
+});
+test('trackStatusPhase: overdue deadline sticks — does not roll to the next Sunday', () => {
+  const c = { id: 'C-STICK', subject: 's', assigneeDept: 'Site IT',
+    trackStatus: 'weekend_case', trackStatusAt: iso(6 * 24 * HOUR),
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(7 * 24 * HOUR) }] };
+  // The deadline stays anchored to the MISSED Sunday (in the past), not re-targeted forward.
+  ok(Date.parse(app.scheduledHandoff(c).dueAt) < FIXED, 'stuck on the past (missed) deadline');
+});
+test('trackStatusPhase: delivered (at destination) wins over overdue past the deadline', () => {
+  const c = { id: 'C-DV', subject: 's', assigneeDept: 'HQ Identity',   // already at HQ (destination)
+    trackStatus: 'weekend_case', trackStatusAt: iso(6 * 24 * HOUR),
+    processTimeline: [{ processType: 'Service Team', processStartTime: iso(7 * 24 * HOUR) }] };
+  eq(app.caseStation(c), 'HQ');
+  eq(app.trackStatusPhase(c), 'delivered');      // not overdue — it arrived
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

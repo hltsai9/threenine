@@ -3874,6 +3874,7 @@ function fillBoardDefaults(c) {
   if (c.weekId == null && c.createdAt) c.weekId = weekIdFor(c.createdAt);
   if (c.agentStatus == null)      c.agentStatus = 'unqueued';
   if (c.trackStatus === undefined) c.trackStatus = null;
+  if (c.trackStatusAt === undefined) c.trackStatusAt = null;   // when the intent was committed (overdue anchor)
   if (c.coreId == null)           c.coreId = null;
   if (c.hqId == null)             c.hqId = null;
   if (c.currentOwner == null) {
@@ -3902,6 +3903,7 @@ function applySeedAgentLayer(cases, overlay) {
     if (!a) continue;
     if (a.agentStatus != null) c.agentStatus = a.agentStatus;
     if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
+    if (a.trackStatusAt !== undefined) c.trackStatusAt = a.trackStatusAt;
     if (a.handover !== undefined) c.handover = a.handover;
     if (a.reminder !== undefined) c.reminder = a.reminder;
   }
@@ -4065,6 +4067,7 @@ function agentLayerFromState() {
       handover: c.handover,
       reminder: c.reminder,
       trackStatus: c.trackStatus || null,
+      trackStatusAt: c.trackStatusAt || null,
     };
   }
   return map;
@@ -4078,6 +4081,7 @@ function applyAgentLayer(map) {
     if (a.handover !== undefined) c.handover = a.handover;
     if (a.reminder !== undefined) c.reminder = a.reminder;
     if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
+    if (a.trackStatusAt !== undefined) c.trackStatusAt = a.trackStatusAt;
   }
 }
 
@@ -4775,9 +4779,16 @@ function scheduledHandoff(c) {
   if (!def?.scheduled) return null;
   const { to, day: targetDay, shift: targetShift, hh, mm } = def.scheduled;
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const nowMs = NOW.getTime();
-  // Today's MST date (treat MST as UTC minus 7 hours, no DST).
-  const mstAnchor = new Date(nowMs - MST_OFFSET_HOURS * 3600 * 1000);
+  // Anchor the deadline to WHEN the operator committed to this intent (`trackStatusAt`), not to
+  // "now". The deadline is the first scheduled occurrence AFTER that commit, and it STICKS there:
+  // once it passes with the case still not at its destination, the case goes overdue against that
+  // date — it does NOT roll forward to the next slot. Fresh/old cases with no anchor fall back to
+  // now, which preserves the original "next upcoming deadline" behaviour (and can't false-overdue,
+  // since the first occurrence after now is always in the future).
+  const anchorParsed = c && c.trackStatusAt ? Date.parse(c.trackStatusAt) : NaN;
+  const startMs = isFinite(anchorParsed) ? anchorParsed : NOW.getTime();
+  // The MST date of the anchor (treat MST as UTC minus 7 hours, no DST).
+  const mstAnchor = new Date(startMs - MST_OFFSET_HOURS * 3600 * 1000);
   const y = mstAnchor.getUTCFullYear();
   const m = mstAnchor.getUTCMonth();
   const day0 = mstAnchor.getUTCDate();
@@ -4787,7 +4798,7 @@ function scheduledHandoff(c) {
     const dayName = DAYS[mstDate.getUTCDay()];
     // The UTC instant for hh:mm MST on this MST date.
     const dueUtcMs = Date.UTC(y, m, day0 + i, hh + MST_OFFSET_HOURS, mm, 0);
-    if (dueUtcMs <= nowMs) continue;
+    if (dueUtcMs <= startMs) continue;   // first occurrence strictly after the commit anchor
     if (targetDay && targetDay !== dayName) continue;
     if (!targetDay) {
       // Need the target shift to exist on that day per the rota for the week
@@ -7971,6 +7982,7 @@ function handlePrompt(caseId, kind) {
       if (!proceed) return;
     }
     c.trackStatus = null;
+    c.trackStatusAt = null;
     logHistory(c, op, 'track-status-cleared', `${ts} → cleared`);
     showToast(`${c.id} Track Status cleared.`, 'info');
     render();
@@ -8321,8 +8333,11 @@ function bindHandlers() {
       if (value === prev) return;
       if (!value) {
         c.trackStatus = null;
+        c.trackStatusAt = null;
       } else {
         c.trackStatus = value;
+        // Stamp the commit time — the overdue deadline anchors off this (see scheduledHandoff).
+        c.trackStatusAt = NOW.toISOString();
       }
       logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
       render();

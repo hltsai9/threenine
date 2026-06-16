@@ -26,6 +26,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **"Live · N cases from Case Center · M picked" banner hidden** on the Picked workspace
   (per request). The render is stubbed to empty in `app.js`.
 
+### Fixed (Route Board — moving cases can now go overdue)
+
+- **A "moving" case (scheduled hand-off) now actually turns overdue at its deadline.**
+  Previously `scheduledHandoff()` only ever returned the next *future* deadline (it skipped
+  past instants), so the red "overdue HH:MM" chip, `actionOverdueCases()`, and the "N overdue"
+  counter were **unreachable** — when a deadline passed, the chip silently rolled forward to
+  the next slot. Now the deadline **anchors on when the operator committed to the Track Status**
+  (new `trackStatusAt`, stamped on every Track-Status set) and **sticks**: once it passes with
+  the case still not at its destination station, the case is overdue against that date (it does
+  not roll forward). A freshly-committed intent is never false-overdue (anchor = now → next
+  future deadline), and a delivered case (at its destination) stays "delivered", not overdue.
+  `trackStatusAt` rides the operator layer (localStorage + the backend's full-payload save), so
+  it round-trips; ingestion never touches it.
+
 ### Fixed (UI)
 
 - **Shift-ending handover banner now counts PICKED cases**, not every open case.
