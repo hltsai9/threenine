@@ -272,6 +272,7 @@
 
   // Auto-start on first visit.
   function maybeAutoStart() {
+    if (window.TOUR_AUTOSTART === false) return;   // disabled via config.js (the launcher link still works)
     let seen = false;
     try { seen = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { /* ignore */ }
     if (!seen) setTimeout(start, 600);

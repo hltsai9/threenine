@@ -1872,12 +1872,15 @@ function renderOwnershipTimeline(c) {
 function processSegments(c) {
   const items = (c.processTimeline || []).filter(s => s && typeof s === 'object').slice();
   items.sort((a, b) => new Date(a.startedAt || a.endedAt || 0) - new Date(b.startedAt || b.endedAt || 0));
+  const nowMs = NOW.getTime();
   return items.map(it => {
     const start = it.startedAt ? new Date(it.startedAt).getTime() : null;
-    const end = it.endedAt ? new Date(it.endedAt).getTime() : null;
+    // An open/current stage has no endedAt — treat its end as "now" so the latest (in-progress)
+    // stage shows its elapsed duration instead of zero.
+    const end = it.endedAt ? new Date(it.endedAt).getTime() : nowMs;
     const ms = (typeof it.minutes === 'number' && isFinite(it.minutes))
       ? Math.max(0, it.minutes) * 60000
-      : (start != null && end != null ? Math.max(0, end - start) : 0);
+      : (start != null ? Math.max(0, end - start) : 0);
     return { ...it, start, end, ms };
   });
 }

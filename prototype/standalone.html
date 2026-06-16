@@ -2950,6 +2950,12 @@ window.API_BASE = '';
 // works at '' because it serves /healthz.
 window.API_MODE = '';
 
+// Guided tour: whether it auto-starts on a visitor's first load.
+//   true  (default) -> auto-start once per browser (preserves the demo/Pages experience).
+//   false           -> never auto-start; the sidebar "Take the tour" link still works.
+// Set to false for an internal deployment where operators don't need the onboarding tour.
+window.TOUR_AUTOSTART = true;
+
 
 // Seed data for the Case Tracker prototype — RAW Case Center records.
 //
@@ -5562,12 +5568,15 @@ function renderOwnershipTimeline(c) {
 function processSegments(c) {
   const items = (c.processTimeline || []).filter(s => s && typeof s === 'object').slice();
   items.sort((a, b) => new Date(a.startedAt || a.endedAt || 0) - new Date(b.startedAt || b.endedAt || 0));
+  const nowMs = NOW.getTime();
   return items.map(it => {
     const start = it.startedAt ? new Date(it.startedAt).getTime() : null;
-    const end = it.endedAt ? new Date(it.endedAt).getTime() : null;
+    // An open/current stage has no endedAt — treat its end as "now" so the latest (in-progress)
+    // stage shows its elapsed duration instead of zero.
+    const end = it.endedAt ? new Date(it.endedAt).getTime() : nowMs;
     const ms = (typeof it.minutes === 'number' && isFinite(it.minutes))
       ? Math.max(0, it.minutes) * 60000
-      : (start != null && end != null ? Math.max(0, end - start) : 0);
+      : (start != null ? Math.max(0, end - start) : 0);
     return { ...it, start, end, ms };
   });
 }
@@ -9047,6 +9056,7 @@ boot();
 
   // Auto-start on first visit.
   function maybeAutoStart() {
+    if (window.TOUR_AUTOSTART === false) return;   // disabled via config.js (the launcher link still works)
     let seen = false;
     try { seen = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) { /* ignore */ }
     if (!seen) setTimeout(start, 600);

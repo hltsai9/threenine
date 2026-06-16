@@ -8,6 +8,21 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-16
+
+### Added (config)
+
+- **`window.TOUR_AUTOSTART` toggle** in `config.js`. `true` (default) keeps the
+  first-visit guided tour; set it `false` to stop the tour auto-starting (the
+  sidebar "Take the tour" link still works). For internal deployments that don't
+  want onboarding.
+
+### Fixed (process timeline)
+
+- The **current/open process-timeline stage** (no `endedAt`) now shows its elapsed
+  duration **up to now** instead of zero — `processSegments` defaults a missing end
+  to `NOW`, so the in-progress stage accrues time like the live clocks.
+
 ## 2026-06-15
 
 ### Internal (Seed + promo deck)

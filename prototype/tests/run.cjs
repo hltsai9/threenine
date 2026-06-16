@@ -190,6 +190,13 @@ test('processSegments: falls back to end − start when minutes absent', () => {
 test('processSegments: non-objects are dropped', () => {
   eq(processSegments({ processTimeline: [null, 0, { startedAt: iso(HOUR), minutes: 0 }] }).length, 1);
 });
+test('processSegments: open stage (no endedAt) runs to now', () => {
+  const segs = processSegments({ processTimeline: [
+    { processType: 'Service Team', startedAt: iso(2 * HOUR) },   // current stage, still open
+  ] });
+  eq(segs[0].ms, 2 * HOUR);   // start 2h ago → now = 2h elapsed
+  eq(segs[0].end, FIXED);     // end defaulted to NOW (the frozen clock)
+});
 
 /* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
  * waitUserDueMs returns signed ms to the Wait User due time (NOW-based): positive = due in the
