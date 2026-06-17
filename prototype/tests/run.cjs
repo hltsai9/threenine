@@ -843,6 +843,23 @@ test('scheduledHandoff: operator hand-off override wins over the standard rule',
     trackStatusDueAt: '2026-06-20T16:30:00.000Z' };
   eq(app.scheduledHandoff(c).dueAt, '2026-06-20T16:30:00.000Z');   // not the rule's Tue 09:00
 });
+test('hand-off suggestion: next rule time in the PICKED zone, today if not yet passed', () => {
+  const escalate = { id: 'escalate_to_core', scheduled: { to: 'Core Team', day: null, shift: 'Day', hh: 9, mm: 0 } };
+  // FIXED = 2026-06-12T13:00Z → 06:00 MST (before 09:00) so today; 21:00 GMT+8 (after 09:00) so tomorrow.
+  app.setDisplayTz('mst');
+  eq(app.suggestHandoffLocalInput(escalate), '2026-06-12T09:00');
+  app.setDisplayTz('gmt8');
+  eq(app.suggestHandoffLocalInput(escalate), '2026-06-13T09:00');
+  app.setDisplayTz('mst');
+});
+test('hand-off suggestion honours the target weekday in the picked zone (Weekend Case = Sun 17:30)', () => {
+  const weekend = { id: 'weekend_case', scheduled: { to: 'HQ', day: 'Sun', shift: 'Day', hh: 17, mm: 30 } };
+  app.setDisplayTz('mst');
+  const v = app.suggestHandoffLocalInput(weekend);
+  eq(v, '2026-06-14T17:30');                                     // next Sunday 17:30 MST
+  eq(app._tzParts(app.localInputToIso(v)).weekday, 'Sun');       // lands on Sunday in the picked zone
+  app.setDisplayTz('mst');
+});
 test('scheduledHandoff: no override → falls back to the standard rule', () => {
   const c = { id: 'C-NOV', trackStatus: 'escalate_to_core', trackStatusAt: '2026-06-15T18:00:00Z',
     trackStatusDueAt: null };

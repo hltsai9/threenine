@@ -5199,17 +5199,37 @@ function commitTrackStatus(c, value, prev) {
   render();
 }
 
+// Suggested default hand-off time for a scheduled status, computed IN THE ACTIVE DISPLAY ZONE:
+// the next occurrence of the rule's HH:MM (on its target weekday, if any) strictly after now.
+// "Strictly after now" means today's slot is suggested when the time hasn't passed yet in the
+// picked zone, and tomorrow's once it has — so picking MST at 11:50 MST suggests tomorrow 09:00,
+// while 02:50 in the picked zone suggests today 09:00. Returns a datetime-local string. The rule
+// HH:MM is the team's standard (authored MST) but is offered in whatever zone the operator picked,
+// so the suggestion always reads as a clean "09:00 / 17:30" in their chosen timezone.
+function suggestHandoffLocalInput(def) {
+  const s = def && def.scheduled;
+  const nowMs = Date.now();
+  if (!s) return isoToLocalInput(new Date(nowMs + 24 * 3600 * 1000).toISOString());
+  const hh = String(s.hh).padStart(2, '0'), mm = String(s.mm).padStart(2, '0');
+  const DAY = 24 * 3600 * 1000;
+  for (let i = 0; i < 14; i++) {
+    const p = _tzParts(new Date(nowMs + i * DAY).toISOString());   // calendar day i, in the picked zone
+    const candStr = `${p.year}-${p.month}-${p.day}T${hh}:${mm}`;
+    const candIso = localInputToIso(candStr);
+    if (!candIso || Date.parse(candIso) <= nowMs) continue;        // must be strictly in the future
+    if (s.day && _tzParts(candIso).weekday !== s.day) continue;    // honour the target weekday (Weekend Case)
+    return candStr;
+  }
+  return isoToLocalInput(new Date(nowMs + DAY).toISOString());
+}
+
 // Scheduled statuses (Weekend Case, HQ did not handle, Escalate to Core) let the operator pick
-// the hand-off time. The modal pre-fills the standard rule's deadline (in the active display
-// zone) and stores whatever they confirm as `trackStatusDueAt`. `selectEl` is reverted to the
-// committed value so the dropdown never shows an uncommitted choice if they cancel.
+// the hand-off time. The modal pre-fills the next standard slot IN THE PICKED DISPLAY ZONE and
+// stores whatever they confirm as `trackStatusDueAt`. `selectEl` is reverted to the committed
+// value so the dropdown never shows an uncommitted choice if they cancel.
 function openHandoffTimeModal(c, value, prev, selectEl) {
   const def = TRACK_STATUS_BY_ID[value];
-  // Default = the standard rule's slot, anchored at now (computed on a probe so nothing commits yet).
-  const probe = { ...c, trackStatus: value, trackStatusAt: NOW.toISOString(), trackStatusDueAt: null };
-  const h = scheduledHandoff(probe);
-  const defMs = h ? Date.parse(h.dueAt) : NOW.getTime() + 24 * 3600 * 1000;
-  const inputVal = isoToLocalInput(new Date(defMs).toISOString());
+  const inputVal = suggestHandoffLocalInput(def);
   if (selectEl) selectEl.value = prev || '';   // keep dropdown on the committed status until confirm
   showModal(`
     <h3>${escapeHtml(def.label)} — hand-off time</h3>

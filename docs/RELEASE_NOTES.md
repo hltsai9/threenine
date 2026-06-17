@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Fixed (hand-off time suggestion uses the picked timezone)
+
+- The hand-off-time picker now suggests the default in the **selected display timezone**, not by
+  translating the fixed-MST rule instant into that zone (which produced odd times/days — e.g. a
+  GMT+8 viewer saw `00:00` or the wrong day). New `suggestHandoffLocalInput()` finds the **next
+  occurrence of the rule's time-of-day** (e.g. 09:00, or Sun 17:30) **in the picked zone**, strictly
+  after now — so it lands on **today** when that time hasn't passed yet in the picked zone, and the
+  next day once it has. Example: MST picked at 11:50 MST → suggests tomorrow 09:00; a viewer whose
+  zone reads 02:50 → suggests today 09:00.
+
 ### Changed (Weekly Archive hides future weeks)
 
 - The **Weekly Archive** index now lists only the current week and past weeks — upcoming (empty)
