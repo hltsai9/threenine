@@ -10,6 +10,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Added (custom hand-off time for scheduled Track Statuses)
+
+- Setting **Weekend Case**, **HQ did not handle**, or **Escalate to Core Team** now opens a
+  hand-off-time picker (a date+time field) pre-filled with the standard rule's deadline
+  (e.g. Sun 17:30, next 09:00). The operator can move it to any day/time; the chosen instant is
+  stored on the case (`trackStatusDueAt`) and drives the Route Board deadline chip and the
+  overdue logic. Leaving it unchanged keeps the standard rule. Non-scheduled statuses commit
+  immediately as before.
+- The case detail shows the scheduled hand-off time next to the Track Status picker
+  (`→ hand off …`, with a "(rule)" tag when it's the default and not a custom time).
+- `trackStatusDueAt` round-trips through the seed/agent layers and the live-refresh merge.
+
+### Added (MST / GMT+8 / Local timezone toggle)
+
+- New **timezone toggle** in the sidebar (under the clock) switches **every** time-of-day render
+  between **MST**, **GMT+8**, and the **computer's local** zone — shift times, Route Board
+  deadline chips (day label included, so the weekday follows the zone), case timestamps, and the
+  sidebar clock. Persisted per-device (`case-tracker-tz-v1`); defaults to **MST** (the zone the
+  rota and hand-off rules are written in).
+- Time formatting now routes through a single zone-aware layer (`_tzParts` + `displayTz*`
+  helpers); the hand-off picker reads/writes its datetime in the active zone.
+
 ### Changed (Route Board over-limit highlight — accent only)
 
 - The IT-process over-limit highlight on a **Route Board** row is now just the **dark-red left

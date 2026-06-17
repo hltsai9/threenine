@@ -283,6 +283,31 @@ html, body {
   margin-top: 4px;
   font-weight: 600;
 }
+.tz-toggle {
+  display: inline-flex;
+  margin-top: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  overflow: hidden;
+}
+.tz-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-faint-2);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-left: 1px solid var(--border);
+  transition: background 120ms, color 120ms;
+}
+.tz-btn:first-child { border-left: none; }
+.tz-btn:hover { color: var(--text); background: var(--accent-bg); }
+.tz-btn.active { background: var(--accent); color: #fff; }
+.tz-btn:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .shift-info {
   margin: 4px -4px 0;
   display: flex;
@@ -2306,6 +2331,9 @@ table.case-table {
 .ts-picker:hover { border-color: var(--accent-soft); }
 .ts-picker:focus { outline: none; border-color: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-bg); }
 .ts-picker option { font-weight: 600; color: var(--text); }
+/* Scheduled hand-off time shown next to the Track Status picker in the case detail. */
+.ts-due { display: inline-flex; align-items: center; white-space: nowrap; }
+.ts-due-rule { opacity: .7; margin-left: 3px; }
 
 /* Modern stylable select — themes the open popup too (Chrome 135+/supported
    browsers). Falls back to the themed closed box + native menu elsewhere. */
@@ -2898,6 +2926,7 @@ table.case-table {
     <div class="sidebar-clock">
       <div class="clock-time" id="clock-time">—</div>
       <div class="clock-date" id="clock-date">—</div>
+      <div class="tz-toggle" id="tz-toggle" role="group" aria-label="Display timezone"></div>
     </div>
     <div class="shift-info">
       <div class="op-id">
@@ -3885,6 +3914,7 @@ function fillBoardDefaults(c) {
   if (c.agentStatus == null)      c.agentStatus = 'unqueued';
   if (c.trackStatus === undefined) c.trackStatus = null;
   if (c.trackStatusAt === undefined) c.trackStatusAt = null;   // when the intent was committed (overdue anchor)
+  if (c.trackStatusDueAt === undefined) c.trackStatusDueAt = null;   // operator-set hand-off time (overrides the rule)
   if (c.coreId == null)           c.coreId = null;
   if (c.hqId == null)             c.hqId = null;
   if (c.currentOwner == null) {
@@ -3914,6 +3944,7 @@ function applySeedAgentLayer(cases, overlay) {
     if (a.agentStatus != null) c.agentStatus = a.agentStatus;
     if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
     if (a.trackStatusAt !== undefined) c.trackStatusAt = a.trackStatusAt;
+    if (a.trackStatusDueAt !== undefined) c.trackStatusDueAt = a.trackStatusDueAt;
     if (a.handover !== undefined) c.handover = a.handover;
     if (a.reminder !== undefined) c.reminder = a.reminder;
   }
@@ -4094,6 +4125,7 @@ function agentLayerFromState() {
       reminder: c.reminder,
       trackStatus: c.trackStatus || null,
       trackStatusAt: c.trackStatusAt || null,
+      trackStatusDueAt: c.trackStatusDueAt || null,
     };
   }
   return map;
@@ -4108,6 +4140,7 @@ function applyAgentLayer(map) {
     if (a.reminder !== undefined) c.reminder = a.reminder;
     if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
     if (a.trackStatusAt !== undefined) c.trackStatusAt = a.trackStatusAt;
+    if (a.trackStatusDueAt !== undefined) c.trackStatusDueAt = a.trackStatusDueAt;
   }
 }
 
@@ -4360,11 +4393,13 @@ function updateClock() {
   const d = document.getElementById('clock-date');
   if (!t || !d) return;
   const now = realNow();
-  t.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  d.textContent = `${date}${LOCAL_TZ ? ' · ' + LOCAL_TZ : ''}`;
+  const iso = now.toISOString();
+  const p = _tzParts(iso);
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  t.textContent = `${p.hour}:${p.minute}:${p.second}`;
+  d.textContent = `${p.weekday}, ${MON[+p.month - 1]} ${+p.day}, ${p.year} · ${displayTzLabel()}`;
   const wrap = t.closest('.sidebar-clock');
-  if (wrap) wrap.title = `UTC ${now.toISOString().slice(11, 16)}`;
+  if (wrap) wrap.title = `UTC ${iso.slice(11, 16)}`;
 }
 function fmtUntil(iso) {
   const diff = new Date(iso).getTime() - realNow().getTime();
@@ -4413,56 +4448,101 @@ const LOCAL_TZ = (() => {
   } catch (e) { return ''; }
 })();
 
-// Absolute case timestamps are shown in the viewer's LOCAL time (case timestamps are
-// stored as ISO UTC; this renders them where the operator actually is).
+// ---- Display timezone (per-device toggle: MST / GMT+8 / computer local) ----
+// One global preference that drives EVERY time-of-day render — shift times, Route Board
+// deadline chips, case timestamps, and the sidebar clock. Persisted per-device (like the
+// operator pick). MST and GMT+8 are fixed-offset zones (no DST for Phoenix / Singapore);
+// "local" defers to the browser. Defaults to MST — the zone the shift rota and hand-off
+// rules are written in, so existing behaviour is preserved until the operator flips it.
+const DISPLAY_TZ_KEY = 'case-tracker-tz-v1';
+const DISPLAY_TZ_OPTIONS = {
+  mst:   { zone: 'America/Phoenix', label: 'MST',                offsetHours: -7 },
+  gmt8:  { zone: 'Asia/Singapore',  label: 'GMT+8',              offsetHours: 8 },
+  local: { zone: undefined,         label: LOCAL_TZ || 'Local',  offsetHours: null },
+};
+let DISPLAY_TZ = 'mst';
+function loadDisplayTz() {
+  try { const v = localStorage.getItem(DISPLAY_TZ_KEY); if (v && DISPLAY_TZ_OPTIONS[v]) DISPLAY_TZ = v; } catch (e) { /* ignore */ }
+}
+function setDisplayTz(v) {
+  if (!DISPLAY_TZ_OPTIONS[v]) return;
+  DISPLAY_TZ = v;
+  try { localStorage.setItem(DISPLAY_TZ_KEY, v); } catch (e) { /* ignore */ }
+}
+function displayTz() { return DISPLAY_TZ; }
+function displayTzZone() { return DISPLAY_TZ_OPTIONS[DISPLAY_TZ].zone; }
+function displayTzLabel() { return DISPLAY_TZ_OPTIONS[DISPLAY_TZ].label; }
+
+// Break an ISO instant into calendar/clock parts in the active display zone (24-hour).
+function _tzParts(iso, zone) {
+  if (zone === undefined) zone = displayTzZone();
+  const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, weekday: 'short' };
+  if (zone) opts.timeZone = zone;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(new Date(iso));
+    const get = t => (parts.find(p => p.type === t) || {}).value || '';
+    let hour = get('hour'); if (hour === '24') hour = '00';   // Intl can emit "24" at midnight
+    return { year: get('year'), month: get('month'), day: get('day'), hour, minute: get('minute'), second: get('second'), weekday: get('weekday') };
+  } catch (e) {
+    const d = new Date(iso), pad = n => String(n).padStart(2, '0');
+    return { year: String(d.getUTCFullYear()), month: pad(d.getUTCMonth() + 1), day: pad(d.getUTCDate()),
+      hour: pad(d.getUTCHours()), minute: pad(d.getUTCMinutes()), second: pad(d.getUTCSeconds()),
+      weekday: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()] };
+  }
+}
+function _displayHHMM(iso) { const p = _tzParts(iso); return `${p.hour}:${p.minute}`; }
+function _displayYmd(iso)  { const p = _tzParts(iso); return `${p.year}-${p.month}-${p.day}`; }
+function _displayWeekday(iso) { return _tzParts(iso).weekday; }
+// datetime-local round-trip in the active display zone (for the hand-off time picker).
+function isoToLocalInput(iso) { const p = _tzParts(iso); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`; }
+function localInputToIso(val) {
+  const m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const opt = DISPLAY_TZ_OPTIONS[DISPLAY_TZ];
+  if (opt.offsetHours == null) {           // "local" — the input already is browser-local
+    const dt = new Date(val);
+    return isNaN(dt) ? null : dt.toISOString();
+  }
+  const [, y, mo, d, hh, mm] = m.map(Number);   // fixed-offset zone: UTC = wall-clock − offset
+  return new Date(Date.UTC(y, mo - 1, d, hh, mm) - opt.offsetHours * 3600 * 1000).toISOString();
+}
+loadDisplayTz();
+
+// Absolute case timestamps render in the active display zone (case timestamps are stored as
+// ISO UTC; the MST/GMT+8/Local toggle decides where they're shown).
 function fmtAbsolute(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d)) return '—';
-  const pad = n => String(n).padStart(2, '0');
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return `${date} ${time}${LOCAL_TZ ? ' ' + LOCAL_TZ : ''}`;
+  const p = _tzParts(iso);
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} ${displayTzLabel()}`;
 }
-// Compact local "M/D HH:MM" for timeline transition markers (full time on hover).
+// Compact "M/D HH:MM" (display zone) for timeline transition markers (full time on hover).
 function fmtClockShort(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d)) return '—';
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const p = _tzParts(iso);
+  return `${+p.month}/${+p.day} ${p.hour}:${p.minute}`;
 }
-// Shifts are displayed in Mountain Standard Time (UTC-7, no DST — IANA "America/Phoenix").
-// Changing this constant retargets every shift-time render: the sidebar shift-ends clock,
-// the Shifts page roster headers, and the shift-card subtitles. Case timestamps still use
-// the viewer's own local time (see fmtAbsolute).
+// LEGACY: the shift/hand-off RULES are authored in MST (UTC-7, no DST — "America/Phoenix"); the
+// rota times and TRACK_STATUSES hh:mm are MST. DISPLAY of all times is now controlled by the
+// per-device timezone toggle (DISPLAY_TZ — see displayTzZone/displayTzLabel above), so these
+// constants no longer drive rendering and are kept only to document the canonical rule zone.
 const SHIFT_TZ = 'America/Phoenix';
 const SHIFT_TZ_LABEL = 'MST';
 
-// Convert an ISO UTC instant to "HH:MM" in the shift timezone via Intl.DateTimeFormat.
-function _shiftTzHHMM(iso) {
-  try {
-    return new Intl.DateTimeFormat('en-US', {
-      timeZone: SHIFT_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(new Date(iso));
-  } catch (e) {
-    // Fallback: hard-coded UTC-7 (MST is UTC-7 year-round, no DST).
-    const d = new Date(iso);
-    const ms = d.getTime() - 7 * 60 * 60 * 1000;
-    const utc = new Date(ms);
-    const pad = n => String(n).padStart(2, '0');
-    return `${pad(utc.getUTCHours())}:${pad(utc.getUTCMinutes())}`;
-  }
-}
+// "HH:MM" of an ISO instant in the active display zone.
+function _shiftTzHHMM(iso) { return _displayHHMM(iso); }
 
-// Shift-time HH:MM (+tz) for a single ISO timestamp (e.g. shift end).
+// Shift-time HH:MM (+tz label) for a single ISO timestamp (e.g. shift end).
 function fmtLocalTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d)) return '—';
-  return `${_shiftTzHHMM(iso)} ${SHIFT_TZ_LABEL}`;
+  return `${_shiftTzHHMM(iso)} ${displayTzLabel()}`;
 }
-// Render a "HH:MM – HH:MM UTC" coverage window in the shift timezone (display only; the
+// Render a "HH:MM – HH:MM" coverage window in the active display zone (display only; the
 // roster still stores the canonical UTC text). Falls back to the raw string if unparseable.
 function fmtShiftHoursLocal(hoursUtc) {
   const m = String(hoursUtc || '').match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
@@ -4472,7 +4552,7 @@ function fmtShiftHoursLocal(hoursUtc) {
     const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), +h, +min));
     return _shiftTzHHMM(d.toISOString());
   };
-  return `${toShiftTz(m[1], m[2])} – ${toShiftTz(m[3], m[4])} ${SHIFT_TZ_LABEL}`;
+  return `${toShiftTz(m[1], m[2])} – ${toShiftTz(m[3], m[4])} ${displayTzLabel()}`;
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, ch => ({
@@ -4691,6 +4771,23 @@ function renderSidebar() {
     sw.value = STATE.operatorId;
   }
 
+  // Display-timezone toggle (MST / GMT+8 / Local) — repaint active state every render; bind once.
+  const tz = document.getElementById('tz-toggle');
+  if (tz) {
+    tz.innerHTML = ['mst', 'gmt8', 'local']
+      .map(v => `<button type="button" class="tz-btn${displayTz() === v ? ' active' : ''}" data-tz="${v}" title="Show all times in ${escapeHtml(DISPLAY_TZ_OPTIONS[v].label)}">${escapeHtml(DISPLAY_TZ_OPTIONS[v].label)}</button>`)
+      .join('');
+    if (tz.dataset.bound !== '1') {
+      tz.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-tz]');
+        if (!b) return;
+        setDisplayTz(b.dataset.tz);
+        render();
+      });
+      tz.dataset.bound = '1';
+    }
+  }
+
   document.getElementById('op-shift').textContent = op.shift;
   document.getElementById('op-ends').textContent = fmtLocalTime(window.CURRENT_SHIFT.endsAtUtc);
   document.getElementById('op-week').textContent = window.CURRENT_WEEK.label;
@@ -4824,6 +4921,15 @@ function scheduledHandoff(c) {
   if (!def?.scheduled) return null;
   const { to, day: targetDay, shift: targetShift, hh, mm } = def.scheduled;
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  // Operator-set explicit hand-off time wins over the standard rule (set when the status was
+  // chosen; see the hand-off-time modal). dueDay stays MST-anchored for consistency — the chip
+  // re-derives the display-zone weekday itself.
+  const overrideMs = c && c.trackStatusDueAt ? Date.parse(c.trackStatusDueAt) : NaN;
+  if (isFinite(overrideMs)) {
+    const mstO = new Date(overrideMs - MST_OFFSET_HOURS * 3600 * 1000);
+    return { from: caseStation(c), to, dueAt: new Date(overrideMs).toISOString(),
+      dueDay: DAYS[mstO.getUTCDay()], dueShift: targetShift };
+  }
   // Anchor the deadline to WHEN the operator committed to this intent (`trackStatusAt`), not to
   // "now". The deadline is the first scheduled occurrence AFTER that commit, and it STICKS there:
   // once it passes with the case still not at its destination, the case goes overdue against that
@@ -5051,15 +5157,75 @@ function _mstYmd(iso) {
   return `${m.getUTCFullYear()}-${m.getUTCMonth()}-${m.getUTCDate()}`;
 }
 
-// "today HH:MM" if the dueAt falls on the same MST date as NOW; otherwise
-// "<Day> HH:MM" (e.g. "Sun 17:30"). Overdue chips get "overdue HH:MM".
+// "today HH:MM" if the dueAt falls on the same date as NOW in the active display zone;
+// otherwise "<Day> HH:MM" (e.g. "Sun 17:30"). Overdue chips get "overdue HH:MM". Day + time
+// both render in the display zone, so the chip stays correct under the MST/GMT+8/Local toggle.
 function formatDeadlineChip(handoff, phase) {
   const due = handoff.dueAt;
-  const time = _shiftTzHHMM(due);  // HH:MM in MST
+  const time = _displayHHMM(due);
   if (phase === 'overdue') return `overdue ${time}`;
-  const sameMstDay = _mstYmd(due) === _mstYmd(NOW.toISOString());
-  if (sameMstDay) return `today ${time}`;
-  return `${handoff.dueDay} ${time}`;
+  const sameDay = _displayYmd(due) === _displayYmd(NOW.toISOString());
+  if (sameDay) return `today ${time}`;
+  return `${_displayWeekday(due)} ${time}`;
+}
+
+// Human hint for a scheduled status's STANDARD rule (e.g. "Sun 17:30 MST", "next 09:00 MST").
+function handoffRuleHint(def) {
+  const s = def && def.scheduled;
+  if (!s) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${s.day || 'next'} ${pad(s.hh)}:${pad(s.mm)} MST`;
+}
+
+// Commit a Track Status with NO custom hand-off time (clearing, or a non-scheduled status).
+function commitTrackStatus(c, value, prev) {
+  const op = getOperator(STATE.operatorId);
+  if (!value) {
+    c.trackStatus = null;
+    c.trackStatusAt = null;
+    c.trackStatusDueAt = null;
+  } else {
+    c.trackStatus = value;
+    c.trackStatusAt = NOW.toISOString();   // overdue anchor (see scheduledHandoff)
+    c.trackStatusDueAt = null;             // no override → the standard rule applies
+  }
+  logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
+  render();
+}
+
+// Scheduled statuses (Weekend Case, HQ did not handle, Escalate to Core) let the operator pick
+// the hand-off time. The modal pre-fills the standard rule's deadline (in the active display
+// zone) and stores whatever they confirm as `trackStatusDueAt`. `selectEl` is reverted to the
+// committed value so the dropdown never shows an uncommitted choice if they cancel.
+function openHandoffTimeModal(c, value, prev, selectEl) {
+  const def = TRACK_STATUS_BY_ID[value];
+  // Default = the standard rule's slot, anchored at now (computed on a probe so nothing commits yet).
+  const probe = { ...c, trackStatus: value, trackStatusAt: NOW.toISOString(), trackStatusDueAt: null };
+  const h = scheduledHandoff(probe);
+  const defMs = h ? Date.parse(h.dueAt) : NOW.getTime() + 24 * 3600 * 1000;
+  const inputVal = isoToLocalInput(new Date(defMs).toISOString());
+  if (selectEl) selectEl.value = prev || '';   // keep dropdown on the committed status until confirm
+  showModal(`
+    <h3>${escapeHtml(def.label)} — hand-off time</h3>
+    <div class="modal-sub">Default follows the standard rule (${escapeHtml(handoffRuleHint(def))}). Adjust if this case needs a different hand-off time. Times shown in <strong>${escapeHtml(displayTzLabel())}</strong>.</div>
+    <label>Hand off by</label>
+    <input type="datetime-local" data-field="dueAt" value="${escapeHtml(inputVal)}">
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Set ${escapeHtml(def.short || def.label)}</button>
+    </div>
+  `, (modal) => {
+    const iso = localInputToIso(fieldVal(modal, 'dueAt'));
+    if (!iso) return modalError('Enter a valid date and time.');
+    const op = getOperator(STATE.operatorId);
+    c.trackStatus = value;
+    c.trackStatusAt = NOW.toISOString();
+    c.trackStatusDueAt = iso;
+    logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value} · hand off ${fmtAbsolute(iso)}`);
+    showToast(`${c.id} — ${def.label}. Hand off by ${fmtAbsolute(iso)}.`, 'success');
+    render();
+    return true;
+  });
 }
 
 function _classifyRouteRow(c) {
@@ -5967,6 +6133,11 @@ function renderDetailActions(c) {
   `);
   if (ts) {
     items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="clear_track_status" title="Clear Track Status (after work is done and handover written)">Clear</button>`);
+  }
+  // Show the scheduled hand-off time (custom if the operator set one, else the standard rule).
+  const sh = scheduledHandoff(c);
+  if (sh) {
+    items.push(`<span class="ts-due muted tiny" title="Scheduled hand-off time — set it when you pick a Weekend Case / Escalate / HQ-retry status">→ hand off ${escapeHtml(fmtAbsolute(sh.dueAt))}${c.trackStatusDueAt ? '' : ' <span class="ts-due-rule">(rule)</span>'}</span>`);
   }
   if (c.caseLink) {
     items.push(`<a class="btn" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" title="Open this case in Case Center">↗ Case Center</a>`);
@@ -8068,6 +8239,7 @@ function handlePrompt(caseId, kind) {
     }
     c.trackStatus = null;
     c.trackStatusAt = null;
+    c.trackStatusDueAt = null;
     logHistory(c, op, 'track-status-cleared', `${ts} → cleared`);
     showToast(`${c.id} Track Status cleared.`, 'info');
     render();
@@ -8413,19 +8585,12 @@ function bindHandlers() {
       const caseId = el.dataset.caseId;
       const c = caseById(caseId);
       if (!c) return;
-      const op = getOperator(STATE.operatorId);
       const prev = caseTrackStatus(c);
       if (value === prev) return;
-      if (!value) {
-        c.trackStatus = null;
-        c.trackStatusAt = null;
-      } else {
-        c.trackStatus = value;
-        // Stamp the commit time — the overdue deadline anchors off this (see scheduledHandoff).
-        c.trackStatusAt = NOW.toISOString();
-      }
-      logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
-      render();
+      // Scheduled statuses open a modal to confirm/adjust the hand-off time; others commit now.
+      const def = value ? TRACK_STATUS_BY_ID[value] : null;
+      if (def && def.scheduled) { openHandoffTimeModal(c, value, prev, el); return; }
+      commitTrackStatus(c, value, prev);
     });
   });
   document.querySelectorAll('[data-action="handover-to-select"]').forEach(el => {

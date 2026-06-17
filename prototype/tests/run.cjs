@@ -800,6 +800,55 @@ test('scheduledHandoff: no anchor → falls back to the logged track-status-set 
   eq(app.scheduledHandoff(c).dueAt, '2026-06-16T16:00:00.000Z');  // Tue 09:00 MST — anchored to history
 });
 
+/* ---------- display timezone toggle (MST / GMT+8 / Local) ---------- */
+// 2026-06-14T00:30Z = Sat 17:30 MST = Sun 08:30 GMT+8 — the weekday flips across the date line.
+test('display zone: MST vs GMT+8 render the same instant differently', () => {
+  const inst = '2026-06-14T00:30:00.000Z';
+  app.setDisplayTz('mst');
+  eq(app._displayHHMM(inst), '17:30');
+  eq(app._displayWeekday(inst), 'Sat');
+  app.setDisplayTz('gmt8');
+  eq(app._displayHHMM(inst), '08:30');
+  eq(app._displayWeekday(inst), 'Sun');
+  app.setDisplayTz('mst');
+});
+test('fmtAbsolute carries the active zone label', () => {
+  app.setDisplayTz('gmt8');
+  eq(app.fmtAbsolute('2026-06-14T00:30:00.000Z'), '2026-06-14 08:30 GMT+8');
+  app.setDisplayTz('mst');
+});
+test('formatDeadlineChip weekday + time follow the display zone', () => {
+  const h = { dueAt: '2026-06-14T00:30:00.000Z', dueDay: 'Sat', to: 'HQ' };
+  app.setDisplayTz('mst');
+  eq(app.formatDeadlineChip(h, 'upcoming'), 'Sat 17:30');
+  app.setDisplayTz('gmt8');
+  eq(app.formatDeadlineChip(h, 'upcoming'), 'Sun 08:30');
+  app.setDisplayTz('mst');
+});
+
+/* ---------- custom hand-off time (datetime-local picker) ---------- */
+test('localInputToIso ⇄ isoToLocalInput round-trip in a fixed-offset zone (GMT+8)', () => {
+  app.setDisplayTz('gmt8');
+  const inst = '2026-06-14T00:30:00.000Z';
+  eq(app.isoToLocalInput(inst), '2026-06-14T08:30');
+  eq(app.localInputToIso('2026-06-14T08:30'), inst);
+  app.setDisplayTz('mst');
+});
+test('localInputToIso interprets the wall-clock in MST', () => {
+  app.setDisplayTz('mst');
+  eq(app.localInputToIso('2026-06-16T09:00'), '2026-06-16T16:00:00.000Z');  // 09:00 MST = 16:00Z
+});
+test('scheduledHandoff: operator hand-off override wins over the standard rule', () => {
+  const c = { id: 'C-OV', trackStatus: 'escalate_to_core', trackStatusAt: '2026-06-15T18:00:00Z',
+    trackStatusDueAt: '2026-06-20T16:30:00.000Z' };
+  eq(app.scheduledHandoff(c).dueAt, '2026-06-20T16:30:00.000Z');   // not the rule's Tue 09:00
+});
+test('scheduledHandoff: no override → falls back to the standard rule', () => {
+  const c = { id: 'C-NOV', trackStatus: 'escalate_to_core', trackStatusAt: '2026-06-15T18:00:00Z',
+    trackStatusDueAt: null };
+  eq(app.scheduledHandoff(c).dueAt, '2026-06-16T16:00:00.000Z');   // Tue 09:00 MST
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {
