@@ -4807,7 +4807,7 @@ function renderSidebar() {
   const navOwners = document.getElementById('nav-owners-count');
   if (navOwners) navOwners.textContent = (window.OWNERS.core.length + window.OWNERS.hq.length);
   const navArchive = document.getElementById('nav-archive-count');
-  if (navArchive) navArchive.textContent = window.WEEKS.length;
+  if (navArchive) navArchive.textContent = window.WEEKS.filter(w => !w.isFuture).length;
 }
 
 /* ---------- Shared action helpers ---------- */
@@ -6278,7 +6278,9 @@ function weekStats(weekId) {
 }
 
 function renderArchiveIndex() {
-  const cards = window.WEEKS.map(w => {
+  // The archive lists the current week and past weeks only — upcoming (empty) weeks are kept in
+  // window.WEEKS for the Shifts rota planner but not shown here.
+  const cards = window.WEEKS.filter(w => !w.isFuture).map(w => {
     const s = weekStats(w.id);
     const current = w.isCurrent ? '<span class="badge-current">Current</span>' : '';
     return `

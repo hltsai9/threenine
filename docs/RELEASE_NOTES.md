@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Changed (Weekly Archive hides future weeks)
+
+- The **Weekly Archive** index now lists only the current week and past weeks — upcoming (empty)
+  weeks are no longer shown as cards, and the sidebar Archive count matches. The future weeks are
+  still kept in `window.WEEKS` so the **Shifts** page can plan rotas for the next few weeks
+  (`editableWeekIds` = current + next 3). Filtered via `w.isFuture` in `renderArchiveIndex`.
+
 ### Fixed (current week now tracks the real date)
 
 - The **current week** (sidebar "Week", the Archive "Current" card, the Shifts page) now follows

@@ -874,6 +874,14 @@ test('a case weekId resolves to a bucket whose range contains its createdAt', ()
   ok(Date.parse(w.startsAt) <= t && t < Date.parse(w.endsAt), 'createdAt sits inside its week bucket');
 });
 
+test('weekly archive hides future weeks (kept in WEEKS for the Shifts planner)', () => {
+  const html = app.renderArchiveIndex();
+  const future = app.WEEKS.filter(w => w.isFuture);
+  ok(future.length > 0, 'WEEKS still carries upcoming weeks');
+  future.forEach(w => ok(!html.includes(`#/archive/${w.id}`), `future week ${w.id} should not be listed`));
+  ok(html.includes(`#/archive/${app.CURRENT_WEEK.id}`), 'current week is listed');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {
