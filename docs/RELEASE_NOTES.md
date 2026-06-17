@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-16
 
+### Fixed (operator selection resets on refresh)
+
+- The selected operator now **survives a page refresh in every mode** — including the
+  server-authoritative `backend/` DB, where it previously reset to the seed default on each
+  reload. Operator identity is a per-device UI choice ("who's sitting at this terminal"), so it
+  persists in its own `localStorage` key (`case-tracker-operator-v1`) independently of the shared
+  per-case agent layer. New `saveOperatorChoice()` / `restoreOperatorChoice()`; restore runs on
+  every boot path (seed/demo, serve.py live, and server-authoritative).
+
 ### Changed (case-detail Clocks → SLA / Total / On-us share)
 
 - The case-detail **Clocks** panel is simplified to three: **SLA · time on us** (now equals the

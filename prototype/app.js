@@ -362,6 +362,22 @@ const STORAGE_KEY = 'case-tracker-state-v8';
 // operator's own work. Seed/demo mode keeps full state.
 const AGENT_KEY = 'case-tracker-agent-v1';
 
+// Which operator this browser is acting as. This is a PER-DEVICE UI choice — "who's sitting at
+// this terminal" — not shared board state, so it persists locally in EVERY mode (including the
+// server-authoritative backend, where the per-case agent layer comes from the DB but the operator
+// pick still belongs to this browser). Kept in its own key so it survives a refresh regardless of
+// how the case data is sourced.
+const OPERATOR_KEY = 'case-tracker-operator-v1';
+function saveOperatorChoice() {
+  try { localStorage.setItem(OPERATOR_KEY, STATE.operatorId || ''); } catch (e) { /* ignore */ }
+}
+function restoreOperatorChoice() {
+  try {
+    const id = localStorage.getItem(OPERATOR_KEY);
+    if (id && window.OPERATORS.some(o => o.id === id)) STATE.operatorId = id;
+  } catch (e) { /* ignore */ }
+}
+
 // The agent-owned fields that survive a live data refresh.
 function agentLayerFromState() {
   const map = {};
@@ -412,6 +428,8 @@ function snapshotSavedCases() {
 
 function saveState() {
   try {
+    // The operator pick is per-device and persists in every mode (see OPERATOR_KEY).
+    saveOperatorChoice();
     if (window.__LIVE__) {
       // In server-authoritative mode the DB is the source of truth, so don't cache the operator
       // layer locally (it must never override the shared server copy on the next boot). The edits
@@ -559,6 +577,7 @@ function seedBoot(loadedFromStorage) {
   } else {
     anchorFreshSeed();
   }
+  restoreOperatorChoice();   // per-device operator pick takes precedence over the seed default
 }
 
 seedBoot(loadState());
@@ -5054,6 +5073,9 @@ async function tryLoadLiveCases(allCases) {
   // the result so only later edits POST back to the server. In server-authoritative mode the
   // payload already carries the shared operator layer, so skip the localStorage overlay.
   if (!window.__SERVER_OPERATOR_LAYER__) applyStoredAgentLayer();
+  // The operator pick is per-device — restore it in EVERY mode (server-authoritative skips the
+  // agent-layer overlay above, but the chosen operator still belongs to this browser).
+  restoreOperatorChoice();
   snapshotSavedCases();
   return true;
 }
@@ -5100,6 +5122,7 @@ function enterLiveMode() {
   window.__LIVE__ = true;
   NOW = new Date(); // real time for SLA math against live timestamps
   applyStoredAgentLayer();
+  restoreOperatorChoice();   // per-device operator pick survives a refresh
   snapshotSavedCases();
 }
 
