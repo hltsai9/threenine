@@ -1343,6 +1343,7 @@ table.case-table {
 .clock .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint-2); font-weight: 700; }
 .clock-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
 .clock .value { font-size: 20px; font-weight: 800; margin-top: 4px; color: var(--text); font-family: var(--font-mono); }
+.clock .value.over { color: var(--danger); }
 .clock .state { font-size: 11px; color: var(--text-faint-2); margin-top: 4px; font-weight: 600; }
 .clock .state.running { color: var(--good); }
 .clock .state.paused { color: var(--warn); }

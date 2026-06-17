@@ -269,6 +269,25 @@ test('itProcessOver: over the configured limit (THRESHOLDS.itProcessHours)', () 
   ok(app.itProcessOver(over), 'over 15h limit');
 });
 
+/* ---------- SLA · time on us / Total time / On-us share (case-detail clocks) ----------
+ * SLA · time on us = itProcessMs (IT-side stages). Total time = every process stage. The share
+ * is itProcessMs / processTotalMs as a 0–100 integer. */
+test('processTotalMs: sums every stage incl. User (the whole lifetime)', () => {
+  eq(app.processTotalMs({ status: 'closed', processTimeline: [
+    { processType: 'User',     startedAt: iso(20 * HOUR), endedAt: iso(15 * HOUR) },  // 5h
+    { processType: '1st Line', startedAt: iso(15 * HOUR), endedAt: iso(0) },          // 15h
+  ] }), 20 * HOUR);
+});
+test('slaSharePct: IT time as a share of total time', () => {
+  eq(app.slaSharePct({ status: 'closed', processTimeline: [
+    { processType: 'User',     startedAt: iso(20 * HOUR), endedAt: iso(15 * HOUR) },  // 5h (not on us)
+    { processType: '1st Line', startedAt: iso(15 * HOUR), endedAt: iso(0) },          // 15h on us
+  ] }), 75);   // 15 / 20
+});
+test('slaSharePct: empty timeline → null (renders as —)', () => {
+  eq(app.slaSharePct({ status: 'new', processTimeline: [] }), null);
+});
+
 /* ---------- "Wait User" due math (case-detail "Waiting on user" panel) ----------
  * waitUserDueMs returns signed ms to the Wait User due time (NOW-based): positive = due in the
  * future, negative = overdue, null = no waitUser/due date. */
@@ -759,6 +778,26 @@ test('trackStatusPhase: delivered (at destination) wins over overdue past the de
     processTimeline: [{ processType: 'Service Team', processStartTime: iso(7 * 24 * HOUR) }] };
   eq(app.caseStation(c), 'HQ');
   eq(app.trackStatusPhase(c), 'delivered');      // not overdue — it arrived
+});
+
+/* ---------- escalate_to_core: "next 09:00" lands on the day AFTER a same-day commit ---------- */
+// Regression: a status set on Monday (after 09:00 MST) must schedule Tue 09:00 — not Wed.
+test('scheduledHandoff: escalate_to_core set Mon 11:00 MST → Tue 09:00 (not Wed)', () => {
+  const c = { id: 'C-ESC', subject: 's', trackStatus: 'escalate_to_core',
+    trackStatusAt: '2026-06-15T18:00:00Z' };          // Mon 2026-06-15, 11:00 MST
+  const h = app.scheduledHandoff(c);
+  eq(h.dueDay, 'Tue');
+  eq(h.dueAt, '2026-06-16T16:00:00.000Z');            // Tue 2026-06-16 09:00 MST (Wed would be the 17th)
+});
+test('scheduledHandoff: set before 09:00 MST → same day (Mon 06:00 → Mon 09:00)', () => {
+  const c = { id: 'C-ESC2', subject: 's', trackStatus: 'escalate_to_core',
+    trackStatusAt: '2026-06-15T13:00:00Z' };          // Mon 06:00 MST
+  eq(app.scheduledHandoff(c).dueAt, '2026-06-15T16:00:00.000Z');  // Mon 09:00 MST
+});
+test('scheduledHandoff: no anchor → falls back to the logged track-status-set time, not NOW', () => {
+  const c = { id: 'C-HF', subject: 's', trackStatus: 'escalate_to_core', trackStatusAt: null,
+    history: [{ kind: 'track-status-set', at: '2026-06-15T18:00:00Z', who: 'op' }] };  // set Mon 11:00 MST
+  eq(app.scheduledHandoff(c).dueAt, '2026-06-16T16:00:00.000Z');  // Tue 09:00 MST — anchored to history
 });
 
 /* ---------- report ---------- */

@@ -1078,6 +1078,21 @@ function caseStation(c) {
 // is still labelled "Sun". Walks forward up to 14 MST-days. Returns null for non-
 // scheduled statuses.
 const MST_OFFSET_HOURS = 7;
+// When the operator last committed a Track Status, read back from the case history (the
+// dropdown logs a `track-status-set` entry on every change). Used as the deadline anchor
+// when `trackStatusAt` is missing — so a case set via an older build (or whose anchor was
+// never stored) still pins its deadline to when it was set, instead of floating with NOW.
+function lastTrackStatusSetAt(c) {
+  const hist = (c && c.history) || [];
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const h = hist[i];
+    if (h && h.kind === 'track-status-set' && h.at) {
+      const t = Date.parse(h.at);
+      if (isFinite(t)) return t;
+    }
+  }
+  return NaN;
+}
 function scheduledHandoff(c) {
   const ts = caseTrackStatus(c);
   const def = TRACK_STATUS_BY_ID[ts];
@@ -1087,11 +1102,15 @@ function scheduledHandoff(c) {
   // Anchor the deadline to WHEN the operator committed to this intent (`trackStatusAt`), not to
   // "now". The deadline is the first scheduled occurrence AFTER that commit, and it STICKS there:
   // once it passes with the case still not at its destination, the case goes overdue against that
-  // date — it does NOT roll forward to the next slot. Fresh/old cases with no anchor fall back to
-  // now, which preserves the original "next upcoming deadline" behaviour (and can't false-overdue,
-  // since the first occurrence after now is always in the future).
+  // date — it does NOT roll forward to the next slot. With no explicit anchor we fall back to
+  // the logged set-time from history, then finally to now — which preserves the original "next
+  // upcoming deadline" behaviour for truly fresh cases (and can't false-overdue, since the first
+  // occurrence after now is always in the future).
   const anchorParsed = c && c.trackStatusAt ? Date.parse(c.trackStatusAt) : NaN;
-  const startMs = isFinite(anchorParsed) ? anchorParsed : NOW.getTime();
+  const histAnchor = isFinite(anchorParsed) ? NaN : lastTrackStatusSetAt(c);
+  const startMs = isFinite(anchorParsed) ? anchorParsed
+    : isFinite(histAnchor) ? histAnchor
+    : NOW.getTime();
   // The MST date of the anchor (treat MST as UTC minus 7 hours, no DST).
   const mstAnchor = new Date(startMs - MST_OFFSET_HOURS * 3600 * 1000);
   const y = mstAnchor.getUTCFullYear();
@@ -1921,6 +1940,20 @@ function itProcessMs(c) {
     .filter(s => IT_PROCESS_TYPES.has(String(s.processType || '').replace(/\s+/g, ' ').trim().toLowerCase()))
     .reduce((sum, s) => sum + (s.ms || 0), 0);
 }
+// Total time = the whole elapsed lifetime of the case across every process stage (IT-side
+// plus time waiting on the user, etc.) — the sum of all process segments. SLA · time on us
+// (= itProcessMs) is a subset, so itProcessMs / processTotalMs is the share of the case's
+// life that was actively on us.
+function processTotalMs(c) {
+  return processSegments(c).reduce((sum, s) => sum + (s.ms || 0), 0);
+}
+// Share of total elapsed time that the case was on us (IT process time), 0–100. Null when
+// there's no timeline to measure against.
+function slaSharePct(c) {
+  const total = processTotalMs(c);
+  if (!total) return null;
+  return Math.round((itProcessMs(c) / total) * 100);
+}
 // The IT-process-time limit (hours) past which a case is "over" and gets highlighted. Configurable
 // via THRESHOLDS.itProcessHours in data.js; falls back to this default.
 const IT_PROCESS_HOURS_DEFAULT = 15;
@@ -2039,16 +2072,12 @@ function renderCaseDetailBody(c) {
   const core = getOwner('core', c.coreId);
   const hq = getOwner('hq', c.hqId);
 
-  const slaMs = caseSlaMs(c);
-  // FIT/HQ time spent is derived from the ownership timeline so the clocks and the
-  // timeline legend always agree (same source: the case history).
-  const hold = holderTotals(c);
-  const coreMs = hold.core;
-  const hqMs = hold.hq;
-  // First-line handling = time the case sat directly with the first-line agent during triage
-  // (status New). Sanity Check counts as requester time, not first-line, so it's excluded.
-  const firstLineMs = hold.triage;
-  const firstLineHolding = c.currentOwner === null && c.status === 'new';
+  // SLA · time on us = IT process time (the sum of the IT-side process stages). Total time is
+  // the case's whole elapsed lifetime; the share is what fraction of that was on us.
+  const itMs = itProcessMs(c);
+  const totalMs = processTotalMs(c);
+  const share = slaSharePct(c);
+  const settled = ['resolved', 'closed', 'cancelled'].includes(c.status);
 
   const handoverHtml = c.handover ? (() => {
     const author = getOperator(c.handover.author);
@@ -2091,25 +2120,20 @@ function renderCaseDetailBody(c) {
           <div class="detail-section">
             <h3>Clocks</h3>
             <div class="clock-grid">
-              <div class="clock">
+              <div class="clock" title="Time the case was actively on us — the IT process time (1st Line + Service Team + 2nd Line + Unknown stages).">
                 <div class="label">SLA · time on us</div>
-                <div class="value">${fmtDuration(slaMs)}</div>
-                <div class="state ${c.slaPaused ? 'paused' : 'running'}">${c.slaPaused ? 'Paused (with requester)' : 'Running'}</div>
+                <div class="value${itProcessOver(c) ? ' over' : ''}">${fmtDuration(itMs)}</div>
+                <div class="state ${settled ? '' : 'running'}">${settled ? 'Settled' : 'Running'}</div>
               </div>
-              <div class="clock" title="Time the first-line agent handled this case directly, during triage (status New). Sanity Check counts as requester time.">
-                <div class="label"><span class="clock-swatch tl-triage"></span>First line</div>
-                <div class="value">${fmtDuration(firstLineMs)}</div>
-                <div class="state ${firstLineHolding ? 'running' : ''}">${firstLineHolding ? 'Holding now' : 'Idle'}</div>
+              <div class="clock" title="The case's whole elapsed lifetime across every process stage, including time waiting on the user.">
+                <div class="label">Total time</div>
+                <div class="value">${fmtDuration(totalMs)}</div>
+                <div class="state ${settled ? '' : 'running'}">${settled ? 'Settled' : 'Running'}</div>
               </div>
-              <div class="clock">
-                <div class="label">Core Team</div>
-                <div class="value">${fmtDuration(coreMs)}</div>
-                <div class="state ${c.currentOwner === 'core' ? 'running' : ''}">${c.currentOwner === 'core' ? 'Holding now' : 'Idle'}</div>
-              </div>
-              <div class="clock">
-                <div class="label">HQ Product Team</div>
-                <div class="value">${fmtDuration(hqMs)}</div>
-                <div class="state ${c.currentOwner === 'hq' ? 'running' : ''}">${c.currentOwner === 'hq' ? 'Holding now' : 'Idle'}</div>
+              <div class="clock" title="Share of the case's total elapsed time that was on us (SLA ÷ Total time).">
+                <div class="label">On us</div>
+                <div class="value">${share == null ? '—' : share + '%'}</div>
+                <div class="state">of total time</div>
               </div>
             </div>
           </div>

@@ -544,9 +544,11 @@ window.CASES = window.CASES.concat((function () {
 
 window.SEED_AGENT_LAYER = {
   // — MOVING lane (scheduled hand-off) — these sit AT USER and move toward their target —
-  'C-2407': { agentStatus: 'queued', trackStatus: 'weekend_case' },       // User → HQ (Sun 17:30)
-  'C-2416': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle' },  // User → HQ (next 17:30)
-  'C-2423': { agentStatus: 'queued', trackStatus: 'escalate_to_core' },   // User → Core (09:00)
+  // `trackStatusAt` is the commit time the deadline anchors off (first scheduled slot AFTER it,
+  // then it STICKS — see scheduledHandoff). Without it the chip would float with the clock.
+  'C-2407': { agentStatus: 'queued', trackStatus: 'weekend_case',      trackStatusAt: '2026-06-11T12:00:00Z' }, // User → HQ (next Sun 17:30)
+  'C-2416': { agentStatus: 'queued', trackStatus: 'hq_did_not_handle', trackStatusAt: '2026-06-12T10:00:00Z' }, // User → HQ (next 17:30)
+  'C-2423': { agentStatus: 'queued', trackStatus: 'escalate_to_core',  trackStatusAt: '2026-06-15T17:00:00Z' }, // set Mon 10:00 MST → Core by Tue 09:00
   // — WATCH: escalated_to_hq (expected HQ) — one settled at HQ, one not yet (intent arrow → HQ) —
   'C-2414': { agentStatus: 'queued', trackStatus: 'escalated_to_hq',     // AT HQ → watch ring
     handover: { note: 'Pinged HQ Identity at 09:30 — awaiting a cert-rotation fix ETA. Keep watching; chase if nothing back by noon.',

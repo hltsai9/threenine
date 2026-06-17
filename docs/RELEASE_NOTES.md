@@ -10,6 +10,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-16
 
+### Changed (case-detail Clocks → SLA / Total / On-us share)
+
+- The case-detail **Clocks** panel is simplified to three: **SLA · time on us** (now equals the
+  case's **IT process time** — the IT-side process stages), **Total time** (the case's whole
+  elapsed lifetime across every process stage, incl. time waiting on the user), and **On us**
+  (the share of total time that was on us, `SLA ÷ Total`). The old **First line / Core Team /
+  HQ Product Team** clocks are removed. SLA goes red when over the IT-process limit.
+- New helpers `processTotalMs()` (sum of all process-timeline stages) and `slaSharePct()`
+  (`itProcessMs ÷ processTotalMs`, 0–100, null when there's no timeline).
+
+### Fixed (scheduled hand-off deadline anchoring)
+
+- A scheduled Track Status (e.g. **Escalate to Core Team**, next 09:00) now reliably anchors its
+  deadline to **when the operator set it** and sticks there. Previously a case whose
+  `trackStatusAt` was absent (set on an older build, or a demo seed) let the chip **float with the
+  clock** — so e.g. a status set Monday could drift to read "Wed 09:00" instead of "Tue 09:00".
+  `scheduledHandoff` now falls back to the logged `track-status-set` history time before falling
+  back to NOW (`lastTrackStatusSetAt`), so the deadline pins to the commit even without a stored
+  anchor.
+- Demo seed: the three MOVING-lane cases (C-2407, C-2416, **C-2423**) now carry an explicit
+  `trackStatusAt` so their chips no longer float — C-2423 reads **Tue 09:00** (set Mon 10:00 MST).
+
 ### Changed (UI — hide chrome behind flags; tour off by default)
 
 - **Guided tour is now OFF by default.** `window.TOUR_AUTOSTART` in `config.js`
