@@ -899,6 +899,26 @@ test('weekly archive hides future weeks (kept in WEEKS for the Shifts planner)',
   ok(html.includes(`#/archive/${app.CURRENT_WEEK.id}`), 'current week is listed');
 });
 
+/* ---------- weekly archive summary stats ---------- */
+test('isCancelledOrDropped: counts the cancelled enum and raw Drop/Cancel labels', () => {
+  ok(app.isCancelledOrDropped({ status: 'cancelled' }), 'mapped cancelled enum');
+  ok(app.isCancelledOrDropped({ status: 'new', ccStatusLabel: 'Drop' }), 'raw Drop label');
+  ok(app.isCancelledOrDropped({ status: 'new', ccStatusLabel: 'Cancelled' }), 'raw Cancelled label');
+  ok(!app.isCancelledOrDropped({ status: 'with_core', ccStatusLabel: 'In-Progress' }), 'in-progress is not cancelled');
+});
+test('_percentile: nearest-rank (P95/P99/empty)', () => {
+  const v = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  eq(app._percentile(v, 95), 10);
+  eq(app._percentile(v, 50), 5);
+  eq(app._percentile([], 95), null);
+});
+test('weekStats: cancelled+dropped counted, IT P95/P99 present, no median field', () => {
+  const s = app.weekStats(app.CURRENT_WEEK.id);
+  ok(typeof s.cancelled === 'number', 'cancelled is a count');
+  ok('itP95Ms' in s && 'itP99Ms' in s, 'IT percentiles present');
+  ok(!('medianOnUsHrs' in s), 'old median field removed');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {

@@ -10,6 +10,18 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Changed (Weekly Archive summary stats)
+
+- Per-week archive **summary bar**: removed **Carried in** and **Returned to requester**; it now
+  shows Total · Open · Closed · Cancelled · **IT time · P95** · **IT time · P99**.
+- **Cancelled** now counts **cancelled + dropped** cases — `isCancelledOrDropped()` matches the
+  mapped `cancelled` enum (Case Center "Drop") *and* any raw/displayed status reading as
+  cancel/drop (e.g. a live "Cancelled" caseStatus that otherwise falls through to `new`). Such
+  cases are also excluded from the **Open** count.
+- **Median on us (closed)** replaced by **IT process time percentiles (P95 & P99)** computed over
+  **all** cases in the week (not just closed), via a nearest-rank `_percentile()` helper. The
+  archive index card's "Median on us" likewise becomes **IT P95**.
+
 ### Fixed (hand-off time suggestion uses the picked timezone)
 
 - The hand-off-time picker now suggests the default in the **selected display timezone**, not by

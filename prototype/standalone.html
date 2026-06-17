@@ -6280,21 +6280,32 @@ function syncWeeksToNow() {
   }
 }
 
+// A case counts as cancelled if it's the mapped 'cancelled' enum (Case Center "Drop") OR its
+// raw/displayed status reads as a cancel/drop — covers live cases whose CC status didn't map to
+// the enum (e.g. a "Cancelled" caseStatus that falls through to 'new').
+function isCancelledOrDropped(c) {
+  return (c && c.status === 'cancelled') || /cancel|drop/i.test(displayStatus(c) || '');
+}
+// Nearest-rank percentile of an ascending-sorted numeric array (null when empty).
+function _percentile(sortedAsc, p) {
+  if (!sortedAsc.length) return null;
+  const i = Math.min(sortedAsc.length - 1, Math.max(0, Math.ceil((p / 100) * sortedAsc.length) - 1));
+  return sortedAsc[i];
+}
+
 function weekStats(weekId) {
   const cases = STATE.cases.filter(c => !c.deletedAt && c.weekId === weekId);
   const total = cases.length;
-  const open = cases.filter(c => !['closed', 'cancelled'].includes(c.status)).length;
   const closed = cases.filter(c => c.status === 'closed').length;
-  const cancelled = cases.filter(c => c.status === 'cancelled').length;
+  const cancelled = cases.filter(isCancelledOrDropped).length;       // cancelled + dropped
+  const open = cases.filter(c => c.status !== 'closed' && !isCancelledOrDropped(c)).length;
   const carriedIn = cases.filter(c => c.carriedFrom).length;
   const bounces = cases.filter(c => (c.history || []).some(h => h.kind === 'returned')).length;
-  const closedCases = cases.filter(c => c.status === 'closed');
-  const medianOnUsHrs = (() => {
-    if (closedCases.length === 0) return null;
-    const v = closedCases.map(c => (c.slaAccumulatedMs || 0) / HOUR).sort((a, b) => a - b);
-    return v[Math.floor(v.length / 2)];
-  })();
-  return { total, open, closed, cancelled, carriedIn, bounces, medianOnUsHrs };
+  // IT process time distribution across ALL cases in the week (not limited to closed).
+  const itMs = cases.map(c => itProcessMs(c)).sort((a, b) => a - b);
+  const itP95Ms = _percentile(itMs, 95);
+  const itP99Ms = _percentile(itMs, 99);
+  return { total, open, closed, cancelled, carriedIn, bounces, itP95Ms, itP99Ms };
 }
 
 function renderArchiveIndex() {
@@ -6313,7 +6324,7 @@ function renderArchiveIndex() {
           <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
           <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
           <div class="stat"><div class="v">${s.bounces}</div><div class="k">Bounces</div></div>
-          <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us</div></div>
+          <div class="stat"><div class="v">${s.itP95Ms != null ? fmtDuration(s.itP95Ms) : '—'}</div><div class="k">IT P95</div></div>
         </div>
       </a>
     `;
@@ -6394,9 +6405,8 @@ function renderArchiveWeek(weekId) {
       <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
       <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
       <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
-      <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
-      <div class="stat"><div class="v">${s.bounces}</div><div class="k">Returned to requester</div></div>
-      <div class="stat"><div class="v">${s.medianOnUsHrs != null ? s.medianOnUsHrs.toFixed(1) + 'h' : '—'}</div><div class="k">Median on us (closed)</div></div>
+      <div class="stat"><div class="v">${s.itP95Ms != null ? fmtDuration(s.itP95Ms) : '—'}</div><div class="k">IT time · P95</div></div>
+      <div class="stat"><div class="v">${s.itP99Ms != null ? fmtDuration(s.itP99Ms) : '—'}</div><div class="k">IT time · P99</div></div>
     </div>
 
     ${cases.length === 0 ? '<div class="queue-empty">No cases filed in this week.</div>' : `
