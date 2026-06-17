@@ -8,6 +8,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-17
+
+### Changed (Route Board over-limit highlight — accent only)
+
+- The IT-process over-limit highlight on a **Route Board** row is now just the **dark-red left
+  accent** — the light-red background fill is removed. With no background of its own, an
+  over-limit row still shows the normal **hover** and **selected** backgrounds, so it's clear
+  which case is selected or hovered even when it's flagged red.
+
 ## 2026-06-16
 
 ### Fixed (operator selection resets on refresh)

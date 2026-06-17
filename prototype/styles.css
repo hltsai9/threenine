@@ -2491,9 +2491,9 @@ table.case-table {
 .rb-row:hover { background: rgba(46, 86, 65, 0.06); }
 .rb-row-selected { background: rgba(46, 86, 65, 0.09); }
 
-/* IT process time over the limit: highlight the whole case row + redden the time chip. */
-.rb-row-over { background: var(--danger-bg); box-shadow: inset 3px 0 0 var(--danger); }
-.rb-row-over:hover { background: var(--danger-bg); }
+/* IT process time over the limit: dark-red left accent only — no background fill, so the
+   hover and selected backgrounds stay visible on an over-limit row. */
+.rb-row-over { box-shadow: inset 3px 0 0 var(--danger); }
 .rb-it-time { font-size: 11px; color: var(--text-faint-2, #8a948f); }
 .rb-it-over { color: var(--danger); font-weight: 600; }
 
