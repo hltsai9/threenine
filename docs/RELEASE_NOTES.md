@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Changed (IT process time shown in hours)
+
+- IT process time is now formatted in **hours and never rolled into days** — "15h", "10.5h", and
+  e.g. **"30.6h"** instead of "1d 6h". New `fmtHours()` (1 decimal, trimmed when whole) is used
+  for the Route Board chip, the Overview "IT process time" column, the case-detail **SLA · time on
+  us** and **Total time** clocks, the process-timeline total, and the archive **IT P95 / P99**.
+
 ### Changed (Weekly Archive summary stats)
 
 - Per-week archive **summary bar**: removed **Carried in** and **Returned to requester**; it now

@@ -653,6 +653,13 @@ function fmtDuration(ms) {
   const rh = h % 24;
   return rh ? `${d}d ${rh}h` : `${d}d`;
 }
+// Process-time formatter: always hours, never rolled into days. 1 decimal, trimmed when whole —
+// "15h", "10.5h", "30.6h". Used for IT process time and the adjacent total/percentile figures.
+function fmtHours(ms) {
+  if (ms == null) return '—';
+  const r = Math.round((ms / 3600000) * 10) / 10;
+  return `${Number.isInteger(r) ? r : r.toFixed(1)}h`;
+}
 // Reminders use real wall-clock time (vs. frozen NOW used for case state).
 function realNow() { return new Date(); }
 
@@ -2147,7 +2154,7 @@ function itProcessOver(c) {
 // Small Route-Board / table label for a case's IT process time (red when over the limit).
 function itTimeLabel(c) {
   const over = itProcessOver(c);
-  return `<span class="rb-it-time${over ? ' rb-it-over' : ''}" title="IT process time${over ? ` — over ${itProcessLimitHours()}h limit` : ''}">${fmtDuration(itProcessMs(c))}</span>`;
+  return `<span class="rb-it-time${over ? ' rb-it-over' : ''}" title="IT process time${over ? ` — over ${itProcessLimitHours()}h limit` : ''}">${fmtHours(itProcessMs(c))}</span>`;
 }
 
 function renderProcessTimeline(c) {
@@ -2212,7 +2219,7 @@ function renderProcessTimeline(c) {
     <div class="timeline" role="img" aria-label="Process timeline">${bar}</div>
     <div class="tl-marks">${marks}</div>
     <div class="tl-legend">${legend}</div>
-    <div class="muted tiny" style="margin-top:6px">Total process time: ${fmtDuration(totalMs)} · ${segs.length} stage${segs.length === 1 ? '' : 's'}</div>
+    <div class="muted tiny" style="margin-top:6px">Total process time: ${fmtHours(totalMs)} · ${segs.length} stage${segs.length === 1 ? '' : 's'}</div>
   `;
 }
 
@@ -2302,12 +2309,12 @@ function renderCaseDetailBody(c) {
             <div class="clock-grid">
               <div class="clock" title="Time the case was actively on us — the IT process time (1st Line + Service Team + 2nd Line + Unknown stages).">
                 <div class="label">SLA · time on us</div>
-                <div class="value${itProcessOver(c) ? ' over' : ''}">${fmtDuration(itMs)}</div>
+                <div class="value${itProcessOver(c) ? ' over' : ''}">${fmtHours(itMs)}</div>
                 <div class="state ${settled ? '' : 'running'}">${settled ? 'Settled' : 'Running'}</div>
               </div>
               <div class="clock" title="The case's whole elapsed lifetime across every process stage, including time waiting on the user.">
                 <div class="label">Total time</div>
-                <div class="value">${fmtDuration(totalMs)}</div>
+                <div class="value">${fmtHours(totalMs)}</div>
                 <div class="state ${settled ? '' : 'running'}">${settled ? 'Settled' : 'Running'}</div>
               </div>
               <div class="clock" title="Share of the case's total elapsed time that was on us (SLA ÷ Total time).">
@@ -2587,7 +2594,7 @@ function renderArchiveIndex() {
           <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
           <div class="stat"><div class="v">${s.carriedIn}</div><div class="k">Carried in</div></div>
           <div class="stat"><div class="v">${s.bounces}</div><div class="k">Bounces</div></div>
-          <div class="stat"><div class="v">${s.itP95Ms != null ? fmtDuration(s.itP95Ms) : '—'}</div><div class="k">IT P95</div></div>
+          <div class="stat"><div class="v">${s.itP95Ms != null ? fmtHours(s.itP95Ms) : '—'}</div><div class="k">IT P95</div></div>
         </div>
       </a>
     `;
@@ -2668,8 +2675,8 @@ function renderArchiveWeek(weekId) {
       <div class="stat"><div class="v">${s.open}</div><div class="k">Open</div></div>
       <div class="stat"><div class="v">${s.closed}</div><div class="k">Closed</div></div>
       <div class="stat"><div class="v">${s.cancelled}</div><div class="k">Cancelled</div></div>
-      <div class="stat"><div class="v">${s.itP95Ms != null ? fmtDuration(s.itP95Ms) : '—'}</div><div class="k">IT time · P95</div></div>
-      <div class="stat"><div class="v">${s.itP99Ms != null ? fmtDuration(s.itP99Ms) : '—'}</div><div class="k">IT time · P99</div></div>
+      <div class="stat"><div class="v">${s.itP95Ms != null ? fmtHours(s.itP95Ms) : '—'}</div><div class="k">IT time · P95</div></div>
+      <div class="stat"><div class="v">${s.itP99Ms != null ? fmtHours(s.itP99Ms) : '—'}</div><div class="k">IT time · P99</div></div>
     </div>
 
     ${cases.length === 0 ? '<div class="queue-empty">No cases filed in this week.</div>' : `

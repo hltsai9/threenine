@@ -48,6 +48,12 @@ test('fmtDuration: hours + minutes', () => eq(fmtDuration(90 * 60000), '1h 30m')
 test('fmtDuration: exact day', () => eq(fmtDuration(24 * HOUR), '1d'));
 test('fmtDuration: days + hours', () => eq(fmtDuration(25 * HOUR), '1d 1h'));
 
+/* ---------- fmtHours (IT process time — always hours, never days) ---------- */
+test('fmtHours: whole hours trim the decimal', () => eq(app.fmtHours(15 * HOUR), '15h'));
+test('fmtHours: half hour → 10.5h', () => eq(app.fmtHours(10.5 * HOUR), '10.5h'));
+test('fmtHours: over a day stays in hours → 30.6h (not 1d 6.6h)', () => eq(app.fmtHours(30.6 * HOUR), '30.6h'));
+test('fmtHours: null → em dash', () => eq(app.fmtHours(null), '—'));
+
 /* ---------- statusLabel / displayStatus / isQueued ---------- */
 test('statusLabel: maps known enum', () => eq(statusLabel('with_core'), 'With Core Team'));
 test('statusLabel: passthrough unknown', () => eq(statusLabel('weird'), 'weird'));
