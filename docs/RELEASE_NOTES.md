@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-17
 
+### Fixed (current week now tracks the real date)
+
+- The **current week** (sidebar "Week", the Archive "Current" card, the Shifts page) now follows
+  the **real current date** instead of staying frozen at the seed's authoring week (W24 · June
+  2026). New `syncWeeksToNow()` runs on every boot: it rebuilds `window.WEEKS` from each case's
+  (re-anchored) `createdAt` on the Sunday-aligned grid, ensures the current week plus the next 3
+  upcoming weeks exist, flags `isCurrent`/`isFuture`, and points `window.CURRENT_WEEK` at today's
+  bucket. Runs in seed/demo, serve.py live, and server-authoritative modes. `WEEK_STARTS_ON`
+  moved above the boot block (it's read during the synchronous boot now).
+
 ### Added (custom hand-off time for scheduled Track Statuses)
 
 - Setting **Weekend Case**, **HQ did not handle**, or **Escalate to Core Team** now opens a

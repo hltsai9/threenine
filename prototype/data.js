@@ -32,6 +32,8 @@ window.THRESHOLDS = {
 
 window.CURRENT_SHIFT = { name: 'Day', endsAtUtc: '2026-06-12T12:00:00Z', date: '2026-06-12' };
 // Week boundaries: weeks start on SUNDAY 00:00 UTC. W24 of 2026 starts Sun Jun 7.
+// NOTE: these are authoring-time defaults. On boot, app.js re-anchors the seed onto the real
+// clock and `syncWeeksToNow()` rebuilds WEEKS + CURRENT_WEEK so "this week" tracks today's date.
 window.CURRENT_WEEK = { id: 'W24-2026', label: 'W24 · June 7 – 13, 2026', startsAt: '2026-06-07T00:00:00Z' };
 
 window.WEEKS = [

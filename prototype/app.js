@@ -531,6 +531,9 @@ const RECYCLE_BIN_MS = 7 * DAY;   // deleted cases are kept in the recycle bin f
 let NOW = window.NOW;
 const SEED_ANCHOR = window.NOW.getTime();
 const SEED_CURRENT_SHIFT = structuredClone(window.CURRENT_SHIFT);
+// Day index the work-week starts on (0 = Sunday). Declared up here because syncWeeksToNow()
+// runs during the synchronous boot below and weekIdFor()/weekNumberFor() read it.
+const WEEK_STARTS_ON = 0;
 
 function shiftIso(v, off) { return v ? new Date(new Date(v).getTime() + off).toISOString() : v; }
 function shiftCaseTimes(c, off) {
@@ -581,6 +584,7 @@ function seedBoot(loadedFromStorage) {
   } else {
     anchorFreshSeed();
   }
+  syncWeeksToNow();          // make "this week" track the real current date, not the seed's week
   restoreOperatorChoice();   // per-device operator pick takes precedence over the seed default
 }
 
@@ -2439,9 +2443,7 @@ function statusTransitions(_c) { return []; }
 
 /* ---------- Weekly Archive ---------- */
 
-// Day-of-week index where weeks start. 0 = Sunday (per the team's convention; matches
-// the W24-2026 seed that starts on Sun Jun 7). Change here if the week ever moves.
-const WEEK_STARTS_ON = 0;
+// (WEEK_STARTS_ON is declared near the boot block — syncWeeksToNow() needs it at load time.)
 
 // Find an existing window.WEEKS bucket whose [startsAt, endsAt) contains `createdAt`,
 // or auto-create one when no week fits. The new week is inserted in date order so the
@@ -2492,6 +2494,33 @@ function weekLabel(start, end) {
   const w = weekNumberFor(start);
   const range = sm === em ? `${sm} ${sd} – ${ed}` : `${sm} ${sd} – ${em} ${ed}`;
   return `W${w} · ${range}, ${yr}`;
+}
+
+// Re-anchor the weekly buckets onto the real current date. The seed's weeks (and case weekIds)
+// are authored around window.NOW; on boot we slide every case timestamp onto the real clock, so
+// "this week" must track today too — otherwise CURRENT_WEEK stays frozen at the authoring week.
+// Rebuilds window.WEEKS from each case's (real) createdAt on the Sunday-aligned grid, ensures the
+// current week + the next 3 upcoming weeks exist, flags them, and points window.CURRENT_WEEK at
+// today's bucket. Safe to call in any mode (idempotent — re-derives purely from case dates + now).
+function syncWeeksToNow() {
+  window.WEEKS = [];
+  STATE.cases.forEach(c => { if (c.createdAt) c.weekId = weekIdFor(c.createdAt); });
+  const today = new Date();
+  const D = 24 * 60 * 60 * 1000;
+  const curId = weekIdFor(today.toISOString());                 // ensure the current week exists
+  for (let i = 1; i <= 3; i++) weekIdFor(new Date(today.getTime() + i * 7 * D).toISOString());  // upcoming empties
+  const nowMs = today.getTime();
+  let cur = null;
+  for (const w of window.WEEKS) {
+    w.isCurrent = w.id === curId;
+    w.isFuture = Date.parse(w.startsAt) > nowMs && w.id !== curId;
+    if (w.isCurrent) cur = w;
+  }
+  if (cur) window.CURRENT_WEEK = { id: cur.id, label: cur.label, startsAt: cur.startsAt };
+  // Keep the current week's rota resolvable by the Shifts editor (defaults to the base rota).
+  if (cur && window.ROTA && window.ROTA_BY_WEEK && !window.ROTA_BY_WEEK[cur.id]) {
+    window.ROTA_BY_WEEK[cur.id] = window.ROTA;
+  }
 }
 
 function weekStats(weekId) {
@@ -5212,6 +5241,7 @@ async function tryLoadLiveCases(allCases) {
   // The operator pick is per-device — restore it in EVERY mode (server-authoritative skips the
   // agent-layer overlay above, but the chosen operator still belongs to this browser).
   restoreOperatorChoice();
+  syncWeeksToNow();   // re-anchor the weekly buckets onto today for the freshly loaded cases
   snapshotSavedCases();
   return true;
 }

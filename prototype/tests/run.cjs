@@ -849,6 +849,31 @@ test('scheduledHandoff: no override → falls back to the standard rule', () => 
   eq(app.scheduledHandoff(c).dueAt, '2026-06-16T16:00:00.000Z');   // Tue 09:00 MST
 });
 
+/* ---------- current week tracks the real date (syncWeeksToNow) ---------- */
+// The seed authors weeks around window.NOW; on boot they're re-derived so "this week" follows
+// the clock. (Under the frozen test clock, "now" = the seed anchor, so this is deterministic.)
+test('CURRENT_WEEK is the bucket containing now, flagged isCurrent', () => {
+  const id = app.weekIdFor(new Date(FIXED).toISOString());
+  eq(app.CURRENT_WEEK.id, id);
+  const cur = app.WEEKS.find(w => w.id === app.CURRENT_WEEK.id);
+  ok(cur && cur.isCurrent, 'current bucket exists and is flagged');
+  ok(Date.parse(cur.startsAt) <= FIXED && FIXED < Date.parse(cur.endsAt), 'now falls inside the current week');
+});
+test('the week after the current one is flagged isFuture', () => {
+  const next = app.weekIdFor(new Date(FIXED + 7 * 24 * HOUR).toISOString());
+  const w = app.WEEKS.find(x => x.id === next);
+  ok(w && w.isFuture && !w.isCurrent, 'next week is future, not current');
+});
+test('a case weekId resolves to a bucket whose range contains its createdAt', () => {
+  const idField = app.CASES_RAW_CC ? 'caseId' : 'id';
+  const id = app.CASES.map(r => r[idField]).find(Boolean);
+  const c = app.caseById(id);
+  const w = app.WEEKS.find(x => x.id === c.weekId);
+  ok(w, 'weekId resolves to a real bucket');
+  const t = Date.parse(c.createdAt);
+  ok(Date.parse(w.startsAt) <= t && t < Date.parse(w.endsAt), 'createdAt sits inside its week bucket');
+});
+
 /* ---------- report ---------- */
 process.stdout.write('\n\n');
 for (const f of fails) {
