@@ -2672,7 +2672,9 @@ table.case-table {
 }
 .rb-chip {
   top: 6px;
-  transform: translateX(-50%);
+  /* Right-anchored: the inline `left` marks the chip's right edge (the arrow's end), so the chip
+     grows leftwards and never collides with the id / process-time label at the origin end. */
+  transform: translateX(-100%);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   border-radius: 6px;

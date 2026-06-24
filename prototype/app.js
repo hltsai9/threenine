@@ -1433,10 +1433,8 @@ const ROUTE_STATION_POS = { 'User': 12, '1st Line': 31, 'Core Team': 50, 'HQ': 8
 window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
 // Dot colour per station — matches the station squares in the band header.
 const STATION_DOT_COLOR = { 'User': '#3f6e5e', '1st Line': '#6b7a72', 'Core Team': '#8A3434', 'HQ': '#8C4A2F' };
-// Midpoint of the route line where the deadline chip sits.
-// Spec is explicit: 31% for Core, 70% for HQ (not the geometric midpoint of
-// 12→88 — biased toward the destination so it doesn't overlap the case id).
-const ROUTE_CHIP_POS = { 'Core Team': 31, 'HQ': 70 };
+// The deadline chip sits at the END of the arrow (just left of the destination ring), so it never
+// overlaps the case id / IT-process-time label anchored at the origin end. See _renderMovingRow.
 const ROUTE_GREEN = '#2E5641';
 const ROUTE_RED = '#B05050';
 
@@ -1776,7 +1774,6 @@ function _renderMovingRow(c, top, animDelay) {
   const color = overdue ? ROUTE_RED : ROUTE_GREEN;
   const originPct = ROUTE_STATION_POS[handoff.from] ?? ROUTE_STATION_POS['User'];
   const destPct = ROUTE_STATION_POS[handoff.to];
-  const chipPct = ROUTE_CHIP_POS[handoff.to] ?? ((originPct + destPct) / 2);
   const widthPct = destPct - originPct;
   const chipText = formatDeadlineChip(handoff, phase);
   const chipCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
@@ -1800,7 +1797,7 @@ function _renderMovingRow(c, top, animDelay) {
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
       ${routeTrackerTag(c)}
       <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
-      <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
+      <div class="${chipCls}"         style="left:calc(${destPct}% - 12px);">${escapeHtml(chipText)}</div>
     </div>
   `;
 }

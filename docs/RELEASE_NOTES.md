@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Fixed (Route Board deadline chip no longer overlaps the case id)
+
+- On a moving (scheduled-handoff) row, the deadline/timestamp chip moved from the route-line midpoint
+  to the **end of the arrow** (just left of the destination ring) and is now **right-anchored** — so
+  it never sits on top of the case id / IT-process-time label anchored at the origin end. Removed the
+  unused `ROUTE_CHIP_POS` midpoint table.
+
 ### Fixed (Copy as table pastes as a real table in Teams/Outlook; Note date trimmed)
 
 - **"Copy as table" now puts HTML on the clipboard**, so chat/mail apps (Teams, Outlook, Slack,
