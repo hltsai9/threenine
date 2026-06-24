@@ -10,6 +10,7 @@ on:
       - claude/charming-cray-ti71j0
       - claude/intelligent-goldberg-c5lpt8
       - claude/vigilant-knuth-slap60
+      - claude/exciting-faraday-tartrr
     paths:
       - 'prototype/**'
       - '.github/workflows/pages.yml'
