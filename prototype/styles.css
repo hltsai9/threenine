@@ -2553,12 +2553,12 @@ table.case-table {
   font-family: 'IBM Plex Mono', monospace;
 }
 
-/* Tracker chip on a Route Board row — who picked the case ("👤 name") or whom it is being
-   handed over to ("→ name"). Kept small and muted so it trails the id without crowding it. */
+/* Tracker chip at the FRONT of a Route Board row — who picked the case ("👤 name") or whom it is
+   being handed over to ("→ name"). Kept small and muted so it leads the id without crowding it. */
 .rb-tracker {
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 11px; font-weight: 600;
-  margin-left: 4px;
+  margin-right: 4px;
   padding: 0 5px; border-radius: 8px;
   white-space: nowrap;
 }

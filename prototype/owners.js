@@ -85,3 +85,10 @@ window.OWNERS = {
 // Matching is case-insensitive exact match against a case's assigneeDept.
 window.CC_CORE_DEPARTMENTS = ['Site IT'];
 window.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
+
+// User (requester) departments sit at the *User* station on the Route Board. Unlike the Core/HQ
+// lists above (matched on exact dept names), every requesting business unit is named with a shared
+// PREFIX in Case Center — "ABC-Sales", "ABC-Finance", … — so user departments are matched by that
+// prefix instead of an exhaustive list. A case whose assigneeDept starts with this prefix
+// (case-insensitive) is categorized as a User case. Set to '' to disable prefix matching.
+window.CC_USER_DEPARTMENT_PREFIX = 'ABC';

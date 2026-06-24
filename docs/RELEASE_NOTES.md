@@ -10,6 +10,21 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Changed (Route Board tracker chip moved to the front)
+
+- The picked-case **tracker chip** ("👤 picked by" / "→ handed to") now renders at the **front of
+  each Route Board row**, before the case id, instead of trailing it. `routeTrackerTag()` carries a
+  trailing separator and is prepended at every row type; `.rb-tracker` uses `margin-right`.
+
+### Added (User-department categorization by prefix)
+
+- New **`window.CC_USER_DEPARTMENT_PREFIX`** in `owners.js` (default `'ABC'`) categorizes cases
+  **from User/requester departments** by a shared name prefix, completing the Route Board station
+  trio (Core / HQ / **User**). Unlike the exact-match `CC_CORE_DEPARTMENTS` / `CC_HQ_DEPARTMENTS`
+  lists, user departments are matched by prefix (case-insensitive) since every requesting unit is
+  named `ABC-<team>`. New `deptHasPrefix()` helper; `caseStation()` now maps an assignee whose
+  department starts with the prefix to the **User** station. Set the prefix to `''` to disable.
+
 ### Added (Route Board tracker + Overview picked filter & copy)
 
 - **Hand-off Route Board** now shows a **tracker** on every picked-case row: **"👤 name"** for

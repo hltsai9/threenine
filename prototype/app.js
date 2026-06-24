@@ -1157,6 +1157,12 @@ function deptInList(dept, list) {
   const d = String(dept).toLowerCase();
   return list.some(x => String(x).toLowerCase() === d);
 }
+// True when a department name starts with the configured user-department prefix (case-insensitive).
+// User departments are matched by prefix rather than an exhaustive list — see CC_USER_DEPARTMENT_PREFIX.
+function deptHasPrefix(dept, prefix) {
+  if (!dept || !prefix) return false;
+  return String(dept).toLowerCase().startsWith(String(prefix).toLowerCase());
+}
 // CURRENT station of a case, from Case Center only (assigneeDept + latest processType).
 // Track Status (the DESIRED location) must NOT influence this — see the design spec.
 function caseStation(c) {
@@ -1168,6 +1174,7 @@ function caseStation(c) {
     return STATION_1ST_LINE;                                         // 1st Line / any other pt
   }
   if (deptInList(dept, window.CC_HQ_DEPARTMENTS)) return 'HQ';       // HQ side
+  if (deptHasPrefix(dept, window.CC_USER_DEPARTMENT_PREFIX)) return 'User';   // user dept (prefix) → User
   return STATION_1ST_LINE;                                           // unrecognised → triage
 }
 
@@ -1553,15 +1560,15 @@ function caseTracker(c) {
   return null;
 }
 
-// Compact tracker chip appended to a Route Board row's id label. The leading separator is
-// included so callers can drop it straight into the existing "id · time" string. "→ name"
-// means the case is being handed over to that teammate/shift; "👤 name" means they picked it.
+// Compact tracker chip shown at the FRONT of a Route Board row, before the case id. A trailing
+// separator is included so callers can prepend it straight onto the existing "id · time" string.
+// "→ name" means the case is being handed over to that teammate/shift; "👤 name" means they picked it.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
   const sym = t.kind === 'to' ? '→' : '👤';
   const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return ` <span class="rb-tracker rb-tracker-${t.kind}" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</span>`;
+  return `<span class="rb-tracker rb-tracker-${t.kind}" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</span> `;
 }
 
 function _classifyRouteRow(c) {
@@ -1603,7 +1610,7 @@ function _renderMovingRow(c, top, animDelay) {
       ${travel}
       <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
-      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
+      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
     </div>
   `;
@@ -1626,7 +1633,7 @@ function _renderWatchRow(c, top) {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>`;
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
-  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>`;
+  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>`;
   const overCls = itProcessOver(c) ? ' rb-row-over' : '';
 
   if (station === expected) {
@@ -1667,7 +1674,7 @@ function _renderStayRow(c, top) {
   return `
     <div class="rb-row rb-row-stay${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-stay-dot" style="left:${pct}%;"></div>
-      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -1682,7 +1689,7 @@ function _renderFirstLineRow(c, top) {
       <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
       <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
       <div class="rb-fl-dot" style="left:${pct}%;"></div>
-      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -1705,7 +1712,7 @@ function _renderSanitySubRow(c, top) {
   return `
     <div class="rb-row rb-row-sanity-sub${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
