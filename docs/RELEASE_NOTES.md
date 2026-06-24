@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Fixed (Import case by ID now records the pick in history)
+
+- "+ Import case by ID" auto-picks the fetched case, but it set `agentStatus = 'queued'` directly
+  without logging a **picked** history entry — so the pick never appeared in the case history (and
+  the tracker / Note column couldn't attribute it). It now calls `logHistory(..., 'picked', …)` like
+  the manual pick toggle (only when the case isn't already queued, avoiding duplicate entries).
+
 ### Fixed (Route Board deadline chip no longer overlaps the case id)
 
 - On a moving (scheduled-handoff) row, the deadline/timestamp chip moved from the route-line midpoint

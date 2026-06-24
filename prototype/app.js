@@ -5068,7 +5068,13 @@ async function addCaseById(id) {
       // follow up on this case, so it belongs in the Picked workspace from
       // the moment it lands rather than sitting unpicked in the Overview.
       const c = caseById(m.id);
-      if (c && !['closed', 'cancelled'].includes(c.status)) c.agentStatus = 'queued';
+      if (c && !['closed', 'cancelled'].includes(c.status) && !isQueued(c)) {
+        c.agentStatus = 'queued';
+        // Record the auto-pick in history (mirrors the manual pick toggle) so the imported case
+        // shows a 'picked' entry, and the tracker / Note column can attribute it to this operator.
+        const op = getOperator(STATE.operatorId);
+        if (op) logHistory(c, op, 'picked', 'Picked for follow-up · imported by ID');
+      }
       STATE.kanbanSelected = m.id;
       if (!firstId) firstId = m.id;
     }
