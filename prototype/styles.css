@@ -2427,6 +2427,27 @@ table.case-table {
   font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+/* ---- Band footer action bar (sits on the green frame, below the white card) ---- */
+.rb-actions {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px;
+}
+.rb-action-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: #DCE7DD;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.rb-action-btn:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.4); }
+.rb-action-btn svg { width: 14px; height: 14px; display: block; flex: none; }
+.rb-copied { color: #BFE6C6; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity .15s; }
+.rb-copied.show { opacity: 1; }
+
 /* ---- Band titlebar ---- */
 
 .rb-band-titlebar {

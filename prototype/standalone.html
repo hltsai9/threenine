@@ -2435,6 +2435,27 @@ table.case-table {
   font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+/* ---- Band footer action bar (sits on the green frame, below the white card) ---- */
+.rb-actions {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 14px;
+}
+.rb-action-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  color: #DCE7DD;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.rb-action-btn:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.4); }
+.rb-action-btn svg { width: 14px; height: 14px; display: block; flex: none; }
+.rb-copied { color: #BFE6C6; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity .15s; }
+.rb-copied.show { opacity: 1; }
+
 /* ---- Band titlebar ---- */
 
 .rb-band-titlebar {
@@ -5382,6 +5403,76 @@ function routeTrackerTag(c) {
   return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span></div>`;
 }
 
+// Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
+const RB_DOWNLOAD_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+const RB_COPY_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+
+// The picked cases the Route Board is currently showing, honouring the "Mine only" toggle. Shared
+// by the renderer and the Export-CSV / Copy-as-table buttons so the output matches what's on screen.
+function routeBoardCases() {
+  const all = pickedCases();
+  return STATE.routeMineOnly ? all.filter(c => caseTrackerOperatorId(c) === STATE.operatorId) : all;
+}
+
+// Column model for the Route Board export — one place feeding both the TSV (copy) and CSV (download)
+// renderers, so the two never drift.
+function routeBoardTableData() {
+  const headers = ['ID', 'Subject', 'Station', 'Track Status', 'Tracker', 'Status',
+    'Process Time', 'IT process time', 'Case Link'];
+  const rows = routeBoardCases().map(c => {
+    const ts = caseTrackStatus(c);
+    const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
+    const tracker = caseTracker(c);
+    const trackerLabel = tracker ? `${tracker.kind === 'to' ? '→ ' : ''}${tracker.label}` : '';
+    return [
+      c.id, c.subject, caseStation(c), tsLabel, trackerLabel, displayStatus(c),
+      fmtDuration(caseSlaMs(c)) + (c.slaPaused ? ' (paused)' : ''),
+      itProcessMs(c) > 0 ? itTimeLabel(c) : '',
+      caseHref(c),
+    ];
+  });
+  return { headers, rows };
+}
+// Tab-separated — paste into Excel / Google Sheets (tabs → columns, newlines → rows).
+function routeBoardTableText() {
+  const { headers, rows } = routeBoardTableData();
+  const clean = v => String(v == null ? '' : v).replace(/[\t\n\r]+/g, ' ').trim();
+  return [headers.join('\t'), ...rows.map(r => r.map(clean).join('\t'))].join('\n');
+}
+// RFC-4180-ish CSV — quote any cell containing a comma, quote or newline; double embedded quotes.
+function routeBoardCsvText() {
+  const { headers, rows } = routeBoardTableData();
+  const esc = v => {
+    const s = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
+    return /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
+}
+// Copy text to the clipboard with a hidden-textarea fallback for file:// / older browsers.
+async function copyToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return; }
+  catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+}
+// Trigger a client-side file download (Blob + temporary anchor). No server round-trip.
+function downloadTextFile(filename, text, mime) {
+  try {
+    const blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    showToast('Could not export the file in this environment.', 'warn');
+  }
+}
+
 // The operator id a picked case currently "belongs to" — the handover recipient when it's been
 // handed to a specific teammate, otherwise whoever picked it (most recent 'picked' entry), falling
 // back to the current operator. Drives the Route Board "Mine only" toggle.
@@ -5551,9 +5642,7 @@ function renderRouteBoardStrip() {
   const myName = me ? shortOpName(me.name) : 'me';
   // "Mine only" narrows the board to cases that currently belong to the signed-in operator —
   // ones they picked (and haven't handed off) or that were handed over to them by name.
-  const all = mineOnly
-    ? pickedCases().filter(c => caseTrackerOperatorId(c) === STATE.operatorId)
-    : pickedCases();
+  const all = routeBoardCases();
 
   // Bucket every picked case into one of the four visual row types.
   const moving = [], watch = [], stay = [], sanity = [], firstline = [];
@@ -5650,6 +5739,12 @@ function renderRouteBoardStrip() {
         </div>
         ${emptyBody}
       </div>
+      ${all.length === 0 ? '' : `
+      <div class="rb-actions">
+        <button class="rb-action-btn" id="rb-export-csv" title="Download the shown cases as a CSV file">${RB_DOWNLOAD_SVG}Export to CSV</button>
+        <button class="rb-action-btn" id="rb-copy-table" title="Copy the shown cases as a table (paste into Excel / Google Sheets)">${RB_COPY_SVG}Copy as table</button>
+        <span class="rb-copied" id="rb-copied">Copied</span>
+      </div>`}
     </section>
   `;
 }
@@ -5772,8 +5867,6 @@ function renderCaseList() {
     </div>
   ` : '';
 
-  const watchlist = renderWatchlists(approachingSlaCases(), actionDueCases().concat(actionOverdueCases()));
-
   // Live "N cases from Case Center · M picked" banner intentionally hidden (per request).
   // To restore: render the strip below where ${liveBanner} used to sit.
   const liveBanner = '';
@@ -5818,7 +5911,6 @@ function renderCaseList() {
           <div class="picked-workspace-detail">${renderReadingPanel(activeCase)}</div>
         </div>
       </div>
-      ${watchlist}
     </div>
   `;
 }
@@ -8896,6 +8988,14 @@ function bindHandlers() {
     STATE.routeMineOnly = e.target.checked;
     render();
   });
+  document.getElementById('rb-export-csv')?.addEventListener('click', () => {
+    downloadTextFile('route-board.csv', routeBoardCsvText(), 'text/csv;charset=utf-8');
+  });
+  document.getElementById('rb-copy-table')?.addEventListener('click', async () => {
+    await copyToClipboard(routeBoardTableText());
+    const flash = document.getElementById('rb-copied');
+    if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
+  });
   document.querySelectorAll('[data-action="toggle-sanity"]').forEach(el => {
     el.addEventListener('click', () => {
       STATE.sanityExpanded = !STATE.sanityExpanded;
@@ -8986,20 +9086,7 @@ function bindHandlers() {
   const archiveCopyBtn = document.getElementById('archive-copy-table');
   if (archiveCopyBtn) {
     archiveCopyBtn.addEventListener('click', async () => {
-      const text = archiveTableText(archiveCopyBtn.dataset.weekId);
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch (_) {
-        // file:// / older browsers: fall back to a hidden textarea + execCommand.
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); } catch (e) { /* ignore */ }
-        document.body.removeChild(ta);
-      }
+      await copyToClipboard(archiveTableText(archiveCopyBtn.dataset.weekId));
       const flash = document.getElementById('archive-copied');
       if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
     });

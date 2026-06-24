@@ -10,6 +10,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Added (Route Board export — CSV download + copy as table)
+
+- The Hand-off Route Board gains a footer action bar **on the green frame** (below the white card)
+  with **Export to CSV** (downloads `route-board.csv`) and **Copy as table** (tab-separated, paste
+  into Excel / Google Sheets) buttons. Both export the cases **currently shown** on the board —
+  honouring the "Mine only" toggle — with columns ID · Subject · Station · Track Status · Tracker ·
+  Status · Process Time · IT process time · Case Link. New `routeBoardCases()`,
+  `routeBoardTableData()` / `routeBoardTableText()` / `routeBoardCsvText()`, plus reusable
+  `copyToClipboard()` and `downloadTextFile()` helpers (the Overview copy button now shares
+  `copyToClipboard()`). The bar is hidden when no cases are picked.
+
+### Removed (Approaching SLA / Escalated watchlist panels on the Picked page)
+
+- The **Approaching SLA** and **Escalated — keep an eye** watchlist panels at the bottom of the
+  Picked workspace are removed (the `renderWatchlists()` call is dropped from `renderCasesView`).
+  The Route Board's watch rings/arrows and the per-row tracker already surface this state.
+
 ### Fixed (tracker chip icons render everywhere — SVG instead of emoji)
 
 - The Route Board tracker chip and its legend no longer use emoji glyphs (👤 / →), which silently
