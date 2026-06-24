@@ -1595,40 +1595,86 @@ function routeBoardCases() {
   return STATE.routeMineOnly ? all.filter(c => caseTrackerOperatorId(c) === STATE.operatorId) : all;
 }
 
-// Column model for the Route Board export — one place feeding both the TSV (copy) and CSV (download)
-// renderers, so the two never drift.
+// "Operator A -> Operator B" for the case's latest handover (author → recipient). The recipient is
+// the named teammate when the handover targeted one, else the target shift. '' when never handed over.
+function caseHandoverRoute(c) {
+  const h = c.handover;
+  if (!h) return '';
+  const author = getOperator(h.author);
+  const from = author ? author.name : (h.from || h.author || '');
+  const recip = h.toOperator ? getOperator(h.toOperator) : null;
+  const to = recip ? recip.name : (h.to || '');
+  if (!from && !to) return '';
+  return `${from} -> ${to}`;
+}
+
+// All of a case's notes aggregated, oldest first, one per line as "YYYY-MM-DD HH:MM Operator: text".
+// Sourced from the operator-attributed history log; the handover entry shows the actual note message
+// rather than the generic event label (and a seeded handover with no logged event is still included).
+// Plain text only — no HTML.
+function caseNotesText(c) {
+  const items = [];
+  let handoverShown = false;
+  const stamp = at => `${_displayYmd(at)} ${_displayHHMM(at)}`;
+  for (const h of (c.history || [])) {
+    const op = getOperator(h.who);
+    const who = op ? op.name : (h.who || '?');
+    let text = h.detail || String(h.kind || '').replace(/[-_]/g, ' ');
+    if (h.kind === 'handover' && c.handover && c.handover.at === h.at && c.handover.note) {
+      text = c.handover.note;
+      handoverShown = true;
+    }
+    items.push({ at: h.at, line: `${stamp(h.at)} ${who}: ${text}` });
+  }
+  if (c.handover && c.handover.note && !handoverShown) {
+    const op = getOperator(c.handover.author);
+    const who = op ? op.name : (c.handover.author || '?');
+    items.push({ at: c.handover.at, line: `${stamp(c.handover.at)} ${who}: ${c.handover.note}` });
+  }
+  items.sort((a, b) => new Date(a.at) - new Date(b.at));
+  return items.map(i => i.line).join('\n');
+}
+
+// Column model for the Route Board export — one place feeding both copy (TSV) and download (CSV),
+// so the two never drift. Every cell is PLAIN TEXT (no HTML markup).
 function routeBoardTableData() {
-  const headers = ['ID', 'Subject', 'Station', 'Track Status', 'Tracker', 'Status',
-    'Process Time', 'IT process time', 'Case Link'];
+  const headers = ['Case Link', 'Subject', 'IT Process Time', 'Track Status', 'Handover Route',
+    'Core Team', 'HQ Product Team', 'Note'];
   const rows = routeBoardCases().map(c => {
     const ts = caseTrackStatus(c);
     const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
-    const tracker = caseTracker(c);
-    const trackerLabel = tracker ? `${tracker.kind === 'to' ? '→ ' : ''}${tracker.label}` : '';
+    const core = getOwner('core', c.coreId);
+    const hq = getOwner('hq', c.hqId);
     return [
-      c.id, c.subject, caseStation(c), tsLabel, trackerLabel, displayStatus(c),
-      fmtDuration(caseSlaMs(c)) + (c.slaPaused ? ' (paused)' : ''),
-      itProcessMs(c) > 0 ? itTimeLabel(c) : '',
       caseHref(c),
+      c.subject,
+      itProcessMs(c) > 0 ? fmtHours(itProcessMs(c)) : '',
+      tsLabel,
+      caseHandoverRoute(c),
+      core ? core.name : '',
+      hq ? hq.name : '',
+      caseNotesText(c),
     ];
   });
   return { headers, rows };
 }
-// Tab-separated — paste into Excel / Google Sheets (tabs → columns, newlines → rows).
-function routeBoardTableText() {
-  const { headers, rows } = routeBoardTableData();
-  const clean = v => String(v == null ? '' : v).replace(/[\t\n\r]+/g, ' ').trim();
-  return [headers.join('\t'), ...rows.map(r => r.map(clean).join('\t'))].join('\n');
-}
-// RFC-4180-ish CSV — quote any cell containing a comma, quote or newline; double embedded quotes.
-function routeBoardCsvText() {
+// Render the table as delimited text. A field is quoted when it contains the delimiter, a quote or a
+// newline (internal quotes doubled) — so a multi-line Note stays ONE cell when pasted into Excel /
+// Google Sheets, which honour quoted fields for both CSV and tab-separated paste.
+function renderDelimited(delim) {
   const { headers, rows } = routeBoardTableData();
   const esc = v => {
-    const s = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
-    return /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = String(v == null ? '' : v);
+    if (s.indexOf('"') >= 0 || s.indexOf(delim) >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
   };
-  return [headers, ...rows].map(r => r.map(esc).join(',')).join('\r\n');
+  return [headers, ...rows].map(r => r.map(esc).join(delim)).join('\r\n');
 }
+// Tab-separated (copy) and comma-separated (CSV download).
+function routeBoardTableText() { return renderDelimited('\t'); }
+function routeBoardCsvText() { return renderDelimited(','); }
 // Copy text to the clipboard with a hidden-textarea fallback for file:// / older browsers.
 async function copyToClipboard(text) {
   try { await navigator.clipboard.writeText(text); return; }
@@ -2813,7 +2859,7 @@ function archiveTableText(weekId) {
       displayStatus(c),
       tsLabel,
       fmtDuration(caseSlaMs(c)) + (c.slaPaused ? ' (paused)' : ''),
-      itProcessMs(c) > 0 ? itTimeLabel(c) : '',
+      itProcessMs(c) > 0 ? fmtHours(itProcessMs(c)) : '',
       trackerLabel,
       c.closedAt ? fmtAbsolute(c.closedAt) : fmtAbsolute(c.createdAt),
     ].map(clean).join('\t'));

@@ -10,6 +10,21 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Changed (export/copy format — new columns, plain text, multi-line Note)
+
+- **Fixed HTML leaking into exports.** The "IT process time" cell used `itTimeLabel()` (which
+  returns an HTML `<span>`); the Route Board export and the Overview "Copy as table" now emit the
+  plain `fmtHours()` value. All export cells are plain text.
+- **Route Board Export/Copy columns reworked** to: **Case Link · Subject · IT Process Time · Track
+  Status · Handover Route · Core Team · HQ Product Team · Note**.
+  - **Handover Route** — the latest handover as `Operator A -> Operator B` (author → named recipient,
+    or the target shift). New `caseHandoverRoute()`.
+  - **Note** — every note on the case aggregated oldest-first, one per line as
+    `YYYY-MM-DD HH:MM Operator: text` (from the operator-attributed history; the handover line shows
+    the actual message). New `caseNotesText()`.
+  - Both copy (TSV) and CSV now **quote** any field containing a delimiter/quote/newline, so a
+    multi-line Note stays a single cell when pasted into Excel / Google Sheets (`renderDelimited()`).
+
 ### Added (Route Board export — CSV download + copy as table)
 
 - The Hand-off Route Board gains a footer action bar **on the green frame** (below the white card)
