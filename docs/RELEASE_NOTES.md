@@ -10,6 +10,18 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Fixed (Copy as table pastes as a real table in Teams/Outlook; Note date trimmed)
+
+- **"Copy as table" now puts HTML on the clipboard**, so chat/mail apps (Teams, Outlook, Slack,
+  Word) render an actual table — previously only tab-separated text was copied, which those apps
+  paste as raw text. New `copyRichTable()` writes both `text/html` (a real `<table>`) and
+  `text/plain` (the TSV) via `ClipboardItem`, with a contenteditable-selection fallback then a
+  plain-text fallback; `renderHtmlTable()` builds the table (newlines → `<br>`, Case Link → link).
+  Excel / Google Sheets still get the tab-separated version. Applies to both the Route Board and
+  Overview copy buttons.
+- **Note timestamps trimmed** to month-day only (no year, no time) — e.g. `06-12` instead of
+  `2026-06-12 07:50`.
+
 ### Changed (export/copy format — new columns, plain text, multi-line Note)
 
 - **Fixed HTML leaking into exports.** The "IT process time" cell used `itTimeLabel()` (which

@@ -1615,7 +1615,8 @@ function caseHandoverRoute(c) {
 function caseNotesText(c) {
   const items = [];
   let handoverShown = false;
-  const stamp = at => `${_displayYmd(at)} ${_displayHHMM(at)}`;
+  // Date only — month-day in the active display zone, no year and no time (per request).
+  const stamp = at => { const p = _tzParts(at); return `${p.month}-${p.day}`; };
   for (const h of (c.history || [])) {
     const op = getOperator(h.who);
     const who = op ? op.name : (h.who || '?');
@@ -1658,11 +1659,10 @@ function routeBoardTableData() {
   });
   return { headers, rows };
 }
-// Render the table as delimited text. A field is quoted when it contains the delimiter, a quote or a
-// newline (internal quotes doubled) — so a multi-line Note stays ONE cell when pasted into Excel /
-// Google Sheets, which honour quoted fields for both CSV and tab-separated paste.
-function renderDelimited(delim) {
-  const { headers, rows } = routeBoardTableData();
+// Render a header+rows table as delimited text. A field is quoted when it contains the delimiter, a
+// quote or a newline (internal quotes doubled) — so a multi-line Note stays ONE cell when pasted into
+// Excel / Google Sheets, which honour quoted fields for both CSV and tab-separated paste.
+function renderDelimited(headers, rows, delim) {
   const esc = v => {
     let s = String(v == null ? '' : v);
     if (s.indexOf('"') >= 0 || s.indexOf(delim) >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
@@ -1672,9 +1672,26 @@ function renderDelimited(delim) {
   };
   return [headers, ...rows].map(r => r.map(esc).join(delim)).join('\r\n');
 }
-// Tab-separated (copy) and comma-separated (CSV download).
-function routeBoardTableText() { return renderDelimited('\t'); }
-function routeBoardCsvText() { return renderDelimited(','); }
+// Render a header+rows table as an HTML <table>. Chat/mail clients (Teams, Outlook, Word, Slack)
+// render a real table from clipboard HTML — plain TSV pastes as raw text there. Newlines in a cell
+// become <br>; a leading http(s) Case Link cell becomes a clickable link.
+function renderHtmlTable(headers, rows) {
+  const esc = v => escapeHtml(String(v == null ? '' : v));
+  const th = h => `<th style="border:1px solid #c8c8c8;padding:4px 8px;text-align:left;background:#f2f2f2;">${esc(h)}</th>`;
+  const cell = (v, i) => {
+    const body = esc(v).replace(/\n/g, '<br>');
+    const inner = (i === 0 && v && /^https?:\/\//i.test(String(v))) ? `<a href="${esc(v)}">${body}</a>` : body;
+    return `<td style="border:1px solid #c8c8c8;padding:4px 8px;vertical-align:top;">${inner}</td>`;
+  };
+  return `<table style="border-collapse:collapse;font-family:sans-serif;font-size:13px;">`
+    + `<thead><tr>${headers.map(th).join('')}</tr></thead>`
+    + `<tbody>${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}</tbody>`
+    + `</table>`;
+}
+// Tab-separated (copy), comma-separated (CSV download), and HTML (rich copy) views of the board.
+function routeBoardTableText() { const { headers, rows } = routeBoardTableData(); return renderDelimited(headers, rows, '\t'); }
+function routeBoardCsvText()   { const { headers, rows } = routeBoardTableData(); return renderDelimited(headers, rows, ','); }
+function routeBoardTableHtml() { const { headers, rows } = routeBoardTableData(); return renderHtmlTable(headers, rows); }
 // Copy text to the clipboard with a hidden-textarea fallback for file:// / older browsers.
 async function copyToClipboard(text) {
   try { await navigator.clipboard.writeText(text); return; }
@@ -1685,6 +1702,35 @@ async function copyToClipboard(text) {
     try { document.execCommand('copy'); } catch (e) { /* ignore */ }
     document.body.removeChild(ta);
   }
+}
+// Copy a rich table: put BOTH text/html (a real <table>) and text/plain (TSV) on the clipboard, so
+// chat/mail apps (Teams, Outlook, Slack) render a table while plain-text targets and Excel get the
+// TSV. Falls back to a contenteditable selection (which still carries HTML) then to plain text.
+async function copyRichTable(html, text) {
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })]);
+      return;
+    }
+  } catch (_) { /* fall through */ }
+  try {
+    const holder = document.createElement('div');
+    holder.setAttribute('contenteditable', 'true');
+    holder.style.position = 'fixed'; holder.style.left = '-9999px'; holder.style.opacity = '0';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    const range = document.createRange();
+    range.selectNodeContents(holder);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    const ok = document.execCommand('copy');
+    sel.removeAllRanges(); document.body.removeChild(holder);
+    if (ok) return;
+  } catch (_) { /* fall through */ }
+  await copyToClipboard(text);
 }
 // Trigger a client-side file download (Blob + temporary anchor). No server round-trip.
 function downloadTextFile(filename, text, mime) {
@@ -2835,20 +2881,18 @@ function archiveWeekCases(weekId) {
 // Tab-separated rendering of a week's (filtered) cases — paste straight into Excel / Google
 // Sheets, where tabs become columns and newlines become rows. Cells are flattened of any
 // tab/newline so the grid never breaks.
-function archiveTableText(weekId) {
+function archiveTableData(weekId) {
   const headers = ['ID', 'Subject', 'Case Link', 'User', 'Assignee', 'Core Team',
     'HQ Product Team', 'Status', 'Track Status', 'Process Time', 'IT process time',
     'Tracker', 'Created/Closed'];
-  const clean = v => String(v == null ? '' : v).replace(/[\t\n\r]+/g, ' ').trim();
-  const lines = [headers.join('\t')];
-  for (const c of archiveWeekCases(weekId)) {
+  const rows = archiveWeekCases(weekId).map(c => {
     const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     const ts = caseTrackStatus(c);
     const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
     const tracker = caseTracker(c);
     const trackerLabel = tracker ? `${tracker.kind === 'to' ? '→ ' : ''}${tracker.label}` : '';
-    lines.push([
+    return [
       c.id,
       c.subject,
       caseHref(c),
@@ -2862,10 +2906,12 @@ function archiveTableText(weekId) {
       itProcessMs(c) > 0 ? fmtHours(itProcessMs(c)) : '',
       trackerLabel,
       c.closedAt ? fmtAbsolute(c.closedAt) : fmtAbsolute(c.createdAt),
-    ].map(clean).join('\t'));
-  }
-  return lines.join('\n');
+    ];
+  });
+  return { headers, rows };
 }
+function archiveTableText(weekId) { const { headers, rows } = archiveTableData(weekId); return renderDelimited(headers, rows, '\t'); }
+function archiveTableHtml(weekId) { const { headers, rows } = archiveTableData(weekId); return renderHtmlTable(headers, rows); }
 
 function renderArchiveWeek(weekId) {
   const week = window.WEEKS.find(w => w.id === weekId);
@@ -5219,7 +5265,7 @@ function bindHandlers() {
     downloadTextFile('route-board.csv', routeBoardCsvText(), 'text/csv;charset=utf-8');
   });
   document.getElementById('rb-copy-table')?.addEventListener('click', async () => {
-    await copyToClipboard(routeBoardTableText());
+    await copyRichTable(routeBoardTableHtml(), routeBoardTableText());
     const flash = document.getElementById('rb-copied');
     if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
   });
@@ -5313,7 +5359,8 @@ function bindHandlers() {
   const archiveCopyBtn = document.getElementById('archive-copy-table');
   if (archiveCopyBtn) {
     archiveCopyBtn.addEventListener('click', async () => {
-      await copyToClipboard(archiveTableText(archiveCopyBtn.dataset.weekId));
+      const wk = archiveCopyBtn.dataset.weekId;
+      await copyRichTable(archiveTableHtml(wk), archiveTableText(wk));
       const flash = document.getElementById('archive-copied');
       if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
     });
