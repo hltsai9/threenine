@@ -19,7 +19,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   plain-text fallback; `renderHtmlTable()` builds the table (newlines → `<br>`, Case Link → link).
   Excel / Google Sheets still get the tab-separated version. Applies to both the Route Board and
   Overview copy buttons.
-- **Note timestamps trimmed** to month-day only (no year, no time) — e.g. `06-12` instead of
+- **Note timestamps trimmed** to month/day only (no year, no time) — e.g. `06/12` instead of
   `2026-06-12 07:50`.
 
 ### Changed (export/copy format — new columns, plain text, multi-line Note)

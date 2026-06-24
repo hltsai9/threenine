@@ -5434,8 +5434,8 @@ function caseHandoverRoute(c) {
 function caseNotesText(c) {
   const items = [];
   let handoverShown = false;
-  // Date only — month-day in the active display zone, no year and no time (per request).
-  const stamp = at => { const p = _tzParts(at); return `${p.month}-${p.day}`; };
+  // Date only — month/day in the active display zone, no year and no time (per request).
+  const stamp = at => { const p = _tzParts(at); return `${p.month}/${p.day}`; };
   for (const h of (c.history || [])) {
     const op = getOperator(h.who);
     const who = op ? op.name : (h.who || '?');
