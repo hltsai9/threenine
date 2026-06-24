@@ -2558,6 +2558,7 @@ table.case-table {
    the case, "→ name" = whom it's handed over to — independent of where the case's dot sits. Capped
    so it never crosses into the User station at 12%. */
 .rb-tracker {
+  display: inline-flex; align-items: center; gap: 3px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 4;
@@ -2566,8 +2567,12 @@ table.case-table {
   padding: 1px 5px; border-radius: 8px;
   white-space: nowrap;
   max-width: calc(12% - 6px);
-  overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden;
 }
+/* Inline tracker icons — sized and coloured (via currentColor) like the sidebar .nav-icon SVGs. */
+.rb-tracker-ic { width: 12px; height: 12px; display: block; flex: none; }
+.rb-tracker-name { overflow: hidden; text-overflow: ellipsis; }
+.rb-legend-tracker .rb-tracker-ic { width: 13px; height: 13px; }
 .rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
 .rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
 .rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }

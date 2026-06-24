@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Fixed (tracker chip icons render everywhere — SVG instead of emoji)
+
+- The Route Board tracker chip and its legend no longer use emoji glyphs (👤 / →), which silently
+  fail to render in environments whose font lacks them. They're now **inline SVG icons** drawn the
+  same way as the sidebar nav icons (`viewBox="0 0 24 24"`, `stroke="currentColor"`) — a person icon
+  for "picked by" and an arrow for "handed over to" — so they show consistently and inherit the
+  chip's colour. New `TRACKER_PERSON_SVG` / `TRACKER_ARROW_SVG` constants and `.rb-tracker-ic` /
+  `.rb-tracker-name` styles; the chip is now an `inline-flex` row.
+
 ### Added (Route Board "Mine only" toggle)
 
 - The Hand-off Route Board titlebar gains a **"Mine only"** toggle (`STATE.routeMineOnly`) that

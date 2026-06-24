@@ -1567,15 +1567,21 @@ function caseTracker(c) {
   return null;
 }
 
+// Tracker icons drawn as inline SVG (stroke=currentColor, like the sidebar nav icons) rather than
+// emoji — emoji glyphs (👤 / →) silently fail to render where the font lacks them. The person icon
+// marks "picked by", the arrow marks "handed over to". They inherit the chip's text colour.
+const TRACKER_PERSON_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+const TRACKER_ARROW_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg>`;
+
 // Tracker chip pinned to the LEFT EDGE of a Route Board row — a direct child of .rb-row (so it's
 // absolutely positioned at left:2px, aligned across every row regardless of the case's station).
-// "→ name" means the case is being handed over to that teammate/shift; "👤 name" means they picked it.
+// Arrow icon = handed over to that teammate/shift; person icon = picked by that operator.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
-  const sym = t.kind === 'to' ? '→' : '👤';
+  const icon = t.kind === 'to' ? TRACKER_ARROW_SVG : TRACKER_PERSON_SVG;
   const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</div>`;
+  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span></div>`;
 }
 
 // The operator id a picked case currently "belongs to" — the handover recipient when it's been
@@ -1825,7 +1831,7 @@ function renderRouteBoardStrip() {
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
           <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
           <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
-          <span class="rb-legend-tracker">👤 picked by · → handed to</span>
+          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to</span>
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">
