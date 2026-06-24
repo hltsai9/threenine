@@ -353,6 +353,25 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* Overview week table toolbar — "Picked only" filter + "Copy as table" button. */
+.archive-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.archive-toolbar .picked-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.archive-toolbar .picked-filter input { cursor: pointer; }
 .toolbar input[type="search"], .toolbar select {
   padding: 8px 13px;
   border: 1px solid var(--border);
@@ -2533,6 +2552,19 @@ table.case-table {
 .rb-id, .rb-watch-id, .rb-stay-id, .rb-sanity-sub-id {
   font-family: 'IBM Plex Mono', monospace;
 }
+
+/* Tracker chip on a Route Board row — who picked the case ("👤 name") or whom it is being
+   handed over to ("→ name"). Kept small and muted so it trails the id without crowding it. */
+.rb-tracker {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11px; font-weight: 600;
+  margin-left: 4px;
+  padding: 0 5px; border-radius: 8px;
+  white-space: nowrap;
+}
+.rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
+.rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
+.rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }
 
 /* ---- MOVING row (66px tall) ---- */
 

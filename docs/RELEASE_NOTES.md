@@ -8,6 +8,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-24
+
+### Added (Route Board tracker + Overview picked filter & copy)
+
+- **Hand-off Route Board** now shows a **tracker** on every picked-case row: **"👤 name"** for
+  whoever picked the case into the workspace (derived from the most recent `picked` history entry,
+  falling back to the current operator), or **"→ name"** when the case carries a handover note —
+  the teammate it's being handed over to (`handover.toOperator`, else the target shift). New
+  `caseTracker()` / `routeTrackerTag()` / `shortOpName()` helpers and an `.rb-tracker` chip; the
+  board legend gains a "👤 picked by · → handed to" key.
+- **Overview week table** gains a **"Picked only"** filter (toggles `STATE.archivePickedOnly`,
+  showing just the cases picked into a workspace) and a **"⧉ Copy as table"** button that copies the
+  currently shown cases as tab-separated text (ID, Subject, Case Link, User, Assignee, Core, HQ,
+  Status, Track Status, Process Time, IT process time, Tracker, Created/Closed) — paste straight into
+  Excel / Google Sheets. New `archiveWeekCases()` and `archiveTableText()` helpers; clipboard uses
+  `navigator.clipboard` with a hidden-textarea fallback for `file://`.
+
 ## 2026-06-17
 
 ### Changed (IT process time shown in hours)

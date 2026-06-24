@@ -361,6 +361,25 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* Overview week table toolbar — "Picked only" filter + "Copy as table" button. */
+.archive-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.archive-toolbar .picked-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.archive-toolbar .picked-filter input { cursor: pointer; }
 .toolbar input[type="search"], .toolbar select {
   padding: 8px 13px;
   border: 1px solid var(--border);
@@ -2542,6 +2561,19 @@ table.case-table {
   font-family: 'IBM Plex Mono', monospace;
 }
 
+/* Tracker chip on a Route Board row — who picked the case ("👤 name") or whom it is being
+   handed over to ("→ name"). Kept small and muted so it trails the id without crowding it. */
+.rb-tracker {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11px; font-weight: 600;
+  margin-left: 4px;
+  padding: 0 5px; border-radius: 8px;
+  white-space: nowrap;
+}
+.rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
+.rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
+.rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }
+
 /* ---- MOVING row (66px tall) ---- */
 
 .rb-row-moving { height: 66px; }
@@ -3975,6 +4007,7 @@ const STATE = {
   lastListLabel: 'Cases',
   lookbackHours: 1,          // Case Center query window: older bound (hours ago)
   lookbackToHours: 0,        // newer bound (hours ago); 0 = up to now → "within N hours"
+  archivePickedOnly: false,  // Overview week table: when true, show only picked cases
 };
 try {
   const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
@@ -5261,6 +5294,45 @@ function openHandoffTimeModal(c, value, prev, selectEl) {
   });
 }
 
+// Short operator display name for compact UI ("Mia (DA)" → "Mia").
+function shortOpName(name) {
+  return String(name || '').replace(/\s*\(.*$/, '').trim() || String(name || '');
+}
+
+// The "tracker" for a picked case — whom the case is moving to next. If a handover note is
+// addressed to a specific teammate (or, failing that, a shift), that recipient is the tracker
+// ("→ name"). Otherwise the tracker is whoever picked the case into the workspace: the most
+// recent 'picked' history entry, falling back to the current operator. Returns
+// { label, kind: 'to' | 'by' } or null when nothing is known.
+function caseTracker(c) {
+  if (c.handover) {
+    if (c.handover.toOperator) {
+      const r = getOperator(c.handover.toOperator);
+      if (r) return { label: shortOpName(r.name), kind: 'to' };
+    }
+    if (c.handover.to) return { label: c.handover.to, kind: 'to' };
+  }
+  const picks = (c.history || []).filter(h => h.kind === 'picked');
+  if (picks.length) {
+    const op = getOperator(picks[picks.length - 1].who);
+    if (op) return { label: shortOpName(op.name), kind: 'by' };
+  }
+  const me = getOperator(STATE.operatorId);
+  if (me) return { label: shortOpName(me.name), kind: 'by' };
+  return null;
+}
+
+// Compact tracker chip appended to a Route Board row's id label. The leading separator is
+// included so callers can drop it straight into the existing "id · time" string. "→ name"
+// means the case is being handed over to that teammate/shift; "👤 name" means they picked it.
+function routeTrackerTag(c) {
+  const t = caseTracker(c);
+  if (!t) return '';
+  const sym = t.kind === 'to' ? '→' : '👤';
+  const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
+  return ` <span class="rb-tracker rb-tracker-${t.kind}" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</span>`;
+}
+
 function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
@@ -5300,7 +5372,7 @@ function _renderMovingRow(c, top, animDelay) {
       ${travel}
       <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
-      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
+      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
     </div>
   `;
@@ -5323,7 +5395,7 @@ function _renderWatchRow(c, top) {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>`;
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
-  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>`;
+  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>`;
   const overCls = itProcessOver(c) ? ' rb-row-over' : '';
 
   if (station === expected) {
@@ -5364,7 +5436,7 @@ function _renderStayRow(c, top) {
   return `
     <div class="rb-row rb-row-stay${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-stay-dot" style="left:${pct}%;"></div>
-      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}</div>
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
     </div>
   `;
 }
@@ -5379,7 +5451,7 @@ function _renderFirstLineRow(c, top) {
       <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
       <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
       <div class="rb-fl-dot" style="left:${pct}%;"></div>
-      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}</div>
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
     </div>
   `;
 }
@@ -5402,7 +5474,7 @@ function _renderSanitySubRow(c, top) {
   return `
     <div class="rb-row rb-row-sanity-sub${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}${routeTrackerTag(c)}</div>
     </div>
   `;
 }
@@ -5478,6 +5550,7 @@ function renderRouteBoardStrip() {
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
           <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
           <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
+          <span class="rb-legend-tracker">👤 picked by · → handed to</span>
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">
@@ -6351,6 +6424,51 @@ function renderArchiveIndex() {
   `;
 }
 
+// The cases shown in a week's Overview table, honouring the "Picked only" filter
+// (STATE.archivePickedOnly). Shared by the renderer and the "Copy as table" button so the
+// clipboard always matches what's on screen.
+function archiveWeekCases(weekId) {
+  const pickedOnly = !!STATE.archivePickedOnly;
+  return STATE.cases
+    .filter(c => !c.deletedAt && c.weekId === weekId && (!pickedOnly || isPicked(c)))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// Tab-separated rendering of a week's (filtered) cases — paste straight into Excel / Google
+// Sheets, where tabs become columns and newlines become rows. Cells are flattened of any
+// tab/newline so the grid never breaks.
+function archiveTableText(weekId) {
+  const headers = ['ID', 'Subject', 'Case Link', 'User', 'Assignee', 'Core Team',
+    'HQ Product Team', 'Status', 'Track Status', 'Process Time', 'IT process time',
+    'Tracker', 'Created/Closed'];
+  const clean = v => String(v == null ? '' : v).replace(/[\t\n\r]+/g, ' ').trim();
+  const lines = [headers.join('\t')];
+  for (const c of archiveWeekCases(weekId)) {
+    const core = getOwner('core', c.coreId);
+    const hq = getOwner('hq', c.hqId);
+    const ts = caseTrackStatus(c);
+    const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
+    const tracker = caseTracker(c);
+    const trackerLabel = tracker ? `${tracker.kind === 'to' ? '→ ' : ''}${tracker.label}` : '';
+    lines.push([
+      c.id,
+      c.subject,
+      caseHref(c),
+      c.user,
+      c.assignee || '',
+      core ? core.name : '',
+      hq ? hq.name : '',
+      displayStatus(c),
+      tsLabel,
+      fmtDuration(caseSlaMs(c)) + (c.slaPaused ? ' (paused)' : ''),
+      itProcessMs(c) > 0 ? itTimeLabel(c) : '',
+      trackerLabel,
+      c.closedAt ? fmtAbsolute(c.closedAt) : fmtAbsolute(c.createdAt),
+    ].map(clean).join('\t'));
+  }
+  return lines.join('\n');
+}
+
 function renderArchiveWeek(weekId) {
   const week = window.WEEKS.find(w => w.id === weekId);
   if (!week) {
@@ -6358,9 +6476,9 @@ function renderArchiveWeek(weekId) {
       <a class="btn" href="#/archive">← Back to archive</a>`;
   }
   const s = weekStats(weekId);
-  const cases = STATE.cases
-    .filter(c => !c.deletedAt && c.weekId === weekId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const pickedOnly = !!STATE.archivePickedOnly;
+  const weekHasAny = STATE.cases.some(c => !c.deletedAt && c.weekId === weekId);
+  const cases = archiveWeekCases(weekId);
 
   const rows = cases.length === 0 ? '' : cases.map(c => {
     const core = getOwner('core', c.coreId);
@@ -6416,8 +6534,18 @@ function renderArchiveWeek(weekId) {
       <div class="stat"><div class="v">${s.itP99Ms != null ? fmtHours(s.itP99Ms) : '—'}</div><div class="k">IT time · P99</div></div>
     </div>
 
-    ${cases.length === 0 ? '<div class="queue-empty">No cases filed in this week.</div>' : `
-      <table class="case-table">
+    ${!weekHasAny ? '<div class="queue-empty">No cases filed in this week.</div>' : `
+      <div class="archive-toolbar">
+        <label class="picked-filter" title="Show only cases picked into a workspace">
+          <input type="checkbox" id="archive-picked-only" ${pickedOnly ? 'checked' : ''}>
+          Picked only
+        </label>
+        <button class="btn-tiny" id="archive-copy-table" data-week-id="${escapeHtml(weekId)}" title="Copy these cases as a table (paste into Excel / Google Sheets)">⧉ Copy as table</button>
+        <span class="re-copied" id="archive-copied">Copied ✓</span>
+      </div>
+      ${cases.length === 0
+        ? `<div class="queue-empty">No picked cases in this week.</div>`
+        : `<table class="case-table">
         <thead>
           <tr>
             <th>ID</th>
@@ -6434,7 +6562,7 @@ function renderArchiveWeek(weekId) {
           </tr>
         </thead>
         <tbody>${rows}</tbody>
-      </table>
+      </table>`}
     `}
   `;
 }
@@ -8768,6 +8896,31 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="restore-case"]').forEach(el => {
     el.addEventListener('click', () => handleRestoreCase(el.dataset.caseId));
   });
+  document.getElementById('archive-picked-only')?.addEventListener('change', e => {
+    STATE.archivePickedOnly = e.target.checked;
+    render();
+  });
+  const archiveCopyBtn = document.getElementById('archive-copy-table');
+  if (archiveCopyBtn) {
+    archiveCopyBtn.addEventListener('click', async () => {
+      const text = archiveTableText(archiveCopyBtn.dataset.weekId);
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (_) {
+        // file:// / older browsers: fall back to a hidden textarea + execCommand.
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+        document.body.removeChild(ta);
+      }
+      const flash = document.getElementById('archive-copied');
+      if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
+    });
+  }
   document.querySelectorAll('[data-action="purge-case"]').forEach(el => {
     el.addEventListener('click', () => handlePurgeCase(el.dataset.caseId));
   });
