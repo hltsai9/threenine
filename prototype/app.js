@@ -1158,11 +1158,17 @@ function deptInList(dept, list) {
   const d = String(dept).toLowerCase();
   return list.some(x => String(x).toLowerCase() === d);
 }
-// True when a department name starts with the configured user-department prefix (case-insensitive).
-// User departments are matched by prefix rather than an exhaustive list — see CC_USER_DEPARTMENT_PREFIX.
-function deptHasPrefix(dept, prefix) {
-  if (!dept || !prefix) return false;
-  return String(dept).toLowerCase().startsWith(String(prefix).toLowerCase());
+// True when `dept` is a User/requester department — it either exactly matches one of
+// CC_USER_DEPARTMENTS or starts with one of CC_USER_DEPARTMENT_PREFIXES (all case-insensitive).
+// The prefixes value also accepts a single string for convenience. See owners.js.
+function isUserDept(dept) {
+  if (!dept) return false;
+  if (deptInList(dept, window.CC_USER_DEPARTMENTS)) return true;
+  let prefixes = window.CC_USER_DEPARTMENT_PREFIXES;
+  if (typeof prefixes === 'string') prefixes = [prefixes];
+  if (!Array.isArray(prefixes)) return false;
+  const d = String(dept).toLowerCase();
+  return prefixes.some(p => p && d.startsWith(String(p).toLowerCase()));
 }
 // CURRENT station of a case, from Case Center only (assigneeDept + latest processType).
 // Track Status (the DESIRED location) must NOT influence this — see the design spec.
@@ -1175,7 +1181,7 @@ function caseStation(c) {
     return STATION_1ST_LINE;                                         // 1st Line / any other pt
   }
   if (deptInList(dept, window.CC_HQ_DEPARTMENTS)) return 'HQ';       // HQ side
-  if (deptHasPrefix(dept, window.CC_USER_DEPARTMENT_PREFIX)) return 'User';   // user dept (prefix) → User
+  if (isUserDept(dept)) return 'User';                              // user dept (exact or prefix) → User
   return STATION_1ST_LINE;                                           // unrecognised → triage
 }
 

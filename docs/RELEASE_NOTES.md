@@ -25,14 +25,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   (instead of trailing/leading the station-positioned id). `.rb-tracker` is capped to stay clear of
   the User station at 12%.
 
-### Added (User-department categorization by prefix)
+### Added (User-department categorization — exact list + multiple prefixes)
 
-- New **`window.CC_USER_DEPARTMENT_PREFIX`** in `owners.js` (default `'ABC'`) categorizes cases
-  **from User/requester departments** by a shared name prefix, completing the Route Board station
-  trio (Core / HQ / **User**). Unlike the exact-match `CC_CORE_DEPARTMENTS` / `CC_HQ_DEPARTMENTS`
-  lists, user departments are matched by prefix (case-insensitive) since every requesting unit is
-  named `ABC-<team>`. New `deptHasPrefix()` helper; `caseStation()` now maps an assignee whose
-  department starts with the prefix to the **User** station. Set the prefix to `''` to disable.
+- New **`window.CC_USER_DEPARTMENTS`** (exact dept names, like `CC_CORE_DEPARTMENTS` /
+  `CC_HQ_DEPARTMENTS`) and **`window.CC_USER_DEPARTMENT_PREFIXES`** (a list of name prefixes, e.g.
+  `['ABC', 'XYZ']`) in `owners.js` categorize cases **from User/requester departments**, completing
+  the Route Board station trio (Core / HQ / **User**). A dept matching **either** (exact or any
+  prefix, case-insensitive) is treated as a User dept. New `isUserDept()` helper (also accepts a
+  single prefix string); `caseStation()` maps such an assignee to the **User** station. Leave either
+  list `[]` to disable that mode. *(Supersedes the earlier single `CC_USER_DEPARTMENT_PREFIX`.)*
 
 ### Added (Route Board tracker + Overview picked filter & copy)
 

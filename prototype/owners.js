@@ -86,9 +86,12 @@ window.OWNERS = {
 window.CC_CORE_DEPARTMENTS = ['Site IT'];
 window.CC_HQ_DEPARTMENTS = ['HQ Identity', 'HQ Mobile'];
 
-// User (requester) departments sit at the *User* station on the Route Board. Unlike the Core/HQ
-// lists above (matched on exact dept names), every requesting business unit is named with a shared
-// PREFIX in Case Center — "ABC-Sales", "ABC-Finance", … — so user departments are matched by that
-// prefix instead of an exhaustive list. A case whose assigneeDept starts with this prefix
-// (case-insensitive) is categorized as a User case. Set to '' to disable prefix matching.
-window.CC_USER_DEPARTMENT_PREFIX = 'ABC';
+// User (requester) departments sit at the *User* station on the Route Board. Provide them two ways
+// — both are checked (case-insensitive), and a dept matching EITHER is treated as a User dept:
+//   - CC_USER_DEPARTMENTS          exact dept names, exactly like CC_CORE_DEPARTMENTS / CC_HQ_DEPARTMENTS.
+//   - CC_USER_DEPARTMENT_PREFIXES  name prefixes, for when requesting units share a stem
+//                                  (e.g. "ABC-Sales", "ABC-Finance", "XYZ-Ops" → prefixes ['ABC', 'XYZ']).
+// Use whichever fits — list exact names you know, add prefixes for families of names, or both.
+// Leave either as [] to disable that mode. (A single prefix string is also accepted for convenience.)
+window.CC_USER_DEPARTMENTS = [];
+window.CC_USER_DEPARTMENT_PREFIXES = ['ABC'];
