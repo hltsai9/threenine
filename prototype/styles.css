@@ -2553,18 +2553,32 @@ table.case-table {
   font-family: 'IBM Plex Mono', monospace;
 }
 
-/* Tracker chip at the FRONT of a Route Board row — who picked the case ("👤 name") or whom it is
-   being handed over to ("→ name"). Kept small and muted so it leads the id without crowding it. */
+/* Tracker chip pinned to the LEFT EDGE of every Route Board row (a direct child of .rb-row, so it
+   inherits position:absolute). All chips line up at the board's left margin — "👤 name" = who picked
+   the case, "→ name" = whom it's handed over to — independent of where the case's dot sits. Capped
+   so it never crosses into the User station at 12%. */
 .rb-tracker {
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 11px; font-weight: 600;
-  margin-right: 4px;
-  padding: 0 5px; border-radius: 8px;
+  padding: 1px 5px; border-radius: 8px;
   white-space: nowrap;
+  max-width: calc(12% - 6px);
+  overflow: hidden; text-overflow: ellipsis;
 }
 .rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
 .rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
 .rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }
+
+/* "Mine only" toggle in the dark band titlebar — light text to match the band chrome. */
+.rb-mine-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; color: #C7D4C9;
+  margin-left: 6px; cursor: pointer; user-select: none;
+}
+.rb-mine-toggle input { cursor: pointer; }
 
 /* ---- MOVING row (66px tall) ---- */
 

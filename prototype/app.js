@@ -239,6 +239,7 @@ const STATE = {
   lookbackHours: 1,          // Case Center query window: older bound (hours ago)
   lookbackToHours: 0,        // newer bound (hours ago); 0 = up to now → "within N hours"
   archivePickedOnly: false,  // Overview week table: when true, show only picked cases
+  routeMineOnly: false,      // Route Board: when true, show only the current operator's cases
 };
 try {
   const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
@@ -1560,15 +1561,28 @@ function caseTracker(c) {
   return null;
 }
 
-// Compact tracker chip shown at the FRONT of a Route Board row, before the case id. A trailing
-// separator is included so callers can prepend it straight onto the existing "id · time" string.
+// Tracker chip pinned to the LEFT EDGE of a Route Board row — a direct child of .rb-row (so it's
+// absolutely positioned at left:2px, aligned across every row regardless of the case's station).
 // "→ name" means the case is being handed over to that teammate/shift; "👤 name" means they picked it.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
   const sym = t.kind === 'to' ? '→' : '👤';
   const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return `<span class="rb-tracker rb-tracker-${t.kind}" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</span> `;
+  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${escapeHtml(sym)} ${escapeHtml(t.label)}</div>`;
+}
+
+// The operator id a picked case currently "belongs to" — the handover recipient when it's been
+// handed to a specific teammate, otherwise whoever picked it (most recent 'picked' entry), falling
+// back to the current operator. Drives the Route Board "Mine only" toggle.
+function caseTrackerOperatorId(c) {
+  if (c.handover && c.handover.toOperator) return c.handover.toOperator;
+  const picks = (c.history || []).filter(h => h.kind === 'picked');
+  if (picks.length) {
+    const op = getOperator(picks[picks.length - 1].who);
+    if (op) return op.id;
+  }
+  return STATE.operatorId;
 }
 
 function _classifyRouteRow(c) {
@@ -1610,7 +1624,8 @@ function _renderMovingRow(c, top, animDelay) {
       ${travel}
       <div class="rb-origin-dot"      style="left:${originPct}%; background:#3f6e5e; box-shadow:0 0 0 1.5px #3f6e5e;"></div>
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
-      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
+      ${routeTrackerTag(c)}
+      <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
       <div class="${chipCls}"         style="left:${chipPct}%;">${escapeHtml(chipText)}</div>
     </div>
   `;
@@ -1633,7 +1648,7 @@ function _renderWatchRow(c, top) {
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9A53C" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
       </div>`;
   const idShift = station === 'User' ? `calc(${pct}% + 44px)` : `calc(${pct}% + 42px)`;
-  const idEl = `<div class="rb-watch-id" style="left:${idShift};">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>`;
+  const idEl = `${routeTrackerTag(c)}<div class="rb-watch-id" style="left:${idShift};">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>`;
   const overCls = itProcessOver(c) ? ' rb-row-over' : '';
 
   if (station === expected) {
@@ -1674,7 +1689,8 @@ function _renderStayRow(c, top) {
   return `
     <div class="rb-row rb-row-stay${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-stay-dot" style="left:${pct}%;"></div>
-      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}</div>
+      ${routeTrackerTag(c)}
+      <div class="rb-stay-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · stays · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -1689,7 +1705,8 @@ function _renderFirstLineRow(c, top) {
       <div class="rb-fl-arrow rb-fl-arrow-left"  style="left:${pct}%;"></div>
       <div class="rb-fl-arrow rb-fl-arrow-right" style="left:${pct}%;"></div>
       <div class="rb-fl-dot" style="left:${pct}%;"></div>
-      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}</div>
+      ${routeTrackerTag(c)}
+      <div class="rb-fl-id"  style="left:calc(${pct}% + 16px);">${escapeHtml(c.id)} · 1st Line · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
@@ -1712,13 +1729,21 @@ function _renderSanitySubRow(c, top) {
   return `
     <div class="rb-row rb-row-sanity-sub${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
-      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${routeTrackerTag(c)}${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
+      ${routeTrackerTag(c)}
+      <div class="rb-sanity-sub-id" style="left:calc(${pct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
     </div>
   `;
 }
 
 function renderRouteBoardStrip() {
-  const all = pickedCases();
+  const mineOnly = !!STATE.routeMineOnly;
+  const me = getOperator(STATE.operatorId);
+  const myName = me ? shortOpName(me.name) : 'me';
+  // "Mine only" narrows the board to cases that currently belong to the signed-in operator —
+  // ones they picked (and haven't handed off) or that were handed over to them by name.
+  const all = mineOnly
+    ? pickedCases().filter(c => caseTrackerOperatorId(c) === STATE.operatorId)
+    : pickedCases();
 
   // Bucket every picked case into one of the four visual row types.
   const moving = [], watch = [], stay = [], sanity = [], firstline = [];
@@ -1773,7 +1798,9 @@ function renderRouteBoardStrip() {
 
   // Empty state — keep the band chrome so the layout doesn't jump.
   const emptyBody = all.length === 0
-    ? `<div class="rb-empty">No cases picked yet. Open <a href="#/archive">Overview</a> to find cases to pick.</div>`
+    ? (mineOnly
+        ? `<div class="rb-empty">No cases for ${escapeHtml(myName)} right now. Turn off <strong>Mine only</strong> to see all picked cases.</div>`
+        : `<div class="rb-empty">No cases picked yet. Open <a href="#/archive">Overview</a> to find cases to pick.</div>`)
     : segments.join('');
 
   return `
@@ -1783,6 +1810,10 @@ function renderRouteBoardStrip() {
           <span class="rb-band-dot"></span>
           <span class="rb-band-title">HAND-OFF ROUTE BOARD</span>
           <span class="rb-band-summary">${escapeHtml(summary)}</span>
+          <label class="rb-mine-toggle" title="Show only ${escapeHtml(myName)}'s cases">
+            <input type="checkbox" id="route-mine-only" ${mineOnly ? 'checked' : ''}>
+            Mine only
+          </label>
         </div>
         <div class="rb-band-legend">
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
@@ -5050,6 +5081,10 @@ function bindHandlers() {
       STATE.kanbanSelected = el.dataset.caseId;
       render();
     });
+  });
+  document.getElementById('route-mine-only')?.addEventListener('change', e => {
+    STATE.routeMineOnly = e.target.checked;
+    render();
   });
   document.querySelectorAll('[data-action="toggle-sanity"]').forEach(el => {
     el.addEventListener('click', () => {

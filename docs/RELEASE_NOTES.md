@@ -10,11 +10,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
-### Changed (Route Board tracker chip moved to the front)
+### Added (Route Board "Mine only" toggle)
 
-- The picked-case **tracker chip** ("👤 picked by" / "→ handed to") now renders at the **front of
-  each Route Board row**, before the case id, instead of trailing it. `routeTrackerTag()` carries a
-  trailing separator and is prepended at every row type; `.rb-tracker` uses `margin-right`.
+- The Hand-off Route Board titlebar gains a **"Mine only"** toggle (`STATE.routeMineOnly`) that
+  narrows the board to the **current operator's** cases — ones they picked (and haven't handed off)
+  or that were handed over to them by name. New `caseTrackerOperatorId()` resolves the owning
+  operator; the empty state and summary update with the filter.
+
+### Changed (Route Board tracker chip pinned to the left edge)
+
+- The picked-case **tracker chip** ("👤 picked by" / "→ handed to") is now a left-edge marker on
+  each Route Board row — rendered as a direct child of `.rb-row` and absolutely positioned at the
+  board's left margin, so every chip **lines up at the left end** regardless of the case's station
+  (instead of trailing/leading the station-positioned id). `.rb-tracker` is capped to stay clear of
+  the User station at 12%.
 
 ### Added (User-department categorization by prefix)
 
