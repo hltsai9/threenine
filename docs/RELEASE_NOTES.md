@@ -10,6 +10,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-24
 
+### Added (login gate asks "who are you?" after the access token)
+
+- The shared-token login gate now has a **second step**: once a valid access token is accepted, it
+  asks the operator to pick **who they are** from a dropdown of the roster, then sets
+  `STATE.operatorId` (persisted in `OPERATOR_KEY`) — so picks, handovers and notes on a shared
+  terminal are recorded under the right name. `showLoginGate()` is now a two-step token → operator
+  flow; the picker defaults to the current operator.
+
 ### Fixed (Import case by ID now records the pick in history)
 
 - "+ Import case by ID" auto-picks the fetched case, but it set `agentStatus = 'queued'` directly

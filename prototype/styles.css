@@ -1535,6 +1535,17 @@ table.case-table {
   margin-bottom: 12px;
 }
 .login-card .btn-primary { width: 100%; justify-content: center; }
+.login-card .login-operator {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  margin-bottom: 12px;
+  background: var(--panel);
+  color: var(--text);
+}
 .login-error {
   margin-bottom: 12px;
   padding: 8px 11px;

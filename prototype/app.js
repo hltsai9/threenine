@@ -302,37 +302,71 @@ async function reauth() {
   await showLoginGate('Your session token was rejected. Sign in again to continue.');
 }
 
-// Blocking full-screen login gate. Resolves only once a VALID token is entered and stored.
+// Blocking full-screen login gate. Two steps: (1) enter a valid access token, then (2) pick which
+// operator you are — so picks, handovers and notes are recorded under the right name. Resolves only
+// once both are done (the operator choice persists per-device in OPERATOR_KEY).
 function showLoginGate(message) {
   return new Promise(resolve => {
     document.getElementById('login-gate')?.remove();
     const el = document.createElement('div');
     el.id = 'login-gate';
-    el.innerHTML = `
-      <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
-        <h2 id="login-title">Sign in</h2>
-        <p class="login-sub">${escapeHtml(message || 'Enter the team access token to use the case board.')}</p>
-        <input id="login-token" type="password" placeholder="Access token" autocomplete="current-password" aria-label="Access token" />
-        <div class="login-error" data-login-error role="alert" hidden></div>
-        <button class="btn btn-primary" id="login-submit">Sign in</button>
-      </div>`;
     document.body.appendChild(el);
-    const input = el.querySelector('#login-token');
-    const errEl = el.querySelector('[data-login-error]');
-    const btn = el.querySelector('#login-submit');
-    input.focus();
-    const fail = msg => { errEl.textContent = msg; errEl.hidden = false; btn.disabled = false; input.focus(); input.select(); };
-    const submit = async () => {
-      const token = input.value.trim();
-      if (!token) return fail('Enter your access token.');
-      btn.disabled = true; errEl.hidden = true;
-      if (!(await checkApiToken(token))) return fail('That token was rejected. Check it and try again.');
-      setApiToken(token);
-      el.remove();
-      resolve();
+
+    // Step 2 — "who are you?" operator picker.
+    const operatorStep = () => {
+      const opts = window.OPERATORS
+        .map(o => `<option value="${escapeHtml(o.id)}"${o.id === STATE.operatorId ? ' selected' : ''}>${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`)
+        .join('');
+      el.innerHTML = `
+        <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+          <h2 id="login-title">Who are you?</h2>
+          <p class="login-sub">Select your operator so your picks, handovers and notes are recorded under your name.</p>
+          <select id="login-operator" class="login-operator" aria-label="Operator">${opts}</select>
+          <button class="btn btn-primary" id="login-continue">Continue</button>
+        </div>`;
+      const sel = el.querySelector('#login-operator');
+      const cont = el.querySelector('#login-continue');
+      sel.focus();
+      const go = () => {
+        if (window.OPERATORS.some(o => o.id === sel.value)) {
+          STATE.operatorId = sel.value;
+          saveOperatorChoice();
+        }
+        el.remove();
+        resolve();
+      };
+      cont.addEventListener('click', go);
+      sel.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
     };
-    btn.addEventListener('click', submit);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+
+    // Step 1 — access token.
+    const tokenStep = () => {
+      el.innerHTML = `
+        <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+          <h2 id="login-title">Sign in</h2>
+          <p class="login-sub">${escapeHtml(message || 'Enter the team access token to use the case board.')}</p>
+          <input id="login-token" type="password" placeholder="Access token" autocomplete="current-password" aria-label="Access token" />
+          <div class="login-error" data-login-error role="alert" hidden></div>
+          <button class="btn btn-primary" id="login-submit">Sign in</button>
+        </div>`;
+      const input = el.querySelector('#login-token');
+      const errEl = el.querySelector('[data-login-error]');
+      const btn = el.querySelector('#login-submit');
+      input.focus();
+      const fail = msg => { errEl.textContent = msg; errEl.hidden = false; btn.disabled = false; input.focus(); input.select(); };
+      const submit = async () => {
+        const token = input.value.trim();
+        if (!token) return fail('Enter your access token.');
+        btn.disabled = true; errEl.hidden = true;
+        if (!(await checkApiToken(token))) return fail('That token was rejected. Check it and try again.');
+        setApiToken(token);
+        operatorStep();   // advance to "who are you?" instead of resolving immediately
+      };
+      btn.addEventListener('click', submit);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    };
+
+    tokenStep();
   });
 }
 
