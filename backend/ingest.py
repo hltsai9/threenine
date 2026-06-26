@@ -9,6 +9,9 @@ runs as a scheduled Kubernetes CronJob; for local work run it by hand.
     # Demo seed: load prototype/data.js into the DB, no Case Center access needed
     python -m backend.ingest --seed-from-data-js
 
+    # Seed board config: load prototype/shifts.js + owners.js into the config table
+    python -m backend.ingest --seed-config
+
 The real path reuses the existing adapter in local/casecenter.py unchanged: it
 fetches + maps Case Center records, and we upsert only Case-Center-owned fields so
 operator work is preserved (backend/merge.upsert_cc).
@@ -21,7 +24,7 @@ import subprocess
 import sys
 
 from .db import SessionLocal, init_db
-from .merge import upsert_cc, upsert_operator
+from .merge import set_config, upsert_cc, upsert_operator
 
 logger = logging.getLogger("case_tracker.ingest")
 
@@ -67,6 +70,28 @@ def seed_from_data_js(path=None):
     return added, updated
 
 
+def seed_config_from_js(shifts_path=None, owners_path=None):
+    """Load prototype/shifts.js + owners.js into the config table (keys 'shifts' and 'owners').
+    Builds the same payload shapes the SPA POSTs to /api/config, so the board reads the bundled
+    roster + owners from the DB instead of the JS fallback. Returns the keys written."""
+    extractor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_config_extract.cjs")
+    argv = ["node", extractor]
+    if shifts_path or owners_path:
+        argv += [shifts_path or os.path.join(REPO_ROOT, "prototype", "shifts.js"),
+                 owners_path or os.path.join(REPO_ROOT, "prototype", "owners.js")]
+    out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout
+    cfg = json.loads(out)
+    written = []
+    with SessionLocal() as session:
+        for key in ("shifts", "owners"):
+            if isinstance(cfg.get(key), dict):
+                set_config(session, key, cfg[key])
+                written.append(key)
+        session.commit()
+    logger.info("seed-config: wrote %s config into the DB", " + ".join(written) or "nothing")
+    return written
+
+
 def main(argv=None):
     # Run as a CLI/CronJob: configure root logging so ingest progress and the per-record
     # skip warnings (from casecenter.map_records) actually reach the console / pod logs.
@@ -74,6 +99,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Ingest cases into the Case Tracker DB.")
     p.add_argument("--seed-from-data-js", nargs="?", const=True, default=False,
                    metavar="PATH", help="Demo: load prototype/data.js (or PATH) instead of Case Center.")
+    p.add_argument("--seed-config", action="store_true",
+                   help="Load prototype/shifts.js + owners.js into the config table (shifts/owners). Can combine with --seed-from-data-js.")
     p.add_argument("--hours", type=float, default=None, help="Older bound of the Case Center query window (hours ago).")
     p.add_argument("--to-hours", type=float, default=None, help="Newer bound (hours ago); forms a created-between band with --hours.")
     p.add_argument("--id", default=None, help="Fetch a single case id instead of a window.")
@@ -83,10 +110,15 @@ def main(argv=None):
     if not args.no_create:
         init_db()
 
+    did = False
+    if args.seed_config:
+        seed_config_from_js()
+        did = True
     if args.seed_from_data_js:
         path = None if args.seed_from_data_js is True else args.seed_from_data_js
         seed_from_data_js(path)
-    else:
+        did = True
+    if not did:
         ingest_live(hours=args.hours, to_hours=args.to_hours, case_id=args.id)
 
 

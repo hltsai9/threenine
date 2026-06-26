@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Added (seed shifts & owners config into the DB — `ingest --seed-config`)
+
+- New **`python -m backend.ingest --seed-config`** loads `prototype/shifts.js` + `owners.js` into the
+  `config` table (keys `shifts`, `owners`), mirroring `--seed-from-data-js` for cases. New
+  `seed_config_from_js()` in `backend/ingest.py` and a Node extractor `backend/seed_config_extract.cjs`
+  that evaluates the two JS files and emits the same payload shapes the SPA POSTs to `/api/config`.
+  Upserts (re-runnable); combinable with `--seed-from-data-js`. Documented in
+  `docs/SELF-HOST-UBUNTU.md` §9a.
+
 ### Added (edit the Route Board department lists on the Owners page)
 
 - The Owners page gains a **"Route Board departments"** editor for the four config lists that

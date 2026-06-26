@@ -214,6 +214,34 @@ node backend/seed_board_json.cjs | \
 ```
 (For real data instead of the demo seed, see Step 13.)
 
+## 9a. Seed shifts & owners into the database
+
+Cases are one table; the **shift roster/rota** and the **owner directory + Route Board department
+lists** live in the `config` table (Step 6a). Load the bundled `prototype/shifts.js` +
+`prototype/owners.js` into it with one command (no Case Center access needed):
+
+```bash
+cd /opt/threenine
+set -a; source .env.casetracker; set +a
+.venv/bin/python -m backend.ingest --seed-config
+# log: seed-config: wrote shifts + owners config into the DB
+```
+
+This writes two rows — `shifts` and `owners` — whose JSON payloads match exactly what the
+**Save** buttons on the in-app Shifts / Owners pages produce, so the board reads them from the DB at
+boot (the bundled `.js` files become the fallback). It **upserts**, so re-running is safe and
+overwrites the two rows. Notes:
+
+- If you manage the schema with Alembic (`AUTO_CREATE=0`, Step 6 Option B), add `--no-create` so the
+  seeder doesn't create tables: `... --seed-config --no-create`. Run `alembic upgrade head` first so
+  the `config` table exists (Step 6a).
+- It seeds from `prototype/shifts.js` / `owners.js`. Edit those first to change the defaults, **or**
+  just sign in and edit on the **Shifts** / **Owners** pages and click **Save to database** — same
+  destination, no command needed.
+- To combine with the case seed in Step 9, the CLI also accepts both at once:
+  `.venv/bin/python -m backend.ingest --seed-from-data-js --seed-config`.
+- Confirm the rows: `psql "$DATABASE_URL" -c "SELECT key, updated_at FROM config;"` (Step 6a).
+
 ## 10. Verify end-to-end
 
 ```bash
