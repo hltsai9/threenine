@@ -4343,12 +4343,37 @@ function renderStatusFlow() {
         </ul>
       </div>
     </div></div>
+
+    <h2 style="margin-top:32px;">Route Board station — where a case sits</h2>
+    <p class="muted tiny" style="margin:-6px 0 12px;">The board <em>column</em> above (the Case Center status) is separate from the Route Board <em>station</em> — the dot's horizontal position across <strong>User → 1st Line → Core Team → HQ</strong>. The station is derived purely from Case Center data by <code class="mono">caseStation(c)</code>: the assignee's <strong>department</strong> (<code class="mono">assigneeDept</code>) plus the latest <code class="mono">processTimeline[*].processType</code>. Track Status (operator intent) never changes it.</p>
+
+    <div class="card"><div class="card-body">
+      <div class="detail-section">
+        <h3>How <code class="mono">caseStation(c)</code> resolves — first match wins</h3>
+        <ol class="muted tiny" style="margin:0; padding-left:18px; line-height:1.7;">
+          <li>Latest <code class="mono">processType</code> is <code class="mono">"User"</code> → <strong>User</strong> (returned to / waiting on the requester — this wins over any department).</li>
+          <li><code class="mono">assigneeDept</code> ∈ <code class="mono">CC_CORE_DEPARTMENTS</code> → <strong>Core Team</strong> when the latest <code class="mono">processType</code> is <code class="mono">"Service Team"</code>, otherwise <strong>1st Line</strong>.</li>
+          <li><code class="mono">assigneeDept</code> ∈ <code class="mono">CC_HQ_DEPARTMENTS</code> → <strong>HQ</strong>.</li>
+          <li><code class="mono">assigneeDept</code> is a <strong>user department</strong> — exact match in <code class="mono">CC_USER_DEPARTMENTS</code> or starts with any prefix in <code class="mono">CC_USER_DEPARTMENT_PREFIXES</code> (case-insensitive) → <strong>User</strong>.</li>
+          <li>Anything unrecognised falls through to <strong>1st Line</strong> (triage).</li>
+        </ol>
+      </div>
+      <div class="detail-section" style="margin-bottom:0">
+        <h3>Notes</h3>
+        <ul class="muted tiny" style="margin:0; padding-left:18px; line-height:1.6;">
+          <li>The four department lists live in <code class="mono">owners.js</code> (and, on the DB backend, in the saved <strong>owners</strong> config) and are editable on the <a href="#/owners">Owners</a> page. Department matching is a case-insensitive exact compare, except the user list which also accepts name <em>prefixes</em> (e.g. <code class="mono">['ABC']</code> matches <code class="mono">ABC-Sales</code>).</li>
+          <li>If every case sits at <strong>1st Line</strong>, the lists don't match your real <code class="mono">assigneeDept</code> values — set them on the Owners page.</li>
+          <li>The dot marks where the case <em>is</em>; the operator's Track Status is where it <em>should</em> go, so a mismatch draws the intent arrow / watch ring (see the board legend).</li>
+        </ul>
+      </div>
+    </div></div>
   `;
 }
 
-// Explainer page (like Status Flow) for how each case-detail clock is calculated. The handling
-// clocks are history-derived via the same holderTotals()/ownershipSegments() used on the detail
-// page, so the worked example below renders the real timeline component and can't drift.
+// Explainer page (like Status Flow) for how each case-detail clock is calculated. The three
+// headline clocks (SLA · time on us / Total time / On us) come from the process timeline; the
+// optional ownership timeline is history-derived via holderTotals()/ownershipSegments(), so the
+// worked example below renders the real component and can't drift.
 function renderClockModel() {
   const ago = h => new Date(NOW.getTime() - h * HOUR).toISOString();
   const example = {
@@ -4365,79 +4390,89 @@ function renderClockModel() {
   const firstLine = t.triage;        // Sanity Check is requester time, not first-line
   const requesterMs = t.requester;   // includes the Sanity Check span (see ownershipSegments)
   const lifeMs = t.triage + t.core + t.hq + t.requester;
-  // SLA runs the whole time the case is on us and pauses only on an explicit "Return to
-  // requester". This example never returns, so SLA spans the full lifetime — Sanity Check is
-  // requester-attributed in the breakdown but does not pause SLA.
-  const slaMsEx = lifeMs;
   const swatch = cls => `<span class="clock-swatch ${cls}"></span>`;
   const accentSwatch = '<span class="clock-swatch" style="background:var(--accent)"></span>';
+  const limitH = itProcessLimitHours();
 
   return `
     <div class="page-header">
       <div>
         <h1>Clock model</h1>
-        <div class="subtitle">How each clock on the case detail is calculated. The handling clocks are reconstructed from case history — the same source as the ownership timeline — so the numbers always reconcile.</div>
+        <div class="subtitle">How each clock on the case detail is calculated. The three headline clocks come from Case Center's process timeline; the optional ownership timeline is reconstructed from case history — so the numbers always reconcile.</div>
       </div>
     </div>
 
     <div class="flow-container">
-      <h2 style="margin-top:0;">How each clock is counted</h2>
-      <p class="muted tiny" style="margin:0 0 10px;">The case detail shows four clocks — SLA, First line, Core Team, HQ. The “With requester” row below isn't a separate clock; it's the requester-attributed time you see on the ownership timeline.</p>
+      <h2 style="margin-top:0;">The three case-detail clocks</h2>
+      <p class="muted tiny" style="margin:0 0 10px;">The <strong>Clocks</strong> panel on the case detail shows three figures, all in hours (<code class="mono">fmtHours</code>), derived from <code class="mono">processTimeline</code> — Case Center's per-stage processing log.</p>
       <table class="transition-table">
-        <thead>
-          <tr><th>Clock</th><th>What it measures</th><th>Starts</th><th>Pauses / stops</th><th>Banked</th></tr>
-        </thead>
+        <thead><tr><th>Clock</th><th>What it measures</th><th>How it's computed</th></tr></thead>
         <tbody>
           <tr>
             <td>${accentSwatch}<strong>SLA · time on us</strong></td>
-            <td>Total time the case is our responsibility.</td>
-            <td>When the case is created (<code>slaStartedAt</code>).</td>
-            <td>Pauses only on an explicit <em>Return to requester</em>; resumes on <em>resume</em>. Sanity Check does <strong>not</strong> pause it.</td>
-            <td>Frozen into <code>slaAccumulatedMs</code> on close / cancel.</td>
+            <td>Time the case was actively <em>on us</em> — the IT process time. Turns red when it exceeds the limit.</td>
+            <td><code class="mono">itProcessMs(c)</code> — the sum of the IT-side process stages only (see below). Over-limit past <code class="mono">THRESHOLDS.itProcessHours</code> (currently <strong>${limitH}h</strong>).</td>
           </tr>
           <tr>
+            <td><strong>Total time</strong></td>
+            <td>The case's whole elapsed lifetime across every process stage, including time waiting on the user.</td>
+            <td><code class="mono">processTotalMs(c)</code> — the sum of <em>all</em> <code class="mono">processTimeline</code> stage durations.</td>
+          </tr>
+          <tr>
+            <td><strong>On us</strong></td>
+            <td>What share of the case's life was actually on us.</td>
+            <td><code class="mono">slaSharePct(c)</code> = SLA · time on us ÷ Total time, as a percentage.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>IT process time — which stages count</h2>
+      <p class="muted tiny" style="margin:0 0 8px;">“SLA · time on us” sums only the IT-side stages of the process timeline (<code class="mono">IT_PROCESS_TYPES</code>):</p>
+      <ul class="muted tiny" style="margin:0; padding-left:18px; line-height:1.7;">
+        <li><strong>1st Line</strong>, <strong>Service Team</strong>, <strong>2nd Line</strong>, <strong>Unknown</strong> — these count toward <em>on us</em>.</li>
+        <li>Every other stage (e.g. time the case sat with the user) counts toward <strong>Total time</strong> but not toward <em>on us</em>.</li>
+        <li>The over-limit highlight fires at <code class="mono">THRESHOLDS.itProcessHours</code> in <code class="mono">data.js</code> — currently <strong>${limitH}h</strong>. The same per-week IT process time feeds the <a href="#/archive">Overview</a>'s <strong>P95 / P99</strong> percentiles.</li>
+      </ul>
+
+      <h2 style="margin-top:28px;">Ownership timeline (history-derived)</h2>
+      <p class="muted tiny" style="margin:0 0 10px;">A secondary breakdown — how the case's lifetime split across its holders — reconstructed from case <strong>history</strong> (not the process timeline) via <code class="mono">ownershipSegments()</code> / <code class="mono">holderTotals()</code>. It appears on the case detail when <code class="mono">SHOW_OWNERSHIP_TIMELINE</code> is on (currently <strong>${SHOW_OWNERSHIP_TIMELINE ? 'on' : 'off'}</strong>); the bar in the worked example below is that exact component.</p>
+      <table class="transition-table">
+        <thead><tr><th>Holder</th><th>What it measures</th><th>Spans</th></tr></thead>
+        <tbody>
+          <tr>
             <td>${swatch('tl-triage')}<strong>First line</strong></td>
-            <td>Time the first-line agent handled it directly — <strong>triage</strong> while the case is New.</td>
-            <td>On creation (status New).</td>
-            <td>When assigned to Core Team, or returned / cancelled from New.</td>
-            <td>Summed from history segments.</td>
+            <td>Triage — the first-line agent handling it directly while the case is New.</td>
+            <td>From creation until assigned to Core Team (or returned / cancelled from New).</td>
           </tr>
           <tr>
             <td>${swatch('tl-core')}<strong>Core Team</strong></td>
             <td>Time the case sat with the Core Team desk.</td>
-            <td>On <em>Assign to Core Team</em>.</td>
-            <td>On escalate / return / close.</td>
-            <td>Summed from history segments.</td>
+            <td>From <em>Assign to Core Team</em> until escalate / return / close.</td>
           </tr>
           <tr>
             <td>${swatch('tl-hq')}<strong>HQ Product Team</strong></td>
             <td>Time the case sat with the HQ product team.</td>
-            <td>On <em>Escalate to HQ</em>.</td>
-            <td>On move-to-sanity / return / close.</td>
-            <td>Summed from history segments.</td>
+            <td>From <em>Escalate to HQ</em> until move-to-sanity / return / close.</td>
           </tr>
           <tr>
             <td>${swatch('tl-requester')}<strong>With requester</strong></td>
-            <td>Time waiting on the requester — both <em>Returned to requester</em> and <strong>Sanity Check</strong> (awaiting their confirmation).</td>
-            <td>On return to requester, or on Move to Sanity Check.</td>
-            <td>On resume / verify &amp; close.</td>
-            <td>Timeline only. (Returned spans also pause SLA; Sanity Check does not.)</td>
+            <td>Time waiting on the requester — both <em>Returned to requester</em> and <strong>Sanity Check</strong> (awaiting confirmation).</td>
+            <td>From return / Move to Sanity Check until resume / verify &amp; close.</td>
           </tr>
         </tbody>
       </table>
 
       <h2>Worked example</h2>
-      <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Core Team → HQ → Sanity Check → Closed. The bar below is the exact component shown on the case detail.</p>
+      <p class="muted tiny" style="margin:0 0 8px;">A case that went New → Core Team → HQ → Sanity Check → Closed. The bar below is the ownership-timeline component.</p>
       ${renderOwnershipTimeline(example)}
       <div class="clock-grid" style="margin-top:16px;">
-        <div class="clock"><div class="label">${accentSwatch}SLA · time on us</div><div class="value">${fmtDuration(slaMsEx)}</div><div class="state">runs through Sanity Check (no explicit return)</div></div>
         <div class="clock"><div class="label">${swatch('tl-triage')}First line</div><div class="value">${fmtDuration(firstLine)}</div><div class="state">triage only</div></div>
-        <div class="clock"><div class="label">${swatch('tl-core')}Core Team</div><div class="value">${fmtDuration(t.core)}</div><div class="state">Idle</div></div>
-        <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">Idle</div></div>
+        <div class="clock"><div class="label">${swatch('tl-core')}Core Team</div><div class="value">${fmtDuration(t.core)}</div><div class="state">held</div></div>
+        <div class="clock"><div class="label">${swatch('tl-hq')}HQ Product Team</div><div class="value">${fmtDuration(t.hq)}</div><div class="state">held</div></div>
         <div class="clock"><div class="label">${swatch('tl-requester')}With requester</div><div class="value">${fmtDuration(requesterMs)}</div><div class="state">incl. Sanity Check</div></div>
       </div>
 
-      <p class="muted tiny" style="margin-top:14px;">First line + Core Team + HQ + With requester add up to the case's lifetime (${fmtDuration(lifeMs)}). <strong>Sanity Check</strong> counts as <em>With requester</em> time. <strong>SLA · time on us</strong> runs the whole lifetime and pauses only on an explicit <em>Return to requester</em> — so here it equals the full ${fmtDuration(slaMsEx)}.</p>
+      <p class="muted tiny" style="margin-top:14px;">First line + Core Team + HQ + With requester add up to the case's lifetime (${fmtDuration(lifeMs)}). <strong>Sanity Check</strong> counts as <em>With requester</em> time. A separate pause/resume clock — <code class="mono">caseSlaMs</code>, shown as <strong>Process Time</strong> in the Overview — pauses on an explicit <em>Return to requester</em> but not on Sanity Check; it is distinct from the case-detail “SLA · time on us” (IT process time) above.</p>
     </div>
   `;
 }

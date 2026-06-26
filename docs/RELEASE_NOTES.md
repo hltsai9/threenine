@@ -10,6 +10,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Changed (Status Flow & Clock Model reference pages match the code)
+
+- **Status Flow** (`#/flow`) gains a **"Route Board station — where a case sits"** section
+  documenting `caseStation(c)`: how `assigneeDept` + latest `processType` resolve to User / 1st Line
+  / Core Team / HQ (the first-match order), including the `CC_CORE/HQ/USER_DEPARTMENTS` and
+  `CC_USER_DEPARTMENT_PREFIXES` config and the unrecognised→1st Line fallback. The page previously
+  documented only the status→column mapping and never mentioned the station axis or the User
+  department lists.
+- **Clock Model** (`#/clocks`) rewritten to match what the case detail actually shows: the **three
+  headline clocks** — *SLA · time on us* (= `itProcessMs`, the IT process time, red past
+  `THRESHOLDS.itProcessHours` = 15h), *Total time* (`processTotalMs`), *On us %* (`slaSharePct`) —
+  all in hours. Added which stages count as IT process time (1st Line / Service Team / 2nd Line /
+  Unknown) and the P95/P99 link. The holder breakdown (First line / Core / HQ / With requester) is
+  now correctly framed as the **optional** history-derived *ownership timeline* (`SHOW_OWNERSHIP_TIMELINE`,
+  off by default), not "the four clocks"; the separate pause/resume `caseSlaMs` (Overview *Process
+  Time*) is called out as distinct.
+
 ### Added (shifts & owners saved to / read from the database)
 
 - The decoupled backend now persists **board config** (the shift roster/rota and the owner directory
