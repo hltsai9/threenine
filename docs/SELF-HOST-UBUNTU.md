@@ -136,6 +136,42 @@ DATABASE_URL='mysql+pymysql://casetracker:<STRONG_DB_PASSWORD>@localhost:3306/ca
 cd /opt/threenine
 ```
 
+### 6a. Tables for shifts & owners (board config)
+
+Besides `cases`, the board persists two config blocks in a **`config`** table (one row per key):
+`shifts` (operator roster + rota) and `owners` (the owner directory + Route Board department lists).
+With this table present, the **Save** buttons on the Shifts and Owners pages write straight to the
+database, and every operator/device reads the same config at boot (the bundled `shifts.js` /
+`owners.js` are only the fallback when a key hasn't been saved yet).
+
+You don't normally create it by hand:
+
+- **`AUTO_CREATE=1`** (Option A) creates `config` on the next boot — just restart the service.
+- **Alembic** (Option B) creates it via revision `0002_add_config` — `alembic upgrade head` (above)
+  applies it. After pulling a new version, re-run `alembic upgrade head` (see *Updating*, below).
+
+**PostgreSQL** (the schema this deployment currently uses) — if you prefer to create it manually,
+or to confirm it exists, the equivalent DDL is:
+```sql
+CREATE TABLE IF NOT EXISTS config (
+    key        VARCHAR(64) PRIMARY KEY,   -- 'shifts' or 'owners'
+    updated_at TIMESTAMPTZ,
+    payload    JSON NOT NULL              -- the full config block (use JSONB if you prefer)
+);
+```
+```bash
+# with the running deployment's DATABASE_URL (postgresql+psycopg://… → the psql URL is postgresql://…):
+psql "postgresql://casetracker:<DB_PASSWORD>@localhost:5432/casetracker" -f - <<'SQL'
+CREATE TABLE IF NOT EXISTS config (
+    key VARCHAR(64) PRIMARY KEY,
+    updated_at TIMESTAMPTZ,
+    payload JSON NOT NULL
+);
+SQL
+```
+Inspect what's stored: `psql "$DATABASE_URL" -c "SELECT key, updated_at FROM config;"`. To reset a
+block back to the bundled seed, delete its row: `DELETE FROM config WHERE key = 'shifts';`.
+
 ## 7. Configure the front end
 
 Edit `prototype/config.js`:

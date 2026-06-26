@@ -8,6 +8,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-06-26
+
+### Added (shifts & owners saved to / read from the database)
+
+- The decoupled backend now persists **board config** (the shift roster/rota and the owner directory
+  + Route Board department lists), not just cases. New **`config`** table (one row per key:
+  `shifts`, `owners`) in `backend/db.py`, `get_config()` / `set_config()` in `backend/merge.py`, and
+  **`GET/POST /api/config/{key}`** in `backend/api.py` (auth-gated like the rest). Alembic revision
+  `0002_add_config`; `AUTO_CREATE` makes it on boot.
+- Front end: the **Save** buttons on the Shifts and Owners pages now write to the **database** when
+  running against the decoupled backend (button reads "Save to database"); they still write
+  `shifts.js` / `owners.js` under serve.py. At server-mode boot the SPA pulls the shared config via
+  `loadConfigFromServer()` and applies it (`applyShiftsConfig` / `applyOwnersConfig`), so every
+  operator/device sees the same roster + owners; the bundled `shifts.js` / `owners.js` are the
+  fallback when a key hasn't been saved. New `shiftsConfig()` / `ownersConfig()` builders and
+  `saveConfigToServer()`.
+
+### Docs
+
+- `docs/SELF-HOST-UBUNTU.md` §6a: how the `config` table is created (AUTO_CREATE / Alembic
+  `0002_add_config`) with **PostgreSQL** DDL to create/inspect/reset it by hand.
+
 ## 2026-06-24
 
 ### Added (login gate asks "who are you?" after the access token)

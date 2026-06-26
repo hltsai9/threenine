@@ -12,6 +12,8 @@ Endpoints (same contract the SPA already expects):
     GET  /api/cases            -> {"cases": [...], "operatorLayer": "server"}
     GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
+    GET  /api/config/{key}     -> {"key": "shifts"|"owners", "payload": {...}|null}
+    POST /api/config/{key}     -> body {"payload": {...}}  (shifts roster/rota or owner directory)
 
 Config (env):
     DATABASE_URL      see backend/db.py (default SQLite)
@@ -36,7 +38,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .db import REPO_ROOT, SessionLocal, init_db
-from .merge import all_cases, case_by_id, upsert_operator
+from .merge import all_cases, case_by_id, get_config, set_config, upsert_operator
 
 logger = logging.getLogger("case_tracker.api")
 
@@ -144,6 +146,37 @@ async def save(request: Request):
         added, updated, purged = upsert_operator(session, cases, purge_ids)
         session.commit()
     return JSONResponse({"ok": True, "added": added, "updated": updated, "purged": purged})
+
+
+# Shared board config (shifts roster/rota and the owner directory). Saved from the Shifts / Owners
+# pages and read at boot so every operator/device sees the same config; the SPA falls back to its
+# bundled shifts.js / owners.js when a key has never been saved.
+_CONFIG_KEYS = {"shifts", "owners"}
+
+
+@app.get("/api/config/{key}")
+def get_config_route(key: str, request: Request):
+    require_auth(request)
+    if key not in _CONFIG_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown config key")
+    with SessionLocal() as session:
+        payload = get_config(session, key)
+    return {"key": key, "payload": payload}
+
+
+@app.post("/api/config/{key}")
+async def set_config_route(key: str, request: Request):
+    require_auth(request)
+    if key not in _CONFIG_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown config key")
+    data = await request.json()
+    payload = data.get("payload") if isinstance(data, dict) else None
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail='Body must be {"payload": {...}}')
+    with SessionLocal() as session:
+        result = set_config(session, key, payload)
+        session.commit()
+    return JSONResponse({"ok": True, "result": result})
 
 
 # Optionally serve the static SPA from the same origin (no CORS, no mixed content).

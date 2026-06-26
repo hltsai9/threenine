@@ -4386,7 +4386,9 @@ const SEED_ROSTER = {
   rotaByWeek: structuredClone(window.ROTA_BY_WEEK || {}),
 };
 // Pristine owner directory, so "Reset to seed" can undo in-session Owners-editor changes.
-const SEED_OWNERS = structuredClone(window.OWNERS);
+// `let` (not const): when a DB backend supplies an owners config at boot, this is re-baselined to
+// that config so the editor's dirty-check compares against the stored state, not the bundled seed.
+let SEED_OWNERS = structuredClone(window.OWNERS);
 
 const HOUR = 3600 * 1000;
 const DAY = 24 * HOUR;
@@ -7145,7 +7147,7 @@ function renderRosterEditor() {
       <div class="detail-section" style="margin-bottom:0">
         <div class="re-out-head">
           <h3 style="margin:0">Snippet for <code>shifts.js</code></h3>
-          <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="re-save">Save to shifts.js</button> ' : ''}<button class="btn" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
+          <div>${/^https?:$/.test(location.protocol) ? `<button class="btn btn-primary" id="re-save">${isDbBackend() ? 'Save to database' : 'Save to shifts.js'}</button> ` : ''}<button class="btn" id="re-copy">Copy</button><span class="re-copied" id="re-copied">Copied ✓</span></div>
         </div>
         <textarea class="re-output" id="roster-output" readonly spellcheck="false">${escapeHtml(rosterSnippet())}</textarea>
       </div>
@@ -7333,7 +7335,8 @@ function bindRotaEditor() {
     // Refresh the shifts.js snippet so a copy/paste captures every week.
     const ta = document.getElementById('roster-output');
     if (ta) ta.value = rosterSnippet();
-    if (/^https?:$/.test(location.protocol)) saveJsFile('shifts', rosterSnippet(), 'shifts.js');
+    // Persist to the DB (decoupled backend) or shifts.js (serve.py); no-op on file://.
+    if (/^https?:$/.test(location.protocol)) persistRoster();
     showToast('Rota saved.', 'success');
     render();
   });
@@ -7399,7 +7402,7 @@ function bindRosterEditor() {
   });
   ed.querySelectorAll('.re-del-shift').forEach(btn => btn.addEventListener('click', () => deleteShift(+btn.dataset.si)));
   ed.querySelectorAll('.re-del-op').forEach(btn => btn.addEventListener('click', () => deleteOperator(+btn.dataset.oi)));
-  document.getElementById('re-save')?.addEventListener('click', () => saveJsFile('shifts', rosterSnippet(), 'shifts.js'));
+  document.getElementById('re-save')?.addEventListener('click', () => persistRoster());
   document.getElementById('re-copy')?.addEventListener('click', async () => {
     const ta = document.getElementById('roster-output');
     try { await navigator.clipboard.writeText(ta.value); }
@@ -7536,7 +7539,7 @@ function renderOwnersPage() {
         ${warnHtml}
         <div class="detail-section" style="margin-bottom:0">
           <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
-            <div>${/^https?:$/.test(location.protocol) ? '<button class="btn btn-primary" id="owners-save">Save to owners.js</button> ' : ''}<button class="btn" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
+            <div>${/^https?:$/.test(location.protocol) ? `<button class="btn btn-primary" id="owners-save">${isDbBackend() ? 'Save to database' : 'Save to owners.js'}</button> ` : ''}<button class="btn" id="owners-copy">Copy</button><span class="re-copied" id="owners-copied">Copied ✓</span></div></div>
           <textarea class="re-output" id="owners-output" readonly spellcheck="false">${escapeHtml(ownersSnippet())}</textarea>
         </div>
       </div>
@@ -7642,7 +7645,7 @@ function bindOwnersEditor() {
     render();
   }));
 
-  document.getElementById('owners-save')?.addEventListener('click', () => saveJsFile('owners', ownersSnippet(), 'owners.js'));
+  document.getElementById('owners-save')?.addEventListener('click', () => persistOwners());
   document.getElementById('owners-copy')?.addEventListener('click', async () => {
     const ta = document.getElementById('owners-output');
     try { await navigator.clipboard.writeText(ta.value); }
@@ -9394,6 +9397,109 @@ function saveJsFile(file, snippet, label) {
   }).catch(() => { setSaveStatus('error'); showToast('Save failed — is serve.py running?', 'warn'); });
 }
 
+// True when the board is backed by the decoupled DB API (backend/api.py), as opposed to the
+// single-user serve.py proxy or the file:// demo. Set once /api/cases reports operatorLayer:"server".
+// In this mode the Shifts/Owners pages save their config to the DB instead of to a .js file.
+function isDbBackend() { return !!window.__SERVER_OPERATOR_LAYER__; }
+
+// ---- Shifts / Owners config <-> DB ------------------------------------------------------------
+// The structured (JSON) config blocks the DB stores, mirroring what rosterSnippet()/ownersSnippet()
+// emit as .js — but as data, so the backend needs no JS parser.
+function shiftsConfig() {
+  // Recompute each shift's roster from OPERATORS (mirrors rosterSnippet) so operatorIds never drift.
+  const shifts = window.SHIFTS.map(s => ({
+    name: s.name, hoursUtc: s.hoursUtc,
+    operatorIds: window.OPERATORS.filter(o => o.shift === s.name).map(o => o.id),
+  }));
+  const cur = window.OPERATORS.some(o => o.id === window.CURRENT_OPERATOR_ID)
+    ? window.CURRENT_OPERATOR_ID : (window.OPERATORS[0] && window.OPERATORS[0].id) || '';
+  const rotaByWeek = {};
+  for (const id of editableWeekIds()) rotaByWeek[id] = normalizeRota(rotaForWeek(id));
+  return {
+    operators: window.OPERATORS.map(o => ({ id: o.id, name: o.name, shift: o.shift })),
+    shifts,
+    currentOperatorId: cur,
+    rota: normalizeRota(window.CURRENT_WEEK?.id ? rotaForWeek(window.CURRENT_WEEK.id) : window.ROTA),
+    rotaByWeek,
+  };
+}
+function ownersConfig() {
+  return {
+    owners: window.OWNERS,
+    ccCoreDepartments: window.CC_CORE_DEPARTMENTS || [],
+    ccHqDepartments: window.CC_HQ_DEPARTMENTS || [],
+    ccUserDepartments: window.CC_USER_DEPARTMENTS || [],
+    ccUserDepartmentPrefixes: window.CC_USER_DEPARTMENT_PREFIXES || [],
+  };
+}
+// Apply a DB config block onto the window globals (validating shapes), then re-baseline the pristine
+// seed snapshot so the editor dirty-checks against the stored state.
+function applyShiftsConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return;
+  if (Array.isArray(cfg.operators)) window.OPERATORS = cfg.operators;
+  if (Array.isArray(cfg.shifts)) window.SHIFTS = cfg.shifts;
+  if (typeof cfg.currentOperatorId === 'string' && cfg.currentOperatorId) window.CURRENT_OPERATOR_ID = cfg.currentOperatorId;
+  if (Array.isArray(cfg.rota)) window.ROTA = cfg.rota;
+  if (cfg.rotaByWeek && typeof cfg.rotaByWeek === 'object') window.ROTA_BY_WEEK = cfg.rotaByWeek;
+  SEED_ROSTER.operators = structuredClone(window.OPERATORS);
+  SEED_ROSTER.shifts = structuredClone(window.SHIFTS);
+  SEED_ROSTER.currentOperatorId = window.CURRENT_OPERATOR_ID;
+  SEED_ROSTER.rota = structuredClone(window.ROTA || []);
+  SEED_ROSTER.rotaByWeek = structuredClone(window.ROTA_BY_WEEK || {});
+}
+function applyOwnersConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return;
+  if (cfg.owners && typeof cfg.owners === 'object') window.OWNERS = cfg.owners;
+  if (Array.isArray(cfg.ccCoreDepartments)) window.CC_CORE_DEPARTMENTS = cfg.ccCoreDepartments;
+  if (Array.isArray(cfg.ccHqDepartments)) window.CC_HQ_DEPARTMENTS = cfg.ccHqDepartments;
+  if (Array.isArray(cfg.ccUserDepartments)) window.CC_USER_DEPARTMENTS = cfg.ccUserDepartments;
+  if (Array.isArray(cfg.ccUserDepartmentPrefixes) || typeof cfg.ccUserDepartmentPrefixes === 'string') {
+    window.CC_USER_DEPARTMENT_PREFIXES = cfg.ccUserDepartmentPrefixes;
+  }
+  SEED_OWNERS = structuredClone(window.OWNERS);
+}
+// POST a config block to the DB (POST /api/config/<key>). Returns a promise<boolean> of success.
+function saveConfigToServer(key, payload, label) {
+  setSaveStatus('saving', 'Saving ' + label + '…');
+  return fetch(apiUrl('api/config/' + key), withAuth({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload }),
+  })).then(r => {
+    if (r.status === 401) onApiUnauthorized();
+    if (r.ok) { setSaveStatus('saved', 'Saved ' + label); showToast(label + ' saved to the database.', 'success'); }
+    else { setSaveStatus('error'); showToast('Save failed (' + r.status + ').', 'warn'); }
+    return r.ok;
+  }).catch(() => { setSaveStatus('error'); showToast('Save failed — is the API reachable?', 'warn'); return false; });
+}
+// Pull the shared shifts + owners config from the DB at boot (server mode) and apply it. A 404 / not
+// configured / unreachable just leaves the bundled shifts.js / owners.js seed in place.
+async function loadConfigFromServer() {
+  if (!/^https?:$/.test(location.protocol)) return;
+  for (const key of ['shifts', 'owners']) {
+    try {
+      const res = await fetch(apiUrl('api/config/' + key), withAuth({ headers: { Accept: 'application/json' } }));
+      if (!res.ok) continue;
+      const data = await res.json();
+      const payload = data && data.payload;
+      if (!payload || typeof payload !== 'object') continue;   // never saved → keep the seed
+      if (key === 'shifts') applyShiftsConfig(payload); else applyOwnersConfig(payload);
+    } catch (e) { /* keep the bundled seed */ }
+  }
+}
+// Persist the shift roster/rota — to the DB (decoupled backend) or to shifts.js (serve.py).
+function persistRoster() {
+  if (isDbBackend()) { saveConfigToServer('shifts', shiftsConfig(), 'Shifts'); return; }
+  if (/^https?:$/.test(location.protocol)) { saveJsFile('shifts', rosterSnippet(), 'shifts.js'); return; }
+  showToast('Run the board via the DB backend or serve.py to save.', 'warn');
+}
+// Persist the owner directory — to the DB (decoupled backend) or to owners.js (serve.py).
+function persistOwners() {
+  if (isDbBackend()) { saveConfigToServer('owners', ownersConfig(), 'Owners'); return; }
+  if (/^https?:$/.test(location.protocol)) { saveJsFile('owners', ownersSnippet(), 'owners.js'); return; }
+  showToast('Run the board via the DB backend or serve.py to save.', 'warn');
+}
+
 // Persist ANY case that changed since the last save (queue, status, assignment, reminder,
 // handover note, …). Called from saveState() in live mode; diffs against a snapshot so only
 // changed cases are sent.
@@ -9550,6 +9656,9 @@ async function bootServerLoad() {
     await reauth();
     ok = await tryLoadLiveCases(true);
   }
+  // Pull the shared shifts + owners config (decoupled backend only). Safe no-op elsewhere: a 404 /
+  // unconfigured key / unreachable API just leaves the bundled shifts.js / owners.js seed in place.
+  await loadConfigFromServer();
   hideLiveLoading();
   render();
   if (!ok) {

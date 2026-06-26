@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from .db import Case
+from .db import Case, Config
 
 # Fields Case Center authoritatively owns. Must stay in sync with CC_OWNED_FIELDS in
 # local/persist.py and prototype/app.js. On a live refresh only these are overlaid onto
@@ -138,3 +138,24 @@ def all_cases(session):
 def case_by_id(session, cid):
     row = session.get(Case, cid)
     return [row.payload] if row is not None else []
+
+
+# ---- Board config (shifts / owners) -----------------------------------------------------------
+# A whole config block per key, replaced wholesale on save (it's small and edited as a unit on the
+# Shifts / Owners pages). Returns None when a key has never been saved, so the SPA keeps its
+# bundled shifts.js / owners.js seed.
+
+def get_config(session, key):
+    row = session.get(Config, key)
+    return row.payload if row is not None else None
+
+
+def set_config(session, key, payload):
+    """Insert or replace the config block for `key`. Returns 'created' or 'updated'."""
+    row = session.get(Config, key)
+    if row is None:
+        session.add(Config(key=key, payload=payload, updated_at=datetime.now(timezone.utc)))
+        return "created"
+    row.payload = payload
+    row.updated_at = datetime.now(timezone.utc)
+    return "updated"

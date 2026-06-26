@@ -60,6 +60,21 @@ class Case(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
 
+class Config(Base):
+    """Shared board configuration that isn't a case: the shift roster/rota ("shifts") and the
+    owner directory + Route Board department lists ("owners"). One row per config key, the whole
+    block stored as a single JSON payload — so the Shifts/Owners pages can save to the DB and every
+    operator/device reads the same config (the bundled shifts.js / owners.js become the fallback)."""
+    __tablename__ = "config"
+
+    # Config key: "shifts" or "owners".
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    updated_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The full config block (board-shaped), e.g. {operators, shifts, currentOperatorId, rota,
+    # rotaByWeek} for "shifts" or {owners, ccCoreDepartments, …} for "owners".
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+
 def init_db() -> None:
     """Create tables if they don't exist. Used for demos/SQLite; production should
     prefer `alembic upgrade head` and may set AUTO_CREATE=0 to skip this."""
