@@ -1684,7 +1684,6 @@ function routeBoardTableData() {
   const rows = routeBoardCases().map(c => {
     const ts = caseTrackStatus(c);
     const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
-    const core = getOwner('core', c.coreId);
     const hq = getOwner('hq', c.hqId);
     return [
       caseHref(c),
@@ -1692,7 +1691,7 @@ function routeBoardTableData() {
       itProcessMs(c) > 0 ? fmtHours(itProcessMs(c)) : '',
       tsLabel,
       caseHandoverRoute(c),
-      core ? core.name : '',
+      coreMemberName(c) || '',
       hq ? hq.name : '',
       caseNotesText(c),
     ];
@@ -1843,22 +1842,22 @@ function wireCoreMemberSelect(deskField) {
   if (!deskSel || !memSel) return;
   deskSel.addEventListener('change', () => { memSel.innerHTML = coreMemberOptions(deskSel.value, null); });
 }
-// Pre-assign modal opened from the Route Board "escalate to Core" chip: mark which Core Team member
-// is taking the case now — operator layer only, the Case Center status is left untouched.
+// Assign modal opened from the Route Board "escalate to Core" chip: record which Core Team member is
+// taking the case — operator layer only, the Case Center status is left untouched.
 function openCorePreassignModal(c, op) {
   const deskOpts = window.OWNERS.core.map(f =>
     `<option value="${escapeHtml(f.id)}"${f.id === c.coreId ? ' selected' : ''}>${escapeHtml(f.name)}${f.region ? ' (' + escapeHtml(f.region) + ')' : ''}</option>`).join('');
   const deskId = c.coreId || (window.OWNERS.core[0] && window.OWNERS.core[0].id) || '';
   showModal(`
-    <h3>Pre-assign to a Core Team member</h3>
-    <div class="modal-sub">Mark who on the Core Team is taking this case now — before Case Center moves it — to shorten the IT process time. This sets the operator layer only; the Case Center status is unchanged.</div>
+    <h3>Assign to a Core Team member</h3>
+    <div class="modal-sub">Record who on the Core Team is taking this case — to shorten the IT process time. This sets the operator layer only; the Case Center status is unchanged.</div>
     <label>Core Team desk</label>
     <select data-field="coreId">${deskOpts}</select>
     <label>Core Team member <span class="req">*</span></label>
     <select data-field="coreMemberId">${coreMemberOptions(deskId, c.coreMemberId)}</select>
     <div class="modal-actions">
       <button class="btn" data-modal-cancel>Cancel</button>
-      <button class="btn btn-primary" data-modal-submit>Mark assigned</button>
+      <button class="btn btn-primary" data-modal-submit>Assign</button>
     </div>
   `, (modal) => {
     const coreId = fieldVal(modal, 'coreId');
@@ -1869,8 +1868,8 @@ function openCorePreassignModal(c, op) {
     c.coreMemberId = memberId;
     const desk = getOwner('core', coreId);
     const mName = coreMemberName(c);
-    logHistory(c, op, 'pre-assigned', `Core Team — ${desk ? desk.name : coreId}${mName ? ' · ' + mName : ''} (before Case Center)`);
-    showToast(`${c.id} marked assigned to ${mName || (desk ? desk.name : 'Core Team')}.`, 'success');
+    logHistory(c, op, 'assigned', `Core Team — ${desk ? desk.name : coreId}${mName ? ' · ' + mName : ''}`);
+    showToast(`${c.id} assigned to ${mName || (desk ? desk.name : 'Core Team')}.`, 'success');
     render();
     return true;
   });

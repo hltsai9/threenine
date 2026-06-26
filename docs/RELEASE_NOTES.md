@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Changed (Core Team export column shows the member; "assigned" wording)
+
+- The Route Board **Copy as table / Export CSV** "Core Team" column now shows the assigned **Core
+  Team member's name** (just the member), instead of the desk name.
+- Dropped the "pre-assigned" wording from the Route Board chip flow — the modal title, button,
+  toast and history entry now simply say **"assign" / "assigned"** (history kind `assigned`).
+
 ### Changed (Core Team member is now mandatory when assigning a desk)
 
 - Picking a Core Team **member** is required wherever a Core Team desk is assigned — the Route Board
