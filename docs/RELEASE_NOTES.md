@@ -10,6 +10,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Added (assign a Core Team member — Route Board chip + case detail)
+
+- **Route Board:** the deadline chip on an *Escalate to Core Team* (Core-bound) row is now clickable.
+  Clicking it opens a desk + member picker so the operator can **pre-assign a specific Core Team
+  member** — marking that the case has gone to that person *before* Case Center moves it, to shorten
+  IT process time. Once set, the chip turns green and shows the **member's name** (click again to
+  change). This is operator-layer only; the Case Center status / station are untouched.
+- **Case detail:** the Core Team **Assign / Change** control now also picks a **member** (a dropdown
+  that follows the chosen desk), not just the desk; the detail row shows "desk · **member**".
+- New `coreMemberId` field on cases (operator layer, defaults null, cleared when the Core owner is
+  unassigned/cleared); helpers `coreMemberName()` / `coreMemberOptions()` / `openCorePreassignModal()`
+  and a green `.rb-chip-assigned` chip variant.
+
 ### Fixed (actions stamped at the real current time in live mode, not page-load time)
 
 - In live mode, `NOW` (which timestamps every recorded action — history entries, Track Status,

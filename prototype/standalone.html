@@ -2718,6 +2718,13 @@ table.case-table {
 }
 .rb-chip-amber   { background: #E8C56A; color: #3A2F12; }
 .rb-chip-overdue { background: #B05050; color: white; }
+/* Pre-assigned to a Core Team member — green "done" chip showing the member's name. */
+.rb-chip-assigned { background: #2E5641; color: #EAF3EC; }
+/* The escalate-to-Core chip is a button (so the row's select-case click skips it). Reset the
+   native button chrome so it looks identical to the static chip. */
+button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-family: 'IBM Plex Mono', monospace; }
+.rb-chip-btn { cursor: pointer; }
+.rb-chip-btn:hover { filter: brightness(1.08); }
 
 /* ---- WATCH row (60px tall) ---- */
 
@@ -4028,6 +4035,7 @@ function fillBoardDefaults(c) {
   if (c.trackStatusAt === undefined) c.trackStatusAt = null;   // when the intent was committed (overdue anchor)
   if (c.trackStatusDueAt === undefined) c.trackStatusDueAt = null;   // operator-set hand-off time (overrides the rule)
   if (c.coreId == null)           c.coreId = null;
+  if (c.coreMemberId == null)     c.coreMemberId = null;   // operator-assigned Core Team member (id)
   if (c.hqId == null)             c.hqId = null;
   if (c.currentOwner == null) {
     if (c.status === 'with_core') c.currentOwner = 'core';
@@ -5655,6 +5663,64 @@ function _classifyRouteRow(c) {
   return 'stay';
 }
 
+// The Core Team member a case has been assigned to (operator layer), or null. Independent of the
+// Case Center status — an operator can pre-assign a member on the Route Board before CC catches up.
+function coreMemberName(c) {
+  if (!c || !c.coreMemberId) return null;
+  const desk = getOwner('core', c.coreId);
+  const m = desk && Array.isArray(desk.members) ? desk.members.find(x => x.id === c.coreMemberId) : null;
+  return m ? m.name : null;
+}
+// <option>s for the members of a Core Team desk; `selectedId` pre-selects one. Leads with a
+// "no specific member" choice so a desk can be assigned without naming a person.
+function coreMemberOptions(deskId, selectedId) {
+  const desk = getOwner('core', deskId);
+  const members = (desk && Array.isArray(desk.members)) ? desk.members : [];
+  return `<option value="">— No specific member —</option>` + members.map(m =>
+    `<option value="${escapeHtml(m.id)}"${m.id === selectedId ? ' selected' : ''}>${escapeHtml(m.name)}${m.role ? ' · ' + escapeHtml(m.role) : ''}</option>`).join('');
+}
+// After a modal with a Core desk select (data-field=deskField) and a member select
+// (data-field=coreMemberId) is shown, repopulate the member list whenever the desk changes.
+function wireCoreMemberSelect(deskField) {
+  const modal = _activeModal;
+  if (!modal) return;
+  const deskSel = modal.querySelector(`[data-field="${deskField}"]`);
+  const memSel = modal.querySelector('[data-field="coreMemberId"]');
+  if (!deskSel || !memSel) return;
+  deskSel.addEventListener('change', () => { memSel.innerHTML = coreMemberOptions(deskSel.value, null); });
+}
+// Pre-assign modal opened from the Route Board "escalate to Core" chip: mark which Core Team member
+// is taking the case now — operator layer only, the Case Center status is left untouched.
+function openCorePreassignModal(c, op) {
+  const deskOpts = window.OWNERS.core.map(f =>
+    `<option value="${escapeHtml(f.id)}"${f.id === c.coreId ? ' selected' : ''}>${escapeHtml(f.name)}${f.region ? ' (' + escapeHtml(f.region) + ')' : ''}</option>`).join('');
+  const deskId = c.coreId || (window.OWNERS.core[0] && window.OWNERS.core[0].id) || '';
+  showModal(`
+    <h3>Pre-assign to a Core Team member</h3>
+    <div class="modal-sub">Mark who on the Core Team is taking this case now — before Case Center moves it — to shorten the IT process time. This sets the operator layer only; the Case Center status is unchanged.</div>
+    <label>Core Team desk</label>
+    <select data-field="coreId">${deskOpts}</select>
+    <label>Core Team member</label>
+    <select data-field="coreMemberId">${coreMemberOptions(deskId, c.coreMemberId)}</select>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Mark assigned</button>
+    </div>
+  `, (modal) => {
+    const coreId = fieldVal(modal, 'coreId');
+    if (!coreId) return modalError('Pick a Core Team desk.');
+    c.coreId = coreId;
+    c.coreMemberId = fieldVal(modal, 'coreMemberId') || null;
+    const desk = getOwner('core', coreId);
+    const mName = coreMemberName(c);
+    logHistory(c, op, 'pre-assigned', `Core Team — ${desk ? desk.name : coreId}${mName ? ' · ' + mName : ''} (before Case Center)`);
+    showToast(`${c.id} marked assigned to ${mName || (desk ? desk.name : 'Core Team')}.`, 'success');
+    render();
+    return true;
+  });
+  wireCoreMemberSelect('coreId');
+}
+
 function _renderMovingRow(c, top, animDelay) {
   const handoff = scheduledHandoff(c);
   const phase = trackStatusPhase(c);
@@ -5663,8 +5729,13 @@ function _renderMovingRow(c, top, animDelay) {
   const originPct = ROUTE_STATION_POS[handoff.from] ?? ROUTE_STATION_POS['User'];
   const destPct = ROUTE_STATION_POS[handoff.to];
   const widthPct = destPct - originPct;
-  const chipText = formatDeadlineChip(handoff, phase);
-  const chipCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
+  // Core-bound cases (escalate to Core Team) let the operator pre-assign a Core Team member from the
+  // chip — before Case Center moves the case — to shorten IT process time. Once assigned, the chip
+  // shows the member's name (and stays clickable to change it); otherwise it's the deadline.
+  const coreBound = handoff.to === 'Core Team';
+  const memberName = coreBound ? coreMemberName(c) : null;
+  const chipText = memberName || formatDeadlineChip(handoff, phase);
+  const chipCls = memberName ? 'rb-chip rb-chip-assigned' : (overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber');
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
 
   // When origin and destination resolve to the same station the travel line has
@@ -5685,7 +5756,9 @@ function _renderMovingRow(c, top, animDelay) {
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
       ${routeTrackerTag(c)}
       <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
-      <div class="${chipCls}"         style="left:calc(${destPct}% - 12px);">${escapeHtml(chipText)}</div>
+      ${coreBound
+        ? `<button type="button" class="${chipCls} rb-chip-btn" style="left:calc(${destPct}% - 12px);" data-action="assign-core-member" data-case-id="${escapeHtml(c.id)}" title="${escapeHtml(memberName ? 'Assigned to ' + memberName + ' — click to change' : 'Click to assign a Core Team member')}">${escapeHtml(chipText)}</button>`
+        : `<div class="${chipCls}" style="left:calc(${destPct}% - 12px);">${escapeHtml(chipText)}</div>`}
     </div>
   `;
 }
@@ -6500,7 +6573,7 @@ function renderCaseDetailBody(c) {
             <div class="detail-row"><span class="k">User</span><span class="v">${c.user ? escapeHtml(c.user) : '<span class="muted">—</span>'}${c.userDept ? ` <span class="muted">· ${escapeHtml(c.userDept)}</span>` : ''}</span></div>
             ${c.reporter ? `<div class="detail-row"><span class="k">Reporter</span><span class="v">${escapeHtml(c.reporter)}${c.reporterDept ? ` <span class="muted">· ${escapeHtml(c.reporterDept)}</span>` : ''}</span></div>` : ''}
             ${c.assignee ? `<div class="detail-row"><span class="k">Assignee</span><span class="v">${escapeHtml(c.assignee)}${c.assigneeDept ? ` <span class="muted">· ${escapeHtml(c.assigneeDept)}</span>` : ''}</span></div>` : ''}
-            <div class="detail-row"><span class="k">Core Team</span><span class="v">${core ? `${escapeHtml(core.name)} ${renderTzHint(core)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="core">${core ? 'Change' : 'Assign'}</button></span></div>
+            <div class="detail-row"><span class="k">Core Team</span><span class="v">${core ? `${escapeHtml(core.name)}${coreMemberName(c) ? ' · <strong>' + escapeHtml(coreMemberName(c)) + '</strong>' : ''} ${renderTzHint(core)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="core">${core ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">HQ Product Team</span><span class="v">${hq ? `${escapeHtml(hq.name)} ${renderTzHint(hq)}` : '<span class="muted">— unassigned</span>'} <button class="btn-tiny" data-action="reassign" data-case-id="${c.id}" data-type="hq">${hq ? 'Change' : 'Assign'}</button></span></div>
             <div class="detail-row"><span class="k">Last contact</span><span class="v">${c.lastOwnerContact ? `${escapeHtml(c.lastOwnerContact.channel)} · ${fmtRelative(c.lastOwnerContact.at)}` : '<span class="muted">—</span>'}</span></div>
           </div>
@@ -8736,6 +8809,7 @@ function handlePrompt(caseId, kind) {
         c.holdStartedAt = null;
         c.lastOwnerContact = null;
         c.coreId = null;
+        c.coreMemberId = null;
         c.hqId = null;
         c.coreCannotResolve = false;
         detail = `Requester replied · resumed unassigned (Core Team/HQ cleared)`;
@@ -9126,6 +9200,8 @@ function handleReassign(caseId, type) {
     <div class="modal-sub">${currentId ? 'Pick a different desk or unassign. If this is the active owner, the hold clock segment will reset to the new owner.' : 'Pick a desk for this case.'}</div>
     <label>${escapeHtml(typeLabel)}</label>
     <select data-field="ownerId">${opts}</select>
+    ${type === 'core' ? `<label>Core Team member</label>
+    <select data-field="coreMemberId">${coreMemberOptions(currentId, c.coreMemberId)}</select>` : ''}
     <label>Reason (optional)</label>
     <textarea data-field="reason" placeholder="Why is the assignment changing?"></textarea>
     <div class="modal-actions">
@@ -9134,8 +9210,10 @@ function handleReassign(caseId, type) {
     </div>
   `, (modal) => {
     const newId = fieldVal(modal, 'ownerId') || null;
+    const newMemberId = type === 'core' ? (fieldVal(modal, 'coreMemberId') || null) : null;
     const reason = fieldVal(modal, 'reason').trim();
-    if (newId === currentId) return true;
+    const memberChanged = type === 'core' && newMemberId !== (c.coreMemberId || null);
+    if (newId === currentId && !memberChanged) return true;
 
     const oldOwner = currentId ? getOwner(type, currentId) : null;
     const newOwner = newId ? getOwner(type, newId) : null;
@@ -9147,7 +9225,7 @@ function handleReassign(caseId, type) {
     }
 
     // Update the contact pointer.
-    if (type === 'core') c.coreId = newId;
+    if (type === 'core') { c.coreId = newId; c.coreMemberId = newId ? newMemberId : null; }
     else c.hqId = newId;
 
     // Decide currentOwner / status / new clock segment.
@@ -9183,11 +9261,13 @@ function handleReassign(caseId, type) {
 
     if (type === 'core') c.coreCannotResolve = false;
 
-    const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${reason ? ' · ' + reason : ''}`;
+    const mName = type === 'core' && newId ? coreMemberName(c) : null;
+    const detail = `${typeLabel}: ${oldOwner ? oldOwner.name : '(unassigned)'} → ${newOwner ? newOwner.name : '(unassigned)'}${mName ? ' · ' + mName : ''}${reason ? ' · ' + reason : ''}`;
     logHistory(c, op, currentId ? 'reassigned' : 'assigned', detail);
     render();
     return true;
   });
+  if (type === 'core') wireCoreMemberSelect('ownerId');
 }
 
 /* ---------- Bind handlers after render ---------- */
@@ -9234,6 +9314,14 @@ function bindHandlers() {
     el.addEventListener('click', e => {
       e.preventDefault();
       handleReassign(el.dataset.caseId, el.dataset.type);
+    });
+  });
+  document.querySelectorAll('[data-action="assign-core-member"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();   // don't also fire the row's select-case
+      const c = caseById(el.dataset.caseId);
+      if (c) openCorePreassignModal(c, getOperator(STATE.operatorId));
     });
   });
   document.querySelectorAll('[data-action="select-case"]').forEach(el => {
@@ -9413,7 +9501,7 @@ function normalizeLiveCase(c) {
     flags: [],
     priority: 'medium',
     caseType: 'access',
-    coreId: null, hqId: null, currentOwner: null,
+    coreId: null, coreMemberId: null, hqId: null, currentOwner: null,
     slaPaused: false, slaAccumulatedMs: 0,
     holdMs: { core: 0, hq: 0 }, holdStartedAt: null,
     lastOwnerContact: null,

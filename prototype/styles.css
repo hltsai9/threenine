@@ -2710,6 +2710,13 @@ table.case-table {
 }
 .rb-chip-amber   { background: #E8C56A; color: #3A2F12; }
 .rb-chip-overdue { background: #B05050; color: white; }
+/* Pre-assigned to a Core Team member — green "done" chip showing the member's name. */
+.rb-chip-assigned { background: #2E5641; color: #EAF3EC; }
+/* The escalate-to-Core chip is a button (so the row's select-case click skips it). Reset the
+   native button chrome so it looks identical to the static chip. */
+button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-family: 'IBM Plex Mono', monospace; }
+.rb-chip-btn { cursor: pointer; }
+.rb-chip-btn:hover { filter: brightness(1.08); }
 
 /* ---- WATCH row (60px tall) ---- */
 
