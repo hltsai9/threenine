@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Fixed (actions stamped at the real current time in live mode, not page-load time)
+
+- In live mode, `NOW` (which timestamps every recorded action — history entries, Track Status,
+  handover, reminders) was set once at boot and never advanced, so without a page refresh an action
+  was logged with the time you first landed on the page. `updateClock()` now advances `NOW` to the
+  wall clock on each tick when `window.__LIVE__` — the same tick that refreshes the sidebar clock —
+  so a recorded action's timestamp matches the time shown in the sidebar. The static demo still
+  freezes `NOW` for stability.
+
 ### Added (seed shifts & owners config into the DB — `ingest --seed-config`)
 
 - New **`python -m backend.ingest --seed-config`** loads `prototype/shifts.js` + `owners.js` into the

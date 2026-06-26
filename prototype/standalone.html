@@ -4550,10 +4550,15 @@ function realNow() { return new Date(); }
 
 // Live wall-clock shown in the sidebar — local-first (UTC kept on hover for reference).
 function updateClock() {
+  const now = realNow();
+  // In live mode, keep NOW tracking the wall clock so any action (history entry, Track Status,
+  // handover, reminder) is stamped at the REAL current time — matching this sidebar clock — rather
+  // than the time the page was first loaded. Both update on the same tick, so they always agree.
+  // The static demo deliberately freezes NOW for stability, so only advance it when live.
+  if (window.__LIVE__) NOW = now;
   const t = document.getElementById('clock-time');
   const d = document.getElementById('clock-date');
   if (!t || !d) return;
-  const now = realNow();
   const iso = now.toISOString();
   const p = _tzParts(iso);
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
