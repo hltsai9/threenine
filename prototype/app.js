@@ -3601,6 +3601,41 @@ function ownerRefCounts(pool, id) {
   return n;
 }
 
+// Normalize a CC department config value to a string array (the prefixes var also accepts a single
+// string for back-compat). Shared by the editor, the snippet, and the DB config builder.
+function deptListArray(v) {
+  if (Array.isArray(v)) return v.slice();
+  return (typeof v === 'string' && v) ? [v] : [];
+}
+// Which window global each Route Board department list maps to.
+const DEPT_LIST_VARS = {
+  core: 'CC_CORE_DEPARTMENTS', hq: 'CC_HQ_DEPARTMENTS',
+  user: 'CC_USER_DEPARTMENTS', userPrefix: 'CC_USER_DEPARTMENT_PREFIXES',
+};
+
+function renderDeptListsEditor() {
+  const field = (key, label, hint, placeholder) => {
+    const vals = deptListArray(window[DEPT_LIST_VARS[key]]);
+    return `
+      <label class="dept-list">
+        <span class="dept-list-label">${label} <code class="mono">${DEPT_LIST_VARS[key]}</code></span>
+        <span class="dept-list-hint muted tiny">${hint}</span>
+        <textarea data-deptlist="${key}" rows="3" spellcheck="false" placeholder="${escapeHtml(placeholder)}">${escapeHtml(vals.join('\n'))}</textarea>
+      </label>`;
+  };
+  return `
+    <div class="detail-section">
+      <h3>Route Board departments</h3>
+      <p class="muted tiny" style="margin:0 0 10px;">Case Center <code class="mono">assigneeDept</code> values that place a case at each Route Board station (see <a href="#/flow">Status Flow</a>). <strong>One entry per line</strong>, matched case-insensitively. A case whose department matches none of these sits at <strong>1st Line</strong>.</p>
+      <div class="dept-lists">
+        ${field('core', 'Core Team / 1st Line', 'Exact dept names handled by the Core Team desk.', 'Site IT')}
+        ${field('hq', 'HQ', 'Exact dept names owned by HQ product teams.', 'HQ Identity\nHQ Mobile')}
+        ${field('user', 'User — exact names', 'Requester departments, matched exactly.', 'ABC-Sales')}
+        ${field('userPrefix', 'User — name prefixes', 'Requester depts matched by name prefix (e.g. ABC → ABC-Sales).', 'ABC')}
+      </div>
+    </div>`;
+}
+
 function ownersSnippet() {
   const q = s => "'" + String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
   const renderMembers = (members) => {
@@ -3613,7 +3648,12 @@ function ownersSnippet() {
     `    { id: ${q(o.id)}, name: ${q(o.name)}, region: ${q(o.region || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
   const hq = window.OWNERS.hq.map(o =>
     `    { id: ${q(o.id)}, name: ${q(o.name)}, area: ${q(o.area || '')}, tz: ${q(o.tz || '')}, office: ${q(o.office || '')}, channel: ${q(o.channel || '')}${renderMembers(o.members)} },`).join('\n');
-  return `window.OWNERS = {\n  core: [\n${core}\n  ],\n  hq: [\n${hq}\n  ],\n};`;
+  const arr = v => `[${deptListArray(v).map(q).join(', ')}]`;
+  return `window.OWNERS = {\n  core: [\n${core}\n  ],\n  hq: [\n${hq}\n  ],\n};\n\n`
+    + `window.CC_CORE_DEPARTMENTS = ${arr(window.CC_CORE_DEPARTMENTS)};\n`
+    + `window.CC_HQ_DEPARTMENTS = ${arr(window.CC_HQ_DEPARTMENTS)};\n`
+    + `window.CC_USER_DEPARTMENTS = ${arr(window.CC_USER_DEPARTMENTS)};\n`
+    + `window.CC_USER_DEPARTMENT_PREFIXES = ${arr(window.CC_USER_DEPARTMENT_PREFIXES)};`;
 }
 
 function ownersWarnings() {
@@ -3695,7 +3735,7 @@ function renderOwnersPage() {
   return `
     <div class="page-header"><div>
       <h1>Owners</h1>
-      <div class="subtitle">Core Team desks and HQ Product Teams that cases are routed to. Session edits; paste the snippet into <code>owners.js</code> to keep them. "Reset to seed" undoes them.</div>
+      <div class="subtitle">Core Team desks and HQ Product Teams cases route to, plus the Route Board department lists. Session edits; ${isDbBackend() ? 'click <strong>Save to database</strong> to share them' : 'paste the snippet into <code>owners.js</code> to keep them'}. "Reset to seed" undoes them.</div>
     </div></div>
     <div class="card roster-editor" id="owners-editor">
       <div class="card-header"><span>Edit Core Team desks &amp; HQ teams</span></div>
@@ -3704,6 +3744,7 @@ function renderOwnersPage() {
         ${renderOwnersTable('hq', 'HQ Product Teams', 'Area')}
         ${renderTeamMembersEditor('core', 'Core Team members')}
         ${renderTeamMembersEditor('hq', 'HQ team members')}
+        ${renderDeptListsEditor()}
         ${warnHtml}
         <div class="detail-section" style="margin-bottom:0">
           <div class="re-out-head"><h3 style="margin:0">Snippet for <code>owners.js</code></h3>
@@ -3811,6 +3852,15 @@ function bindOwnersEditor() {
     if (!Array.isArray(team.members)) return;
     team.members.splice(mi, 1);
     render();
+  }));
+
+  // Route Board department lists (CC_CORE/HQ/USER_DEPARTMENTS, CC_USER_DEPARTMENT_PREFIXES).
+  // One entry per line → string array on the matching window global; refresh the snippet live.
+  ed.querySelectorAll('textarea[data-deptlist]').forEach(t => t.addEventListener('input', () => {
+    const varName = DEPT_LIST_VARS[t.dataset.deptlist];
+    if (!varName) return;
+    window[varName] = t.value.split('\n').map(s => s.trim()).filter(Boolean);
+    refresh();
   }));
 
   document.getElementById('owners-save')?.addEventListener('click', () => persistOwners());

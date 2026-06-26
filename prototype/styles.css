@@ -1830,6 +1830,21 @@ table.case-table {
   font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55;
   white-space: pre; overflow: auto; resize: vertical;
 }
+/* Route Board department-list editor on the Owners page (CC_*_DEPARTMENTS). */
+.dept-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 720px) { .dept-lists { grid-template-columns: 1fr; } }
+.dept-list { display: flex; flex-direction: column; gap: 4px; }
+.dept-list-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.dept-list-label code { font-weight: 500; }
+.dept-list-hint { margin-bottom: 2px; }
+.dept-list textarea {
+  width: 100%; padding: 9px 11px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--chip-soft-2); color: var(--text);
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5;
+  resize: vertical; min-height: 64px;
+}
+.dept-list textarea:focus { outline: none; border-color: var(--accent-soft); background: white; }
+
 .re-refbox { background: var(--high-bg); border: 1px solid #f3d896; border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 13px; color: var(--high); }
 .re-refbox ul { margin: 6px 0 0; padding-left: 18px; }
 .re-radio { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: 13px; cursor: pointer; font-weight: 500; }

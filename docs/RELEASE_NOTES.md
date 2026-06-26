@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Added (edit the Route Board department lists on the Owners page)
+
+- The Owners page gains a **"Route Board departments"** editor for the four config lists that
+  `caseStation()` uses — **`CC_CORE_DEPARTMENTS`**, **`CC_HQ_DEPARTMENTS`**, **`CC_USER_DEPARTMENTS`**,
+  and **`CC_USER_DEPARTMENT_PREFIXES`** — one entry per line. Previously these were only editable by
+  hand-editing `owners.js`. Edits flow through the existing **Save** button: into the database on the
+  decoupled backend (already part of the owners config) or into the `owners.js` snippet under
+  serve.py — `ownersSnippet()` now emits all four lists. New `renderDeptListsEditor()` /
+  `deptListArray()` helpers.
+
 ### Changed (Status Flow & Clock Model reference pages rewritten to match the code)
 
 - **Status Flow** (`#/flow`) rewritten around the current **two-status model**. Removed the stale
