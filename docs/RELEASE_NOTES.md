@@ -10,22 +10,26 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
-### Changed (Status Flow & Clock Model reference pages match the code)
+### Changed (Status Flow & Clock Model reference pages rewritten to match the code)
 
-- **Status Flow** (`#/flow`) gains a **"Route Board station — where a case sits"** section
-  documenting `caseStation(c)`: how `assigneeDept` + latest `processType` resolve to User / 1st Line
-  / Core Team / HQ (the first-match order), including the `CC_CORE/HQ/USER_DEPARTMENTS` and
-  `CC_USER_DEPARTMENT_PREFIXES` config and the unrecognised→1st Line fallback. The page previously
-  documented only the status→column mapping and never mentioned the station axis or the User
-  department lists.
+- **Status Flow** (`#/flow`) rewritten around the current **two-status model**. Removed the stale
+  "Operator transitions" table that described operators driving `c.status` via a *Change status…*
+  dropdown — that UI no longer exists (`derivePromptsForCase` is unused; the only picker is Track
+  Status). New structure: (1) Case Center status lifecycle (the SVG, reframed as Case-Center-side
+  transitions the board mirrors — operators don't edit the status); (2) **Track Status — the
+  operator layer**, a table built from `TRACK_STATUSES` describing each option's Route Board
+  behaviour (scheduled hand-off / watch / closed / sanity); (3) **Case Center status → board column**
+  (the 3-tier `_ccMapStatus` mapping, kept); (4) **Route Board station** documenting `caseStation(c)`
+  (`assigneeDept` + `processType` → User / 1st Line / Core / HQ, incl. the `CC_*_DEPARTMENTS` /
+  `CC_USER_DEPARTMENT_PREFIXES` config). Notes corrected to the operator-never-edits-status model.
 - **Clock Model** (`#/clocks`) rewritten to match what the case detail actually shows: the **three
   headline clocks** — *SLA · time on us* (= `itProcessMs`, the IT process time, red past
   `THRESHOLDS.itProcessHours` = 15h), *Total time* (`processTotalMs`), *On us %* (`slaSharePct`) —
   all in hours. Added which stages count as IT process time (1st Line / Service Team / 2nd Line /
-  Unknown) and the P95/P99 link. The holder breakdown (First line / Core / HQ / With requester) is
-  now correctly framed as the **optional** history-derived *ownership timeline* (`SHOW_OWNERSHIP_TIMELINE`,
-  off by default), not "the four clocks"; the separate pause/resume `caseSlaMs` (Overview *Process
-  Time*) is called out as distinct.
+  Unknown) and the P95/P99 link. The old "four clocks" framing was wrong: the holder breakdown
+  (First line / Core / HQ / With requester) is now correctly the **optional** history-derived
+  *ownership timeline* (`SHOW_OWNERSHIP_TIMELINE`, off by default), and the separate pause/resume
+  `caseSlaMs` (Overview *Process Time*) is called out as distinct.
 
 ### Added (shifts & owners saved to / read from the database)
 

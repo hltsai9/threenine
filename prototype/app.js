@@ -4167,16 +4167,33 @@ function renderStatusFlow() {
   ];
   const pill = (s) => `<span class="pill pill-${s}">${escapeHtml(statusLabel(s))}</span>`;
   const mono = (s) => `<code class="mono">${escapeHtml(s)}</code>`;
+  const tsPill = (t) => `<span class="ts-pill ts-${t.id}" title="${escapeHtml(t.label)}">${escapeHtml(t.short)}</span>`;
+  // Plain-English behaviour for each Track Status, derived from its definition so it can't drift.
+  const tsBehavior = (t) => {
+    if (t.scheduled) {
+      const s = t.scheduled;
+      const pad = n => String(n).padStart(2, '0');
+      const when = `${s.day ? s.day + ' ' : 'the next '}${pad(s.hh)}:${pad(s.mm)} MST`;
+      return `Schedules a hand-off to <strong>${escapeHtml(s.to)}</strong> at ${when}: the Route Board draws a moving arrow from the case's station toward ${escapeHtml(s.to)} with a deadline chip (red once overdue).`;
+    }
+    if (t.id === 'escalated_to_hq') return 'Watch at <strong>HQ</strong> — an eye + dashed ring once the case is at HQ; an intent arrow points toward HQ until it lands there.';
+    if (t.id === 'need_to_contact_user') return 'Watch at <strong>User</strong> — the same watch treatment, expected at the User station.';
+    if (t.id === 'case_closed') return 'Marks the case done in the operator layer; it drops out of the active Picked workspace.';
+    if (t.id === 'sanity_check') return 'Collapses into the Route Board\'s <strong>Sanity Check</strong> group and tags the subject; no scheduled hand-off.';
+    return '';
+  };
 
   return `
     <div class="page-header">
       <div>
         <h1>Status Flow</h1>
-        <div class="subtitle">How a case moves through the lifecycle (operator actions) and how Case Center statuses map onto the board (live refresh).</div>
+        <div class="subtitle">Two statuses per case: the <strong>Case Center status</strong> (which board column a case is in, owned by Case Center) and the operator's <strong>Track Status</strong> (intent — where it should go next, which drives the Route Board). This page covers both, plus how a case's <strong>station</strong> is derived.</div>
       </div>
     </div>
 
     <div class="flow-container">
+      <h2 style="margin-top:0;">Case Center status lifecycle</h2>
+      <p class="muted tiny" style="margin:0 0 12px;">The board column follows the <strong>Case Center</strong> status. Operators do <strong>not</strong> edit it — ingestion / a live refresh sets it (see the mapping below); the board mirrors Case Center as the case is assigned to the Core Team, escalated to HQ, returned to the requester, or closed. The arrows below are those Case-Center-side transitions.</p>
       <svg class="status-flow-svg" viewBox="0 0 980 580" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="arr-forward" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -4276,28 +4293,20 @@ function renderStatusFlow() {
       </div>
     </div>
 
-    <h2 style="margin-top:24px;">Operator transitions</h2>
-    <p class="muted tiny" style="margin:-6px 0 12px;">Triggered by the in-app actions (the Change status… dropdown / Assign / Return-to-requester modal). These run locally and do not touch Case Center.</p>
+    <h2 style="margin-top:24px;">Track Status — the operator layer</h2>
+    <p class="muted tiny" style="margin:-6px 0 12px;">The operator never edits the Case Center status. Instead they set a <strong>Track Status</strong> — their intent for the case this shift — from the Track Status picker on the case's reading panel (★ marks the suggestion for your shift). Track Status drives the Route Board only; Case Center never sees it. The first three options schedule a hand-off at a fixed time and prompt you to confirm it; the "watch" ones draw a ring until you've written the hand-off note.</p>
     <table class="transition-table">
       <thead>
-        <tr><th>From</th><th>Action (Change status… dropdown)</th><th>To</th><th>Effect on clocks</th></tr>
+        <tr><th>Track Status</th><th>Meaning</th><th>Route Board behaviour</th></tr>
       </thead>
       <tbody>
-        <tr><td>${pill('new')}</td><td>Assign to Core Team</td><td>${pill('with_core')}</td><td>Core Team hold-clock starts</td></tr>
-        <tr><td>${pill('new')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses (first line bounces it back)</td></tr>
-        <tr><td>${pill('with_core')}</td><td>Escalate to HQ Product Team</td><td>${pill('with_hq')}</td><td>Core Team clock stops · HQ clock starts</td></tr>
-        <tr><td>${pill('with_core')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses · Core Team clock stops</td></tr>
-        <tr><td>${pill('with_hq')}</td><td>Move to Sanity Check</td><td>${pill('sanity_check')}</td><td>HQ clock stops</td></tr>
-        <tr><td>${pill('with_hq')}</td><td>Return to requester</td><td>${pill('returned_to_requester')}</td><td>SLA pauses · HQ clock stops</td></tr>
-        <tr><td>${pill('sanity_check')}</td><td>Verify &amp; close</td><td>${pill('closed')}</td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td>${pill('returned_to_requester')}</td><td>Requester replied — resume</td><td>Core Team / HQ / Sanity Check / New <span class="muted tiny">(operator picks)</span></td><td>SLA resumes · owner clock restarts</td></tr>
-        <tr><td>${pill('returned_to_requester')}</td><td>Close as resolved</td><td>${pill('closed')}</td><td>All clocks stop · resolution recorded</td></tr>
-        <tr><td>Any non-terminal</td><td>Cancel case</td><td>${pill('cancelled')}</td><td>All clocks stop · no resolution code</td></tr>
+        ${TRACK_STATUSES.map(t => `<tr><td>${tsPill(t)} <span class="muted tiny">${escapeHtml(t.label)}</span></td><td class="muted tiny">${t.scheduled ? 'Scheduled hand-off' : (t.id === 'escalated_to_hq' || t.id === 'need_to_contact_user') ? 'Watch (keep an eye)' : t.id === 'case_closed' ? 'Done on the operator layer' : 'Grouping / triage'}</td><td class="muted tiny">${tsBehavior(t)}</td></tr>`).join('')}
       </tbody>
     </table>
+    <p class="muted tiny" style="margin:10px 0 0;">Clocks are <strong>not</strong> driven by Track Status — they're reconstructed from Case Center's process timeline and the case history (see the <a href="#/clocks">Clock model</a>).</p>
 
-    <h2 style="margin-top:32px;">Case Center → board mapping</h2>
-    <p class="muted tiny" style="margin:-6px 0 12px;">Used by every live refresh: <code class="mono">local/casecenter.py</code> reads a raw Case Center record and assigns the board column via <code class="mono">map_status(caseStatus, subStatus.transition, lastProcessType)</code>. The three lookup tiers are tried in order — the first hit wins.</p>
+    <h2 style="margin-top:32px;">Case Center status → board column</h2>
+    <p class="muted tiny" style="margin:-6px 0 12px;">How the board column is assigned on every live refresh. The ingestion adapter <code class="mono">local/casecenter.py</code> (<code class="mono">map_status</code>), mirrored client-side by <code class="mono">_ccMapStatus(caseStatus, subStatus.transition, lastProcessType)</code> in <code class="mono">app.js</code>, reads a raw Case Center record and picks the column. The three lookup tiers are tried in order — the first hit wins.</p>
 
     <div class="card"><div class="card-body">
       <div class="detail-section">
@@ -4338,8 +4347,8 @@ function renderStatusFlow() {
         <ul class="muted tiny" style="margin:0; padding-left:18px; line-height:1.6;">
           <li><code class="mono">subStatus</code> is the new shape — the prior format's <code class="mono">caseSubstatus</code> field is gone. <code class="mono">sub_transition(r)</code> tolerates the object being missing, null, or the wrong type and returns <code class="mono">null</code> in that case.</li>
           <li><code class="mono">"1st&nbsp;&nbsp;Line"</code> in the processType key has <strong>two</strong> spaces — that's the literal Case Center value.</li>
-          <li>On every live refresh, <code class="mono">status</code> is one of the CC-owned fields — the board column follows Case Center automatically. Operator-local layer (routing, notes, clocks, queue, handover, reminders) is preserved.</li>
-          <li>Operator transitions (above) and Case Center mappings (here) are independent: an operator can move a card to a different column locally, and a later refresh will only override it if Case Center itself has moved.</li>
+          <li>On every live refresh, <code class="mono">status</code> is one of the Case-Center-owned fields — the board column follows Case Center automatically. The operator layer (Track Status, picks, handover, reminders, notes) is never touched by a refresh, so your work is preserved.</li>
+          <li>The two are independent axes: the <strong>column</strong> reflects Case Center; the operator's <strong>Track Status</strong> (above) is intent and only drives the Route Board. A live refresh updates the column without disturbing Track Status.</li>
         </ul>
       </div>
     </div></div>
