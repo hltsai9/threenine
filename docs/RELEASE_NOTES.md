@@ -10,6 +10,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Changed (Core Team member is now mandatory when assigning a desk)
+
+- Picking a Core Team **member** is required wherever a Core Team desk is assigned — the Route Board
+  pre-assign chip and the case-detail Assign/Change control. The member dropdown leads with a
+  disabled "— Select a member —" placeholder and submit is blocked (with a clear error) until a
+  person is chosen; a desk with no members points you to add one on the Owners page. Clearing the
+  desk (“— Unassign —”) is exempt.
+
 ### Added (assign a Core Team member — Route Board chip + case detail)
 
 - **Route Board:** the deadline chip on an *Escalate to Core Team* (Core-bound) row is now clickable.

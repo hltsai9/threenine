@@ -1470,6 +1470,8 @@ table.case-table {
 }
 .modal h3 { margin: 0 0 4px; font-family: var(--font-serif); font-size: 19px; font-weight: 700; color: var(--text); }
 .modal .modal-sub { color: var(--text-faint-2); font-size: 13px; margin-bottom: 16px; font-weight: 500; }
+.modal .req { color: var(--danger); font-weight: 700; }
+.modal .modal-hint { margin: 6px 0 4px; }
 .modal label { display: block; font-size: 11.5px; color: var(--text-faint-2); margin: 14px 0 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .modal select, .modal textarea, .modal input[type="text"] {
   width: 100%;

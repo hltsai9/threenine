@@ -1478,6 +1478,8 @@ table.case-table {
 }
 .modal h3 { margin: 0 0 4px; font-family: var(--font-serif); font-size: 19px; font-weight: 700; color: var(--text); }
 .modal .modal-sub { color: var(--text-faint-2); font-size: 13px; margin-bottom: 16px; font-weight: 500; }
+.modal .req { color: var(--danger); font-weight: 700; }
+.modal .modal-hint { margin: 6px 0 4px; }
 .modal label { display: block; font-size: 11.5px; color: var(--text-faint-2); margin: 14px 0 6px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
 .modal select, .modal textarea, .modal input[type="text"] {
   width: 100%;
@@ -5671,12 +5673,20 @@ function coreMemberName(c) {
   const m = desk && Array.isArray(desk.members) ? desk.members.find(x => x.id === c.coreMemberId) : null;
   return m ? m.name : null;
 }
-// <option>s for the members of a Core Team desk; `selectedId` pre-selects one. Leads with a
-// "no specific member" choice so a desk can be assigned without naming a person.
+// True when a Core Team desk has at least one member to assign to.
+function deskHasMembers(deskId) {
+  const d = getOwner('core', deskId);
+  return !!(d && Array.isArray(d.members) && d.members.length);
+}
+// <option>s for the members of a Core Team desk; `selectedId` pre-selects one. A member is
+// mandatory, so the lead option is a disabled placeholder (forcing a real choice), and a desk with
+// no members surfaces a hint to add one on the Owners page.
 function coreMemberOptions(deskId, selectedId) {
   const desk = getOwner('core', deskId);
   const members = (desk && Array.isArray(desk.members)) ? desk.members : [];
-  return `<option value="">— No specific member —</option>` + members.map(m =>
+  if (!members.length) return `<option value="">(no members on this desk — add one on the Owners page)</option>`;
+  const placeholder = `<option value="" disabled${selectedId ? '' : ' selected'}>— Select a member —</option>`;
+  return placeholder + members.map(m =>
     `<option value="${escapeHtml(m.id)}"${m.id === selectedId ? ' selected' : ''}>${escapeHtml(m.name)}${m.role ? ' · ' + escapeHtml(m.role) : ''}</option>`).join('');
 }
 // After a modal with a Core desk select (data-field=deskField) and a member select
@@ -5700,7 +5710,7 @@ function openCorePreassignModal(c, op) {
     <div class="modal-sub">Mark who on the Core Team is taking this case now — before Case Center moves it — to shorten the IT process time. This sets the operator layer only; the Case Center status is unchanged.</div>
     <label>Core Team desk</label>
     <select data-field="coreId">${deskOpts}</select>
-    <label>Core Team member</label>
+    <label>Core Team member <span class="req">*</span></label>
     <select data-field="coreMemberId">${coreMemberOptions(deskId, c.coreMemberId)}</select>
     <div class="modal-actions">
       <button class="btn" data-modal-cancel>Cancel</button>
@@ -5709,8 +5719,10 @@ function openCorePreassignModal(c, op) {
   `, (modal) => {
     const coreId = fieldVal(modal, 'coreId');
     if (!coreId) return modalError('Pick a Core Team desk.');
+    const memberId = fieldVal(modal, 'coreMemberId');
+    if (!memberId) return modalError(deskHasMembers(coreId) ? 'Pick a Core Team member.' : 'This desk has no members yet — add one on the Owners page.');
     c.coreId = coreId;
-    c.coreMemberId = fieldVal(modal, 'coreMemberId') || null;
+    c.coreMemberId = memberId;
     const desk = getOwner('core', coreId);
     const mName = coreMemberName(c);
     logHistory(c, op, 'pre-assigned', `Core Team — ${desk ? desk.name : coreId}${mName ? ' · ' + mName : ''} (before Case Center)`);
@@ -9200,8 +9212,9 @@ function handleReassign(caseId, type) {
     <div class="modal-sub">${currentId ? 'Pick a different desk or unassign. If this is the active owner, the hold clock segment will reset to the new owner.' : 'Pick a desk for this case.'}</div>
     <label>${escapeHtml(typeLabel)}</label>
     <select data-field="ownerId">${opts}</select>
-    ${type === 'core' ? `<label>Core Team member</label>
-    <select data-field="coreMemberId">${coreMemberOptions(currentId, c.coreMemberId)}</select>` : ''}
+    ${type === 'core' ? `<label>Core Team member <span class="req">*</span></label>
+    <select data-field="coreMemberId">${coreMemberOptions(currentId, c.coreMemberId)}</select>
+    <div class="modal-hint muted tiny">Required when a desk is assigned. Choose “— Unassign —” above to clear the Core Team owner.</div>` : ''}
     <label>Reason (optional)</label>
     <textarea data-field="reason" placeholder="Why is the assignment changing?"></textarea>
     <div class="modal-actions">
@@ -9212,6 +9225,10 @@ function handleReassign(caseId, type) {
     const newId = fieldVal(modal, 'ownerId') || null;
     const newMemberId = type === 'core' ? (fieldVal(modal, 'coreMemberId') || null) : null;
     const reason = fieldVal(modal, 'reason').trim();
+    // A member is mandatory whenever a Core Team desk is assigned (clearing the desk is exempt).
+    if (type === 'core' && newId && !newMemberId) {
+      return modalError(deskHasMembers(newId) ? 'Pick a Core Team member.' : 'This desk has no members yet — add one on the Owners page.');
+    }
     const memberChanged = type === 'core' && newMemberId !== (c.coreMemberId || null);
     if (newId === currentId && !memberChanged) return true;
 
