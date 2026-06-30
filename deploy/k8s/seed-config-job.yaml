@@ -1,0 +1,42 @@
+# OPTIONAL one-shot Job: seed the `config` table (shifts roster + owners directory) from the
+# bundled frontend/shifts.js + owners.js, so the board has a roster/owners on first boot. Run it
+# once after the schema exists (migrations / first API start). Alternatively, sign in and use the
+# Save buttons on the Shifts / Owners pages — same destination, no Job needed.
+#
+#   kubectl apply -f seed-config-job.yaml
+#   kubectl wait --for=condition=complete job/case-tracker-seed-config --timeout=120s
+#   kubectl delete job case-tracker-seed-config        # clean up when done
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: case-tracker-seed-config
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600      # auto-clean 10 min after completion
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: seed-config
+          image: case-tracker-ingest:latest   # has Node + the bundled shifts.js/owners.js
+          imagePullPolicy: IfNotPresent
+          args: ["python", "-m", "backend.ingest", "--seed-config", "--no-create"]
+          envFrom:
+            - secretRef: { name: case-tracker-db }   # DATABASE_URL (no Case Center creds needed)
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      volumes:
+        - { name: tmp, emptyDir: {} }

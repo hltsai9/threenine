@@ -12,8 +12,13 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ backend/
 COPY frontend/ frontend/
 
+# Run as a non-root user (defense in depth; pairs with the runAsNonRoot securityContext).
+RUN useradd -u 1000 -m app
+USER 1000
+
 ENV SERVE_STATIC=1 \
-    AUTO_CREATE=0
+    AUTO_CREATE=0 \
+    PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Production runs migrations out-of-band (initContainer/Job) and disables AUTO_CREATE.

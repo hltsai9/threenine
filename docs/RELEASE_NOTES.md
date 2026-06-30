@@ -10,6 +10,23 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Changed (production hardening of the Kubernetes manifests)
+
+- **Fixed a rollout-breaking probe:** the API readiness probe hit `/api/cases`, which returns 401
+  once `API_AUTH_TOKEN` is set — pods would never become Ready. Probes now use the unauthenticated
+  `/healthz` (added a liveness + startup probe too).
+- **Auth in prod:** added the **`API_AUTH_TOKEN`** secret (`case-tracker-api`) and wired it into the
+  API Deployment, so the API isn't deployed wide open. `secrets.example.yaml` documents it.
+- **Hardening:** resource requests/limits on every workload; non-root `securityContext`
+  (`runAsNonRoot`, read-only root FS, dropped capabilities, `RuntimeDefault` seccomp) with non-root
+  users baked into both Dockerfiles; a **PodDisruptionBudget**; zero-downtime rolling-update strategy;
+  CronJob `activeDeadlineSeconds`/`startingDeadlineSeconds`; named ports; `ingressClassName`.
+- **New:** optional `seed-config-job.yaml` (one-shot `ingest --seed-config` to populate the
+  shifts/owners `config` table) and `deploy/k8s/README.md` (build/apply order, verify, notes). The
+  ingest image now also bundles `shifts.js`/`owners.js` for that seed.
+- Documented that `:latest` images should be pinned, and the per-replica `alembic upgrade head` race
+  is benign on transactional-DDL Postgres (with the stricter Job/hook alternative noted).
+
 ### Changed (renamed the `prototype/` folder to `frontend/`)
 
 - The web app folder is renamed **`prototype/` → `frontend/`** (pairs with `backend/`) for the move

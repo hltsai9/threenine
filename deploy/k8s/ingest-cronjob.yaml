@@ -7,21 +7,40 @@ metadata:
 spec:
   schedule: "*/5 * * * *"            # every 5 minutes — tune to taste
   concurrencyPolicy: Forbid          # don't overlap runs
+  startingDeadlineSeconds: 120       # skip (don't pile up) a run the scheduler missed
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       backoffLimit: 2
+      activeDeadlineSeconds: 600      # a run that hangs is killed, not left forever
       template:
         spec:
           restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile: { type: RuntimeDefault }
           containers:
             - name: ingest
-              image: case-tracker-ingest:latest
+              image: case-tracker-ingest:latest   # Pin to an immutable tag/digest in production.
+              imagePullPolicy: IfNotPresent
               args: ["python", "-m", "backend.ingest", "--hours", "6"]
               envFrom:
-                - secretRef: { name: case-tracker-db }      # DATABASE_URL
+                - secretRef: { name: case-tracker-db }       # DATABASE_URL
                 - secretRef: { name: case-center-creds }     # CC API key + cookie
               env:
-                - name: AUTO_CREATE
-                  value: "0"
+                - { name: AUTO_CREATE, value: "0" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+              volumeMounts:
+                - { name: tmp, mountPath: /tmp }
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { cpu: 500m, memory: 256Mi }
+          volumes:
+            - { name: tmp, emptyDir: {} }

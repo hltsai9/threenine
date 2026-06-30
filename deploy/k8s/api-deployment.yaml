@@ -1,5 +1,11 @@
 # API service: stateless, horizontally scalable. Serves /api/* and the static SPA.
 # An initContainer runs Alembic migrations before the app starts.
+#
+# NOTE on migrations + replicas: each pod runs the `migrate` initContainer, so with replicas > 1
+# they call `alembic upgrade head` concurrently on a rollout. On a transactional-DDL database
+# (PostgreSQL) this is safe — one transaction wins and the others find the version already at head
+# and no-op. For stricter control, run migrations as a one-shot Job (or Helm pre-upgrade hook) and
+# drop this initContainer. Either way AUTO_CREATE stays 0 so the app never creates tables itself.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,35 +13,76 @@ metadata:
   labels: { app: case-tracker-api }
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }   # zero-downtime rollout
   selector:
     matchLabels: { app: case-tracker-api }
   template:
     metadata:
       labels: { app: case-tracker-api }
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
       initContainers:
         - name: migrate
-          image: case-tracker-api:latest   # same image; just runs alembic
+          image: case-tracker-api:latest   # same image; just runs alembic. Pin to a digest/tag in prod.
+          imagePullPolicy: IfNotPresent
           workingDir: /app/backend
           command: ["alembic", "upgrade", "head"]
           envFrom:
             - secretRef: { name: case-tracker-db }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
       containers:
         - name: api
-          image: case-tracker-api:latest
+          image: case-tracker-api:latest   # Pin to an immutable tag/digest in production, not :latest.
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - { name: http, containerPort: 8000 }
           envFrom:
-            - secretRef: { name: case-tracker-db }
+            - secretRef: { name: case-tracker-db }    # DATABASE_URL
+            - secretRef: { name: case-tracker-api }    # API_AUTH_TOKEN (gates /api/*)
           env:
-            - name: AUTO_CREATE
-              value: "0"
-            - name: SERVE_STATIC
-              value: "1"
+            - { name: AUTO_CREATE, value: "0" }
+            - { name: SERVE_STATIC, value: "1" }
+          # /healthz is unauthenticated by design — safe to probe even when API_AUTH_TOKEN is set.
+          # (Probing /api/cases would 401 once auth is on and the pod would never become Ready.)
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 30      # allow up to ~150s for a cold start
           readinessProbe:
-            httpGet: { path: /api/cases, port: 8000 }
-            initialDelaySeconds: 5
+            httpGet: { path: /healthz, port: http }
             periodSeconds: 10
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: "1", memory: 384Mi }
+      volumes:
+        - { name: tmp, emptyDir: {} }
 ---
 apiVersion: v1
 kind: Service
@@ -44,5 +91,14 @@ metadata:
 spec:
   selector: { app: case-tracker-api }
   ports:
-    - port: 80
-      targetPort: 8000
+    - { name: http, port: 80, targetPort: http }
+---
+# Keep at least one pod serving during voluntary disruptions (node drains, rollouts).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: case-tracker-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: case-tracker-api }

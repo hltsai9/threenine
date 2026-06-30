@@ -8,6 +8,8 @@ metadata:
     # Adjust for your ingress controller / cert-manager setup.
     cert-manager.io/cluster-issuer: "internal-ca"
 spec:
+  # Set to your controller's class (e.g. "nginx", "traefik"). Required on most clusters.
+  ingressClassName: nginx
   tls:
     - hosts: ["case-tracker.internal"]
       secretName: case-tracker-tls
