@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const DIR = path.join(__dirname, '..'); // prototype/
+const DIR = path.join(__dirname, '..'); // frontend/
 const read = f => fs.readFileSync(path.join(DIR, f), 'utf8');
 
 // A no-op DOM element: absorbs property writes and method calls so render() runs headless.
@@ -83,7 +83,7 @@ function loadPrototype() {
   sandbox.navigator = { clipboard: { writeText: () => Promise.resolve() } };
   sandbox.alert = () => {};
   sandbox.confirm = () => true;
-  sandbox.location = { hash: '#/cases', search: '', protocol: 'file:', href: 'file:///prototype/standalone.html' };
+  sandbox.location = { hash: '#/cases', search: '', protocol: 'file:', href: 'file:///frontend/standalone.html' };
   sandbox.URLSearchParams = URLSearchParams;
   sandbox.structuredClone = structuredClone;
   // Timers are no-ops: boot()'s polling never runs, so the process can exit cleanly.

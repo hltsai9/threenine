@@ -15,7 +15,7 @@ cases, run the board locally with a tiny stdlib Python server that talks to Case
 ```
 browser ──GET /────────────▶ serve.py ──serves──▶ ../prototype (the SPA)
 browser ──GET /api/cases ──▶ serve.py ──calls──▶ casecenter.fetch_cases() ─▶ Case Center
-browser ──POST /api/save ──▶ serve.py ──writes──▶ prototype/data.js   (operator edits)
+browser ──POST /api/save ──▶ serve.py ──writes──▶ frontend/data.js   (operator edits)
 browser ──POST /api/save-file▶ serve.py ─writes─▶ shifts.js / owners.js (editor Save)
 ```
 
@@ -57,9 +57,9 @@ feed, not the app.) On Windows use `python` instead of `python3`.
 
 | File | Written by | Backups |
 | --- | --- | --- |
-| `prototype/data.js` (the `window.CASES` block) | `/api/cases` pulls + `/api/save` edits | `data.js.orig` (pristine, once) + `data.js.<ts>.bak` (timestamped, each write) |
-| `prototype/shifts.js` | Shift editor "Save" | `shifts.js.orig` + `shifts.js.<ts>.bak` |
-| `prototype/owners.js` | Owners editor "Save" | `owners.js.orig` + `owners.js.<ts>.bak` |
+| `frontend/data.js` (the `window.CASES` block) | `/api/cases` pulls + `/api/save` edits | `data.js.orig` (pristine, once) + `data.js.<ts>.bak` (timestamped, each write) |
+| `frontend/shifts.js` | Shift editor "Save" | `shifts.js.orig` + `shifts.js.<ts>.bak` |
+| `frontend/owners.js` | Owners editor "Save" | `owners.js.orig` + `owners.js.<ts>.bak` |
 
 - Only the `window.CASES` block of `data.js` is rewritten; `NOW`/`THRESHOLDS`/`CURRENT_SHIFT`/
   `WEEKS` are preserved. It's marked `window.CASES_LIVE_CAPTURE = true` so captured cases show
@@ -69,7 +69,7 @@ feed, not the app.) On Windows use `python` instead of `python3`.
 
 ## ⚠️ Privacy — do NOT commit live data
 
-`prototype/data.js` is the committed demo seed and also deploys to **public** GitHub Pages, so
+`frontend/data.js` is the committed demo seed and also deploys to **public** GitHub Pages, so
 overwriting it with a live capture would publish real Case Center data. This is now **safe by
 default**: a live fetch only updates the gitignored store and **does not rewrite `data.js`**
 unless you opt in with `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1`
@@ -78,10 +78,10 @@ unless you opt in with `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1`
 If you do enable the overwrite, the file then holds real data — **don't commit or push it.**
 Strongest safeguard on your machine:
 ```bash
-git update-index --skip-worktree prototype/data.js
+git update-index --skip-worktree frontend/data.js
 ```
-Restore the original anytime from `prototype/data.js.orig`, or
-`git checkout origin/<branch> -- prototype/data.js`.
+Restore the original anytime from `frontend/data.js.orig`, or
+`git checkout origin/<branch> -- frontend/data.js`.
 
 ## Troubleshooting
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PostToolUse hook — keep prototype/standalone.html in sync with the modular sources.
+# PostToolUse hook — keep frontend/standalone.html in sync with the modular sources.
 #
-# Fires after Edit/Write/MultiEdit. If the edited file is a bundled prototype source, it
-# regenerates standalone.html via prototype/bundle.mjs. Ignores edits to the generated
+# Fires after Edit/Write/MultiEdit. If the edited file is a bundled frontend source, it
+# regenerates standalone.html via frontend/bundle.mjs. Ignores edits to the generated
 # standalone.html itself (no loop) and no-ops if node is unavailable or the file isn't a
 # bundled source. Disable any time via /hooks.
 
@@ -23,7 +23,7 @@ case "$file" in
   *standalone.html) exit 0 ;;
 esac
 case "$file" in
-  */prototype/* | prototype/*) : ;;
+  */frontend/* | frontend/*) : ;;
   *) exit 0 ;;
 esac
 case "$base" in
@@ -31,7 +31,7 @@ case "$base" in
   *) exit 0 ;;
 esac
 
-if node prototype/bundle.mjs >/dev/null 2>&1; then
-  printf '%s' '{"systemMessage":"Rebuilt prototype/standalone.html from the modular sources (PostToolUse hook)."}'
+if node frontend/bundle.mjs >/dev/null 2>&1; then
+  printf '%s' '{"systemMessage":"Rebuilt frontend/standalone.html from the modular sources (PostToolUse hook)."}'
 fi
 exit 0

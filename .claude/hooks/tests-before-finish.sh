@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Stop hook — run the test suite before finishing when code changed.
 #
-# Companion to release-note-reminder.sh. If anything under prototype/ or backend/ has changed
-# (committed-not-pushed or uncommitted) it runs prototype/tests/run.cjs; on failure it blocks the
+# Companion to release-note-reminder.sh. If anything under frontend/ or backend/ has changed
+# (committed-not-pushed or uncommitted) it runs frontend/tests/run.cjs; on failure it blocks the
 # stop with the failing output so Claude fixes it before finishing. Honors stop_hook_active so it
 # nudges once and never loops; no-ops outside a git repo or when node is missing. Disable via /hooks.
 
@@ -25,12 +25,12 @@ changed="$(
   } | sort -u
 )"
 
-printf '%s\n' "$changed" | grep -Eq '^(prototype|backend)/' || exit 0
+printf '%s\n' "$changed" | grep -Eq '^(frontend|backend)/' || exit 0
 
-out="$(node prototype/tests/run.cjs 2>&1)"
+out="$(node frontend/tests/run.cjs 2>&1)"
 if [ $? -ne 0 ]; then
   # Compact the output to a single JSON-safe line for the block reason.
   summary="$(printf '%s' "$out" | tail -20 | tr '\n' ' ' | tr '"' "'" | sed 's/\\/\//g')"
-  printf '{"decision":"block","reason":"Tests fail (node prototype/tests/run.cjs) — fix before finishing: %s"}' "$summary"
+  printf '{"decision":"block","reason":"Tests fail (node frontend/tests/run.cjs) — fix before finishing: %s"}' "$summary"
 fi
 exit 0

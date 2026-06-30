@@ -1,14 +1,14 @@
-// Capture screenshots of the CURRENT prototype for the promo deck.
-// Renders prototype/standalone.html (self-contained, no server) via headless Chromium and
+// Capture screenshots of the CURRENT frontend for the promo deck.
+// Renders frontend/standalone.html (self-contained, no server) via headless Chromium and
 // writes PNGs to slides/assets/.
 //   Deps: npm install --prefix slides playwright && node slides/node_modules/playwright/cli.js install chromium
-//   Run AFTER rebundling:  node prototype/bundle.mjs && node slides/capture-screenshots.cjs
+//   Run AFTER rebundling:  node frontend/bundle.mjs && node slides/capture-screenshots.cjs
 const { chromium } = require('playwright');   // installed locally into slides/node_modules
 const fs = require('fs');
 const path = require('path');
 
 const OUT = path.join(__dirname, 'assets');
-const URL = 'file://' + path.join(__dirname, '..', 'prototype', 'standalone.html');
+const URL = 'file://' + path.join(__dirname, '..', 'frontend', 'standalone.html');
 fs.mkdirSync(OUT, { recursive: true });
 
 (async () => {

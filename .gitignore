@@ -5,14 +5,14 @@ local/secrets.local.json
 
 # Live Case Center data written locally — may be sensitive, do NOT commit.
 local/cases.store.json
-prototype/data.js.orig
-prototype/data.js.*.bak
-prototype/data.js.bak
+frontend/data.js.orig
+frontend/data.js.*.bak
+frontend/data.js.bak
 # Backups from the in-app Shift / Owners editors' Save button
-prototype/shifts.js.orig
-prototype/shifts.js.*.bak
-prototype/owners.js.orig
-prototype/owners.js.*.bak
+frontend/shifts.js.orig
+frontend/shifts.js.*.bak
+frontend/owners.js.orig
+frontend/owners.js.*.bak
 
 # Python
 __pycache__/

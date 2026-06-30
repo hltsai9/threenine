@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # App code + the static front end (served same-origin → no CORS, no mixed content).
 COPY backend/ backend/
-COPY prototype/ prototype/
+COPY frontend/ frontend/
 
 ENV SERVE_STATIC=1 \
     AUTO_CREATE=0

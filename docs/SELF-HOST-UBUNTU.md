@@ -1,7 +1,7 @@
 # Self-hosting the Case Tracker on an Ubuntu server
 
 A step-by-step runbook to stand up the **full stack** on your own Ubuntu box:
-the FastAPI API (`backend/`) serving the vanilla-JS SPA (`prototype/`) **same-origin**,
+the FastAPI API (`backend/`) serving the vanilla-JS SPA (`frontend/`) **same-origin**,
 backed by **MySQL**, with the shared-token login.
 
 > Env-var meanings are documented once in **[`SETUP.md`](SETUP.md)** — this runbook tells you
@@ -33,7 +33,7 @@ is the auth-gated API; data lives in MySQL and is shared across operators/device
 - If your DB password contains URL-special characters (`@ : / ? # %`), either pick a password
   without them or percent-encode them in the `DATABASE_URL` (e.g. `@` → `%40`).
 - Run the API **from the repo root** as `backend.api:app` (it uses package-relative imports and
-  serves `prototype/` from the repo root). Don't `cd backend` to launch it.
+  serves `frontend/` from the repo root). Don't `cd backend` to launch it.
 
 Throughout, replace placeholders like `<STRONG_DB_PASSWORD>` and `<API_TOKEN>`.
 
@@ -174,21 +174,21 @@ block back to the bundled seed, delete its row: `DELETE FROM config WHERE key = 
 
 ## 7. Configure the front end
 
-Edit `prototype/config.js`:
+Edit `frontend/config.js`:
 - `window.API_BASE = ''` — same-origin (the API serves the SPA), no CORS.
 - `window.API_MODE = ''` — leave empty; the SPA **auto-detects** the backend by probing
   `/healthz` and switches to server mode (shared login + DB persistence). Set `'server'` to force it.
 - `window.TOUR_AUTOSTART = false` — the onboarding tour stays off (operators can still launch it
   from the sidebar "Take the tour" link). It's already `false` by default.
 
-Edit `prototype/owners.js` — set the department lists to your **real Case Center** department
+Edit `frontend/owners.js` — set the department lists to your **real Case Center** department
 names so the Route Board places dots correctly:
 ```js
 window.CC_CORE_DEPARTMENTS = ['Site IT'];                  // → Core Team / 1st Line
 window.CC_HQ_DEPARTMENTS   = ['HQ Identity', 'HQ Mobile']; // → HQ (can be several)
 ```
-If you edited any `prototype/` source and want the single-file build refreshed:
-`node prototype/bundle.mjs` (optional — `index.html` loads the modular files directly).
+If you edited any `frontend/` source and want the single-file build refreshed:
+`node frontend/bundle.mjs` (optional — `index.html` loads the modular files directly).
 
 ## 8. First run (foreground smoke test)
 
@@ -217,8 +217,8 @@ node backend/seed_board_json.cjs | \
 ## 9a. Seed shifts & owners into the database
 
 Cases are one table; the **shift roster/rota** and the **owner directory + Route Board department
-lists** live in the `config` table (Step 6a). Load the bundled `prototype/shifts.js` +
-`prototype/owners.js` into it with one command (no Case Center access needed):
+lists** live in the `config` table (Step 6a). Load the bundled `frontend/shifts.js` +
+`frontend/owners.js` into it with one command (no Case Center access needed):
 
 ```bash
 cd /opt/threenine
@@ -235,7 +235,7 @@ overwrites the two rows. Notes:
 - If you manage the schema with Alembic (`AUTO_CREATE=0`, Step 6 Option B), add `--no-create` so the
   seeder doesn't create tables: `... --seed-config --no-create`. Run `alembic upgrade head` first so
   the `config` table exists (Step 6a).
-- It seeds from `prototype/shifts.js` / `owners.js`. Edit those first to change the defaults, **or**
+- It seeds from `frontend/shifts.js` / `owners.js`. Edit those first to change the defaults, **or**
   just sign in and edit on the **Shifts** / **Owners** pages and click **Save to database** — same
   destination, no command needed.
 - To combine with the case seed in Step 9, the CLI also accepts both at once:

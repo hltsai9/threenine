@@ -7,11 +7,11 @@
 //          -H 'content-type: application/json' --data-binary @- https://<app>/api/save
 //
 // Unlike seed_extract.cjs (which prints the RAW Case Center records and relies on the Python
-// ingest to map them), this runs the prototype's own mapper headlessly via the test loader, so
+// ingest to map them), this runs the frontend's own mapper headlessly via the test loader, so
 // it works with no Case Center access, no Python, and no shell on the server — handy for seeding
 // a hosted DB (e.g. Render) from any machine that has this repo + node.
 const path = require('node:path');
-const { loadPrototype } = require(path.join(__dirname, '..', 'prototype', 'tests', 'load-prototype.cjs'));
+const { loadPrototype } = require(path.join(__dirname, '..', 'frontend', 'tests', 'load-prototype.cjs'));
 
 const app = loadPrototype();                       // boots the SPA in a sandbox: maps + sanitises seed
 const idField = app.CASES_RAW_CC ? 'caseId' : 'id';

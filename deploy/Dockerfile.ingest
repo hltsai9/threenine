@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend/ backend/
 COPY local/ local/
-COPY prototype/data.js prototype/data.js
+COPY frontend/data.js frontend/data.js
 
 # CC creds (CASE_CENTER_API_KEY / CASE_CENTER_COOKIE) come from a K8s Secret at runtime.
 ENV AUTO_CREATE=0

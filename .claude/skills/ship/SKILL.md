@@ -8,8 +8,8 @@ description: End-of-change ritual for the Case Tracker repo — add the release 
 Run these steps in order. Stop and report if any step fails; do not commit a broken state.
 
 1. **Determine what changed.** `git status --porcelain` and `git diff --stat`. Note whether any
-   files under `prototype/`, `local/`, `backend/`, or `deploy/` changed (these require a release
-   note) and whether any **bundled `prototype/` source** changed (these require a rebundle).
+   files under `frontend/`, `local/`, `backend/`, or `deploy/` changed (these require a release
+   note) and whether any **bundled `frontend/` source** changed (these require a rebundle).
 
 2. **Release note (required for code changes).** If code under those folders changed, add an entry
    to `docs/RELEASE_NOTES.md` **under today's date, newest first**, using the existing headings
@@ -17,10 +17,10 @@ Run these steps in order. Stop and report if any step fails; do not commit a bro
    name, brief description). If today's date heading already exists, append under it. If the change
    is purely docs/tests and needs no note, say so explicitly rather than skipping silently.
 
-3. **Tests.** Run `node prototype/tests/run.cjs`. All tests must pass before continuing.
+3. **Tests.** Run `node frontend/tests/run.cjs`. All tests must pass before continuing.
 
-4. **Rebundle if needed.** If any of `prototype/{app.js,styles.css,data.js,shifts.js,owners.js,config.js,tour.js,index.html,favicon.svg}`
-   changed, run `node prototype/bundle.mjs` so `standalone.html` is current, and stage it.
+4. **Rebundle if needed.** If any of `frontend/{app.js,styles.css,data.js,shifts.js,owners.js,config.js,tour.js,index.html,favicon.svg}`
+   changed, run `node frontend/bundle.mjs` so `standalone.html` is current, and stage it.
 
 5. **Commit.** Stage the change with `git add -A` and commit with a clear, descriptive message
    summarizing what changed and why. Keep to the repo's branch rules (work on the current

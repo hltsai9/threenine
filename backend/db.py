@@ -20,7 +20,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.types import JSON
 
 # Repo root (one level up from this file), so the default SQLite file and the
-# prototype/ webroot resolve no matter where the process is started from.
+# frontend/ webroot resolve no matter where the process is started from.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_SQLITE = "sqlite:///" + os.path.join(REPO_ROOT, "casetracker.db")

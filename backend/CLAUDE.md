@@ -12,7 +12,7 @@ guide and [`../docs/SETUP.md`](../docs/SETUP.md) for env vars. The repo-wide rul
   that path must stay credential-free so end users need no key/cookie.
 - **Respect field ownership in `merge.py`.** `upsert_cc` (ingestion) may refresh **only**
   `CC_OWNED_FIELDS`; `upsert_operator` (the API's `POST /api/save`) owns the operator/agent
-  layer. Keep `CC_OWNED_FIELDS` in sync with `local/persist.py` and `prototype/app.js`.
+  layer. Keep `CC_OWNED_FIELDS` in sync with `local/persist.py` and `frontend/app.js`.
 - **`DATABASE_URL` is the only DB switch.** Don't hardcode a database; SQLite (demo) and
   Postgres/MySQL (prod) must both work via the URL alone (see `db.py`).
 - **Schema changes need a migration.** Add an Alembic revision under `alembic/versions/`;

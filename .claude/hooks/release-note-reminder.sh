@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop hook — keep docs/RELEASE_NOTES.md in step with code changes.
 #
-# Fires when Claude finishes a turn. If code under prototype/, local/, backend/, or deploy/ has
+# Fires when Claude finishes a turn. If code under frontend/, local/, backend/, or deploy/ has
 # changed (either in commits not yet pushed to the upstream branch, or uncommitted in the tree) but
 # docs/RELEASE_NOTES.md is NOT among those changes, it blocks the stop and asks Claude to add a
 # release-note entry. Honors stop_hook_active so it never loops, and no-ops outside a git repo.
@@ -25,10 +25,10 @@ changed="$(
   } | sort -u
 )"
 
-printf '%s\n' "$changed" | grep -Eq '^(prototype|local|backend|deploy)/' && code=1 || code=
+printf '%s\n' "$changed" | grep -Eq '^(frontend|local|backend|deploy)/' && code=1 || code=
 printf '%s\n' "$changed" | grep -Eq '^docs/RELEASE_NOTES\.md$' && note=1 || note=
 
 if [ -n "$code" ] && [ -z "$note" ]; then
-  printf '%s' '{"decision":"block","reason":"You changed code under prototype/, local/, backend/, or deploy/ but did not update docs/RELEASE_NOTES.md. Add a brief entry under today'"'"'s date describing what changed and commit it before finishing. If this change genuinely needs no release note (e.g. a pure test/doc tweak), tell the user why instead of looping."}'
+  printf '%s' '{"decision":"block","reason":"You changed code under frontend/, local/, backend/, or deploy/ but did not update docs/RELEASE_NOTES.md. Add a brief entry under today'"'"'s date describing what changed and commit it before finishing. If this change genuinely needs no release note (e.g. a pure test/doc tweak), tell the user why instead of looping."}'
 fi
 exit 0

@@ -8,7 +8,7 @@ const A = path.join(__dirname, 'assets');
 const img = n => path.join(A, n);
 const has = n => fs.existsSync(img(n));
 
-// palette (from prototype/styles.css :root)
+// palette (from frontend/styles.css :root)
 const ACCENT = '2563EB', CHAR = '1F2937', TEXT = '111827', MUTED = '6B7280',
       BORDER = 'E5E7EB', LIGHT = 'F7FAFC', GOOD = '059669', DANGER = 'DC2626', WARN = 'D97706';
 const FONT = 'Segoe UI';

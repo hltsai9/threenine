@@ -1,5 +1,5 @@
 """
-Persist live Case Center cases into prototype/data.js.
+Persist live Case Center cases into frontend/data.js.
 
 Called by serve.py after each successful /api/cases fetch (unless disabled with the env var
 CASE_TRACKER_WRITE_DATA_JS=0). It:
@@ -13,9 +13,9 @@ CASE_TRACKER_WRITE_DATA_JS=0). It:
 
 PRIVACY: the rewritten data.js contains real Case Center data. data.js is a tracked file
 that also deploys to public GitHub Pages — do NOT commit or push it. The backups and the
-store are gitignored. Consider:  git update-index --skip-worktree prototype/data.js
+store are gitignored. Consider:  git update-index --skip-worktree frontend/data.js
 
-SAFE BY DEFAULT: writing the live capture into the committed prototype/data.js is gated on
+SAFE BY DEFAULT: writing the live capture into the committed frontend/data.js is gated on
 CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1. Without it, _write_data_js() refuses to touch data.js
 (it logs how to enable the overwrite and keeps the gitignored sidecar store up to date), so a
 live fetch can't silently publish real Case Center PII to GitHub Pages.
@@ -34,7 +34,7 @@ STORE = os.path.join(HERE, "cases.store.json")
 
 
 def _data_js_overwrite_allowed():
-    """Whether persist.py may overwrite the committed, Pages-deployed prototype/data.js with
+    """Whether persist.py may overwrite the committed, Pages-deployed frontend/data.js with
     a LIVE capture. Default is False (SAFE): data.js is the public demo seed, so overwriting
     it risks pushing real Case Center PII to GitHub Pages. Opt in per-process with
     CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1 (and remember: do NOT commit a live capture)."""
@@ -44,7 +44,7 @@ def _data_js_overwrite_allowed():
 # refreshed onto a case that already exists; everything else (board status, FIT/HQ routing,
 # history, notes, clocks, queue/handover/reminder) is operator-local and is preserved — so a
 # /api/cases refresh never resets a case you've assigned/moved back to its raw CC status.
-# Must stay in sync with CC_OWNED_FIELDS in prototype/app.js.
+# Must stay in sync with CC_OWNED_FIELDS in frontend/app.js.
 CC_OWNED_FIELDS = (
     "subject", "ccStatusLabel", "priority", "caseLink", "status",
     "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
@@ -191,7 +191,7 @@ def _case_center_base_url():
 
 
 def _write_data_js(path, cases):
-    # SAFETY GUARD: prototype/data.js is the committed demo seed that also deploys to PUBLIC
+    # SAFETY GUARD: frontend/data.js is the committed demo seed that also deploys to PUBLIC
     # GitHub Pages. Refuse to overwrite it with a live capture unless explicitly opted in, so
     # real Case Center PII can't reach Pages by default. The gitignored sidecar store
     # (cases.store.json) is still kept up to date by persist_cases() regardless.

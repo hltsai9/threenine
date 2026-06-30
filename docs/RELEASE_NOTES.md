@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Changed (renamed the `prototype/` folder to `frontend/`)
+
+- The web app folder is renamed **`prototype/` → `frontend/`** (pairs with `backend/`) for the move
+  to production. Updated every path reference: the Pages workflow (`paths`, build step, artifact
+  `path`), the `.claude` hooks (rebundle / tests / release-note triggers), `backend/` (api webroot,
+  ingest + `seed_extract`/`seed_config_extract`/`seed_board_json` paths), `local/serve.py`,
+  `deploy/Dockerfile.*`, `.gitignore`, and the docs. The test loader keeps its name
+  (`frontend/tests/load-prototype.cjs`) and `Array.prototype` usages are untouched. `git mv`
+  preserved history; tests still pass (148) and the rebundled `standalone.html` is clean.
+
 ### Changed (Core Team export column shows the member; "assigned" wording)
 
 - The Route Board **Copy as table / Export CSV** "Core Team" column now shows the assigned **Core
@@ -49,7 +59,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Added (seed shifts & owners config into the DB — `ingest --seed-config`)
 
-- New **`python -m backend.ingest --seed-config`** loads `prototype/shifts.js` + `owners.js` into the
+- New **`python -m backend.ingest --seed-config`** loads `frontend/shifts.js` + `owners.js` into the
   `config` table (keys `shifts`, `owners`), mirroring `--seed-from-data-js` for cases. New
   `seed_config_from_js()` in `backend/ingest.py` and a Node extractor `backend/seed_config_extract.cjs`
   that evaluates the two JS files and emits the same payload shapes the SPA POSTs to `/api/config`.
@@ -478,7 +488,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Changed (Seed data — expanded to 38 cases for realistic testing)
 
-- **`prototype/data.js` grown from 10 → 38 raw Case Center records** so a seeded
+- **`frontend/data.js` grown from 10 → 38 raw Case Center records** so a seeded
   DB / board looks realistic. The 10 curated records (tricky scenarios) are kept
   as-is; ~28 more are appended by a small in-file factory (`C-2411…C-2438`),
   still raw-CC shape (`CASES_RAW_CC`). Spread: 28 in the current week (W24), 10
@@ -540,7 +550,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **The SPA can now treat the DB API as the source of truth for the operator
   layer** (picks / Track Status / handover / reminder), so the board is shared
   across operators and devices instead of being browser-local. Enabled by
-  `window.API_MODE = 'server'` in `prototype/config.js` (default `''` keeps the
+  `window.API_MODE = 'server'` in `frontend/config.js` (default `''` keeps the
   existing single-user/demo + `serve.py` behavior).
   - `backend/api.py` `GET /api/cases` now advertises `operatorLayer: "server"`.
   - In server mode the SPA boot-loads the **full** DB store (`tryLoadLiveCases(true)`,
@@ -561,13 +571,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   and `sanitizeCaseIdentity()`, applied at every point a case enters `STATE`
   (`buildSeedCases`, `normalizeLiveCase`, `overlayLiveCase`). `caseHref()` now
   also refuses non-http(s) links, and the two unescaped owner-id `<option>`
-  sinks are escaped. Locked in by 7 new tests (`prototype/tests/run.cjs`).
+  sinks are escaped. Locked in by 7 new tests (`frontend/tests/run.cjs`).
 - **Backend API now supports authN/authZ.** `backend/api.py` gained an
   `API_AUTH_TOKEN` bearer-token gate (constant-time compare) on `/api/cases`
   and `/api/save`; unset = open (demo preserved) but logs a warning. Previously
   anyone reachable could read all case PII and purge any case via `purgeIds`.
 - **Live capture can no longer clobber the public seed.** `local/persist.py`
-  refuses to overwrite the Pages-deployed `prototype/data.js` unless
+  refuses to overwrite the Pages-deployed `frontend/data.js` unless
   `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1`, closing the accidental-PII-to-public
   leak that previously relied only on a manual `skip-worktree`.
 
@@ -624,7 +634,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Changed (Seed data · raw Case Center shape)
 
-- **`prototype/data.js` rewritten as raw Case Center records.** Each entry is
+- **`frontend/data.js` rewritten as raw Case Center records.** Each entry is
   one CC record (`caseId`, `caseStatus`, `subStatus.transition`, `caseLevel`,
   `userAccount`, `userDept`, `reporter`, `assignee`, `createDateTime`,
   `processTimeline[]`) — the same shape `fetch_raw()` in `local/casecenter.py`
@@ -678,7 +688,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Operator card** in the sidebar footer is redesigned around an `.op-id`
   block (logo-gradient avatar + "On shift" cap + borderless `.op-switcher`
   select) with the per-fact rows (`Shift`, `Ends`, `Week`) sitting under
-  it. Brand block drops the "prototype" badge and adds a "SUPPORT × SRE"
+  it. Brand block drops the "frontend" badge and adds a "SUPPORT × SRE"
   serif sub-line.
 - **Themed dropdowns.** `.op-switcher` and `.ts-picker` now match the
   Forest palette — custom chevron, hover/focus rings, and a fully styled
@@ -700,7 +710,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Internal
 
-- `prototype/standalone.html` regenerated from the modular sources to
+- `frontend/standalone.html` regenerated from the modular sources to
   capture every CSS / JS / HTML change in one self-contained bundle.
 
 ---
@@ -965,7 +975,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   id) with a `+ Add member` button and a per-row ✕ to delete. Edits flow through the
   same Save / Copy snippet path the desks/teams use, so members survive a reload and
   can be copied back into `owners.js`. HQ teams gained a `members[]` array in
-  `prototype/owners.js` seeded with three members per team; `ownersSnippet()` now emits
+  `frontend/owners.js` seeded with three members per team; `ownersSnippet()` now emits
   the members block for both pools.
 
 ### Changed
@@ -1053,10 +1063,10 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 ### Changed
 
 - **`fit-` id prefixes renamed to `core-` across owners.js and seed data.** Desk ids in
-  `prototype/owners.js` are now `core-apac` / `core-emea` / `core-amer` (and member ids
+  `frontend/owners.js` are now `core-apac` / `core-emea` / `core-amer` (and member ids
   follow: `core-apac-lead`, `core-apac-eng`, etc.). All `fitId: 'fit-…'` references in
-  `prototype/data.js` and the test fixture in `prototype/tests/run.cjs` rewritten to
-  match. `makeOwnerId(pool, name, …)` in `prototype/app.js` now slugs Core Team desks
+  `frontend/data.js` and the test fixture in `frontend/tests/run.cjs` rewritten to
+  match. `makeOwnerId(pool, name, …)` in `frontend/app.js` now slugs Core Team desks
   under a `core-` prefix (HQ teams stay `hq-`); the id input placeholder follows. The
   `window.OWNERS.fit` pool key, `c.fitId` field name, `holdMs.fit`, and
   `currentOwner === 'fit'` are state-shape and stay as-is.
@@ -1072,7 +1082,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   "Core Team" instead of "FIT" (assign modal subtitle + label, escalate modal subtitle +
   reason placeholder, escalate history `'Core Team → …'`, escalation toast, chase toast,
   resume "Core Team/HQ cleared", reminder modal hint, SVG flow node label, status-flow
-  table cells, Clocks legend row). Seed cases in `prototype/data.js` updated to match
+  table cells, Clocks legend row). Seed cases in `frontend/data.js` updated to match
   (history `detail`, handover notes, process-timeline `processor`, `handlerType`,
   free-text `notes`). `tour.js` updated likewise. Internal state — `with_fit` enum,
   `pill-with_fit` CSS class, `currentOwner === 'fit'`, `fitId`, `holdMs.fit`,
@@ -1096,17 +1106,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 ### Changed
 
 - **Case Center refresh now moves cases when their status changes.** Added `status` to
-  `CC_OWNED_FIELDS` in `prototype/app.js`, `local/persist.py`, and `backend/merge.py`, so
+  `CC_OWNED_FIELDS` in `frontend/app.js`, `local/persist.py`, and `backend/merge.py`, so
   a live refresh updates the board column to whatever Case Center currently has. The
   operator's local layer (FIT/HQ routing, notes, clocks, queue, handover, reminders) is
   still preserved across a refresh — only the CC-owned fields change. Updated the
   `mergeLiveCase` characterization test to expect status to follow CC.
 - **"Local FIT" wording → "Core Team" everywhere user-visible.** Renamed across
-  `prototype/app.js`, `prototype/data.js`, `prototype/owners.js` doc comments,
-  `prototype/tests/run.cjs`, and `prototype/tour.js`. The internal status enum
+  `frontend/app.js`, `frontend/data.js`, `frontend/owners.js` doc comments,
+  `frontend/tests/run.cjs`, and `frontend/tour.js`. The internal status enum
   `with_fit` and the pill CSS class `pill-with_fit` are unchanged (column id stays).
 - **Week boundaries start on Sunday.** `window.CURRENT_WEEK` and `window.WEEKS` in
-  `prototype/data.js` shifted by one day: W24-2026 now spans Sun Jun 7 – Sat Jun 13,
+  `frontend/data.js` shifted by one day: W24-2026 now spans Sun Jun 7 – Sat Jun 13,
   W23 spans May 31 – Jun 6, W22 spans May 24 – 30, W21 spans May 17 – 23 (labels
   rewritten accordingly). A new `WEEK_STARTS_ON = 0` constant in `app.js` encodes the
   Sunday-first convention for future code.
@@ -1146,12 +1156,12 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   latest item's `processorDeptName` (no direct `deptName` on the new payload). `Wait User`
   attaches `waitUser` only when its block is present and well-formed. The same field
   renames flowed through `local/persist.py` and `backend/merge.py` `CC_OWNED_FIELDS`,
-  `prototype/app.js` (detail rows, table column header → "User", queue/board reads,
-  `CC_OWNED_FIELDS` mirror), `prototype/data.js` seed cases (`requester:` → `user:`),
-  and the test fixture in `prototype/tests/run.cjs`. 77/77 tests pass.
+  `frontend/app.js` (detail rows, table column header → "User", queue/board reads,
+  `CC_OWNED_FIELDS` mirror), `frontend/data.js` seed cases (`requester:` → `user:`),
+  and the test fixture in `frontend/tests/run.cjs`. 77/77 tests pass.
 
 - **Switched the prototype skin from the Pastel CommuGround theme to the Forest variant.**
-  Updated `prototype/styles.css` tokens to the Forest palette (page bg `#e8ece8`, deep-forest
+  Updated `frontend/styles.css` tokens to the Forest palette (page bg `#e8ece8`, deep-forest
   accent `#2e5942`/`#4e8063`/`#e3efe7`, light→dark green lifecycle column ramp, desaturated
   brick/amber/tan semantic pills) and swapped Plus Jakarta Sans + JetBrains Mono for
   Source Serif 4 + Libre Franklin + IBM Plex Mono via Google Fonts. Titles, page header,
@@ -1161,8 +1171,8 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   swatches re-mapped to Forest greens/brick. No markup, class hooks, behavior, or sidebar
   items were changed — only the theme.
 - **CommuGround visual theme applied to the prototype (earlier today).** Reskinned
-  `prototype/styles.css` and loaded Plus Jakarta Sans + JetBrains Mono via Google Fonts in
-  `prototype/index.html` to match the Pastel `design_handoff_commuground` reference. Now
+  `frontend/styles.css` and loaded Plus Jakarta Sans + JetBrains Mono via Google Fonts in
+  `frontend/index.html` to match the Pastel `design_handoff_commuground` reference. Now
   superseded by the Forest skin above.
 
 ---
@@ -1272,7 +1282,7 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   (`#/clocks`) explains how each clock is calculated, with a live worked example.
 - **First line can return a New case to the requester (4.9).** "Return to requester" is now
   available from the New status; Status Flow diagram and table updated to match.
-- **Zero-dependency test harness.** `node prototype/tests/run.cjs` — 66 characterization tests
+- **Zero-dependency test harness.** `node frontend/tests/run.cjs` — 66 characterization tests
   covering the pure functions, action-handler outcomes, the live-merge/refresh logic, the recycle
   bin, and the load-window URL/validation. No npm, no framework.
 
@@ -1342,10 +1352,10 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## How to regenerate `standalone.html`
 
-The modular sources under `prototype/` are the source of truth. After any edit:
+The modular sources under `frontend/` are the source of truth. After any edit:
 
 ```bash
-node prototype/bundle.mjs
+node frontend/bundle.mjs
 ```
 
 The Pages workflow runs this automatically on deploy.

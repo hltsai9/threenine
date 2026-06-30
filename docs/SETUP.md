@@ -13,14 +13,14 @@ and every environment variable.** Other docs link here instead of repeating this
 
 ## Run the prototype
 
-**Online (deployed):** GitHub Pages publishes `prototype/` via `.github/workflows/pages.yml`.
+**Online (deployed):** GitHub Pages publishes `frontend/` via `.github/workflows/pages.yml`.
 After enabling **Settings → Pages → Source = GitHub Actions**, it's served at the Pages URL in
 the deploy job (typically `https://<user>.github.io/threenine/`).
 
-**Locally — easiest (just open a file):** open `prototype/standalone.html` via `file://`.
+**Locally — easiest (just open a file):** open `frontend/standalone.html` via `file://`.
 It's a self-contained build with CSS/JS inlined — no server needed. Best for sharing as one file.
 
-**Locally — modular sources (for editing):** serve `prototype/` over HTTP and open `index.html`:
+**Locally — modular sources (for editing):** serve `frontend/` over HTTP and open `index.html`:
 
 ```bash
 cd prototype && python3 -m http.server 8000   # then open http://localhost:8000
@@ -30,7 +30,7 @@ cd prototype && python3 -m http.server 8000   # then open http://localhost:8000
 them, regenerate `standalone.html`:
 
 ```bash
-node prototype/bundle.mjs
+node frontend/bundle.mjs
 ```
 
 The Pages workflow runs this automatically on deploy, and the `rebundle-standalone.sh`
@@ -45,8 +45,8 @@ live mode won't work:
 | ---- | ---------- |
 | `local/casecenter.py` → `fetch_raw()` | Paste your real Case Center request (the committed version is a **stub**); return the list of raw records (`x_json["data"]`). Do **not** hardcode credentials. |
 | `local/secrets.local.json` | **Gitignored — absent after a clone.** Create it (below) or use env vars. |
-| `prototype/index.html` | A local virus scan may delete parts. Re-check after pulling: `git restore prototype/index.html`. |
-| `prototype/standalone.html` | Same issue — regenerate: `node prototype/bundle.mjs` (or `git restore prototype/standalone.html`). |
+| `frontend/index.html` | A local virus scan may delete parts. Re-check after pulling: `git restore frontend/index.html`. |
+| `frontend/standalone.html` | Same issue — regenerate: `node frontend/bundle.mjs` (or `git restore frontend/standalone.html`). |
 
 ## Case Center credentials
 
@@ -68,7 +68,7 @@ Then wire your request in **`local/casecenter.py`**:
 - `LEVEL_MAP` — `caseLevel` → priority. `map_record()` — field names → board case.
 - `BASE_URL` (top of file, or `CASE_CENTER_BASE_URL` env) — builds each case's link.
 
-> ⚠️ **Privacy:** once real cases are written into `prototype/data.js` (which also deploys to
+> ⚠️ **Privacy:** once real cases are written into `frontend/data.js` (which also deploys to
 > **public** Pages), do **not** commit/push it. See [`local/README.md`](../local/README.md) for
 > the full safeguard (`skip-worktree`) and restore steps.
 
@@ -82,9 +82,9 @@ Then wire your request in **`local/casecenter.py`**:
 | `CASE_CENTER_BASE_URL` | `casecenter.py` | _(empty)_ | Builds each case's clickable link |
 | `CASE_CENTER_LOOKBACK_HOURS` | `casecenter.py` | `6` | Default look-back window for the fetch |
 | `ALLOWED_ORIGINS` | `backend/api.py` | _(empty)_ | CORS origins — explicit allowlist (no `*`); load-bearing now that the API can be auth-gated. Only for a separate-host SPA. |
-| `SERVE_STATIC` | `backend/api.py` | `1` | Also serve `prototype/` at `/` (same origin) |
+| `SERVE_STATIC` | `backend/api.py` | `1` | Also serve `frontend/` at `/` (same origin) |
 | `AUTO_CREATE` | backend | `1` | Create tables on start (set `0` + use Alembic for production) |
 | `PORT` | `local/serve.py` | `8787` | Port for the single-user live proxy |
 | `CASE_TRACKER_WEBROOT` | `local/serve.py` | `../prototype` | Where the board files live |
 | `CASE_TRACKER_WRITE_DATA_JS` | `local/serve.py` | `1` | Run the persist step after a fetch (`0` disables it entirely) |
-| `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE` | `local/persist.py` | _(unset = safe)_ | Gate on actually rewriting the **committed/public** `prototype/data.js` with a live capture. Unset = the demo seed is left untouched (only the gitignored store updates); set `=1` to capture real cases into `data.js` — then **do NOT commit/push it**. |
+| `CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE` | `local/persist.py` | _(unset = safe)_ | Gate on actually rewriting the **committed/public** `frontend/data.js` with a live capture. Unset = the demo seed is left untouched (only the gitignored store updates); set `=1` to capture real cases into `data.js` — then **do NOT commit/push it**. |

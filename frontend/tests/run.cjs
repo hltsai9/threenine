@@ -1,7 +1,7 @@
-// Characterization tests for the prototype's pure functions.
+// Characterization tests for the frontend's pure functions.
 //
 // These lock in current behavior before the planned P1 refactors (e.g. the PROMPT_HANDLERS
-// extraction). Zero dependencies: run with `node prototype/tests/run.cjs`.
+// extraction). Zero dependencies: run with `node frontend/tests/run.cjs`.
 //
 // The clock is frozen to the seed's NOW (see load-prototype.cjs), so NOW-relative inputs are
 // built as offsets from FIXED and assertions are exact.
@@ -24,8 +24,8 @@ let app;
 try {
   app = loadPrototype();
 } catch (e) {
-  console.error('Failed to load the prototype headlessly — the DOM shim or app boot likely needs');
-  console.error('updating in prototype/tests/load-prototype.cjs.\n');
+  console.error('Failed to load the frontend headlessly — the DOM shim or app boot likely needs');
+  console.error('updating in frontend/tests/load-prototype.cjs.\n');
   console.error(e && e.stack || e);
   process.exit(1);
 }

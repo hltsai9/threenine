@@ -12,15 +12,15 @@ clocks/handover/reporting, and the deploy-it-for-your-team story.
 npm install --prefix slides pptxgenjs
 
 # screenshots (optional — assets/*.png are committed; needs Playwright + Chromium):
-node slides/capture-screenshots.cjs # → slides/assets/*.png  (renders prototype/standalone.html)
+node slides/capture-screenshots.cjs # → slides/assets/*.png  (renders frontend/standalone.html)
 
 node slides/build-deck.cjs          # → slides/Case-Tracker-Overview.pptx
 ```
 
-- `capture-screenshots.cjs` drives headless Chromium over `prototype/standalone.html`
+- `capture-screenshots.cjs` drives headless Chromium over `frontend/standalone.html`
   (tour suppressed, 2× scale) and writes the PNGs in `assets/`.
 - `build-deck.cjs` lays out the slides with `pptxgenjs`, embedding those PNGs and using the
-  app's brand colors (`prototype/styles.css :root`).
+  app's brand colors (`frontend/styles.css :root`).
 
 Re-run both after UI changes so the screenshots stay current. Edit copy directly in
 `build-deck.cjs` (slide blocks are in order) or in PowerPoint after generating.

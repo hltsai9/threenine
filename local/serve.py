@@ -4,7 +4,7 @@ Local launcher for the Case Tracker board with LIVE Case Center data.
 
 What it does
 ------------
-- Serves the existing static site (../prototype) at http://127.0.0.1:<PORT>/
+- Serves the existing static site (../frontend) at http://127.0.0.1:<PORT>/
 - Exposes GET /api/cases, which runs your Case Center fetch (see casecenter.py)
   and returns the cases as JSON. The board queries it when you press "Load New" /
   "Refresh Existing" — NOT on every page refresh — so a reload keeps the cases
@@ -36,30 +36,30 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def resolve_webroot():
     """Find the folder that holds the board's index.html. Tries (in order): the
-    CASE_TRACKER_WEBROOT env var, a path given as the first CLI arg, ../prototype next to
-    this script, ./prototype under the current dir, and the current dir itself."""
+    CASE_TRACKER_WEBROOT env var, a path given as the first CLI arg, ../frontend next to
+    this script, ./frontend under the current dir, and the current dir itself."""
     candidates = []
     if os.environ.get("CASE_TRACKER_WEBROOT"):
         candidates.append(os.environ["CASE_TRACKER_WEBROOT"])
     if len(sys.argv) > 1:
         candidates.append(sys.argv[1])
     candidates += [
-        os.path.normpath(os.path.join(HERE, "..", "prototype")),
-        os.path.join(os.getcwd(), "prototype"),
+        os.path.normpath(os.path.join(HERE, "..", "frontend")),
+        os.path.join(os.getcwd(), "frontend"),
         os.getcwd(),
     ]
     for c in candidates:
         if c and os.path.isfile(os.path.join(c, "index.html")):
             return os.path.abspath(c), True
     # Nothing found — fall back to the conventional path so the error is concrete.
-    return os.path.normpath(os.path.join(HERE, "..", "prototype")), False
+    return os.path.normpath(os.path.join(HERE, "..", "frontend")), False
 
 
 WEBROOT, WEBROOT_OK = resolve_webroot()
 
 # Run the persist step (merge fetched cases into the sidecar store, and — if allowed — into
 # data.js). On by default; set CASE_TRACKER_WRITE_DATA_JS=0 to skip persistence entirely.
-# NOTE: this only gates whether persist runs. Overwriting the committed/public prototype/data.js
+# NOTE: this only gates whether persist runs. Overwriting the committed/public frontend/data.js
 # is separately gated, SAFE-BY-DEFAULT, on CASE_TRACKER_ALLOW_DATA_JS_OVERWRITE=1 inside
 # persist.py — so by default a live fetch updates the gitignored store but never rewrites data.js.
 WRITE_DATA_JS = os.environ.get("CASE_TRACKER_WRITE_DATA_JS", "1") not in ("0", "false", "False", "")
@@ -86,10 +86,10 @@ class Handler(SimpleHTTPRequestHandler):
                     "Case Tracker board files not found.\n\n"
                     "serve.py looked for index.html in:\n  " + WEBROOT + "\n\n"
                     "Fix it one of these ways:\n"
-                    "  - run serve.py from inside the cloned repo (so ../prototype exists), or\n"
-                    "  - point it at the prototype folder:\n"
-                    "      CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py\n"
-                    "      (or:  python3 serve.py /path/to/prototype)\n\n"
+                    "  - run serve.py from inside the cloned repo (so ../frontend exists), or\n"
+                    "  - point it at the frontend folder:\n"
+                    "      CASE_TRACKER_WEBROOT=/path/to/frontend python3 serve.py\n"
+                    "      (or:  python3 serve.py /path/to/frontend)\n\n"
                     "The data feed still works: /api/cases\n"
                 ).encode("utf-8")
                 self.send_response(404)
@@ -231,9 +231,9 @@ def main():
     else:
         print("!! WARNING: could not find the board's index.html.")
         print(f"!! Looked in: {WEBROOT}")
-        print("!! The board (/) will 404. Point serve.py at the prototype folder:")
-        print("!!   CASE_TRACKER_WEBROOT=/path/to/prototype python3 serve.py")
-        print("!!   (or:  python3 serve.py /path/to/prototype)")
+        print("!! The board (/) will 404. Point serve.py at the frontend folder:")
+        print("!!   CASE_TRACKER_WEBROOT=/path/to/frontend python3 serve.py")
+        print("!!   (or:  python3 serve.py /path/to/frontend)")
         print("!! The /api/cases data feed still works.")
     print("Ctrl+C to stop.")
     try:

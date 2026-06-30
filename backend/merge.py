@@ -17,7 +17,7 @@ from sqlalchemy import select
 from .db import Case, Config
 
 # Fields Case Center authoritatively owns. Must stay in sync with CC_OWNED_FIELDS in
-# local/persist.py and prototype/app.js. On a live refresh only these are overlaid onto
+# local/persist.py and frontend/app.js. On a live refresh only these are overlaid onto
 # an existing case, so an ingestion run never resets operator routing/status.
 CC_OWNED_FIELDS = (
     "subject", "ccStatusLabel", "priority", "caseLink", "status",

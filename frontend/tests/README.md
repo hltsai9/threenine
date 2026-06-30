@@ -1,13 +1,13 @@
 # Prototype tests
 
-Zero-dependency characterization tests for the pure functions in `prototype/app.js`. They lock
+Zero-dependency characterization tests for the pure functions in `frontend/app.js`. They lock
 in current behavior so the planned refactors (see `docs/improvement-plan.md` §1, e.g. the
 `PROMPT_HANDLERS` extraction) can be made safely.
 
 ## Run
 
 ```sh
-node prototype/tests/run.cjs
+node frontend/tests/run.cjs
 ```
 
 Exit code is `0` when all tests pass, `1` otherwise. No npm install, no framework.

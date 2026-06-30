@@ -22,7 +22,7 @@ Config (env):
                       `Authorization: Bearer <token>` on /api/cases and /api/save.
     ALLOWED_ORIGINS   comma-separated origins for a separate-host front end (CORS).
                       Leave unset for the same-origin deployment.
-    SERVE_STATIC      "1" (default) to also serve prototype/ at / for convenience;
+    SERVE_STATIC      "1" (default) to also serve frontend/ at / for convenience;
                       "0" to run API-only.
     AUTO_CREATE       "1" (default) to create tables on startup; "0" to rely on
                       Alembic migrations in production.
@@ -182,6 +182,6 @@ async def set_config_route(key: str, request: Request):
 # Optionally serve the static SPA from the same origin (no CORS, no mixed content).
 # Registered AFTER the API routes so /api/* always wins over the catch-all mount.
 if os.environ.get("SERVE_STATIC", "1") not in ("0", "false", "False", ""):
-    webroot = os.environ.get("CASE_TRACKER_WEBROOT") or os.path.join(REPO_ROOT, "prototype")
+    webroot = os.environ.get("CASE_TRACKER_WEBROOT") or os.path.join(REPO_ROOT, "frontend")
     if os.path.isfile(os.path.join(webroot, "index.html")):
         app.mount("/", StaticFiles(directory=webroot, html=True), name="spa")

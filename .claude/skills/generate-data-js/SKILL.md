@@ -1,13 +1,13 @@
 ---
 name: generate-data-js
-description: Generate or refresh prototype/data.js (seed data for the Case Tracker prototype). Use when the user asks to change the demo data — shift the calendar, add cases, rename operators, retune SLA scenarios, or rebuild data.js from scratch. Produces a well-formed file the SPA can consume without any other code changes.
+description: Generate or refresh frontend/data.js (seed data for the Case Tracker prototype). Use when the user asks to change the demo data — shift the calendar, add cases, rename operators, retune SLA scenarios, or rebuild data.js from scratch. Produces a well-formed file the SPA can consume without any other code changes.
 ---
 
-# Generate `prototype/data.js`
+# Generate `frontend/data.js`
 
-`prototype/data.js` is the seed dataset the SPA boots from. It declares everything via `window.*` globals (no modules, no build step). After editing it you **must** rerun `node prototype/bundle.mjs` so `prototype/standalone.html` picks up the change.
+`frontend/data.js` is the seed dataset the SPA boots from. It declares everything via `window.*` globals (no modules, no build step). After editing it you **must** rerun `node frontend/bundle.mjs` so `frontend/standalone.html` picks up the change.
 
-> **Roster and owners live in separate files.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are in **`prototype/shifts.js`**; `window.OWNERS` (FIT desks & HQ teams) is in **`prototype/owners.js`**. Both can be edited via in-app editors (Shifts page / Owners page). Do **not** put them in data.js. Keep ids you reference from data.js (`createdBy`, history `who`, `fitId`, `hqId`) consistent with those files.
+> **Roster and owners live in separate files.** `window.OPERATORS`, `window.SHIFTS`, and `window.CURRENT_OPERATOR_ID` are in **`frontend/shifts.js`**; `window.OWNERS` (FIT desks & HQ teams) is in **`frontend/owners.js`**. Both can be edited via in-app editors (Shifts page / Owners page). Do **not** put them in data.js. Keep ids you reference from data.js (`createdBy`, history `who`, `fitId`, `hqId`) consistent with those files.
 
 ## File contract
 
@@ -186,9 +186,9 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 5. **Validate the routing invariants** above for every case before saving.
 6. **Run the bundler** so `standalone.html` updates:
    ```bash
-   node prototype/bundle.mjs
+   node frontend/bundle.mjs
    ```
-7. **Sanity-check in the browser**: open `prototype/index.html`, verify the operator dropdown is populated, the board shows cases in expected columns (Case Center status), and each column's top band ("My queue") holds the cases you seeded as `agentStatus: 'queued'`.
+7. **Sanity-check in the browser**: open `frontend/index.html`, verify the operator dropdown is populated, the board shows cases in expected columns (Case Center status), and each column's top band ("My queue") holds the cases you seeded as `agentStatus: 'queued'`.
 
 ## Common mistakes to avoid
 
@@ -216,5 +216,5 @@ Current production seed has ~14 active + ~9 historical cases. Match that ballpar
 [ ] One stale handover, one carried-over case
 [ ] All FIT/HQ ids reference OWNERS
 [ ] All weekIds reference WEEKS
-[ ] node prototype/bundle.mjs run
+[ ] node frontend/bundle.mjs run
 ```

@@ -5,7 +5,7 @@ asked. They are partly enforced by hooks in `.claude/hooks/` (see **Harness** be
 
 ## What this repo is
 
-A click-through **Case Tracker** prototype (zero-dependency vanilla JS + CSS in `prototype/`)
+A click-through **Case Tracker** prototype (zero-dependency vanilla JS + CSS in `frontend/`)
 plus an optional Python backend. There are two backends: the single-user live proxy
 (`local/serve.py`) and the decoupled ingest→DB→API pipeline (`backend/`). For *how to run,
 credentials, and env vars*, see **@docs/SETUP.md** — do not restate that content elsewhere.
@@ -14,7 +14,7 @@ Per-area detail lives in [`README.md`](README.md), [`local/README.md`](local/REA
 
 ## The three rules
 
-1. **Release notes on every code change (required).** Any change under `prototype/`, `local/`,
+1. **Release notes on every code change (required).** Any change under `frontend/`, `local/`,
    `backend/`, or `deploy/` gets an entry in [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md),
    **newest first, under today's date**, using the existing headings: **Added · Fixed ·
    Changed · Internal · Docs**. If a change genuinely needs no note (pure test/doc tweak),
@@ -32,15 +32,15 @@ Per-area detail lives in [`README.md`](README.md), [`local/README.md`](local/REA
 
 - **Branch:** develop on `claude/<descriptor>` branches; never push to a different branch
   without explicit permission. Don't open a PR unless asked.
-- **Tests:** run `node prototype/tests/run.cjs` (zero-dependency) after code changes.
+- **Tests:** run `node frontend/tests/run.cjs` (zero-dependency) after code changes.
   *(The Stop hook also runs these and blocks on failure.)*
-- **Rebundle:** after editing any `prototype/` source, regenerate the single-file build with
-  `node prototype/bundle.mjs`. *(The PostToolUse hook does this automatically.)*
+- **Rebundle:** after editing any `frontend/` source, regenerate the single-file build with
+  `node frontend/bundle.mjs`. *(The PostToolUse hook does this automatically.)*
 - **Seed data:** to change demo data, use the **`generate-data-js`** skill rather than editing
-  `prototype/data.js` by hand.
+  `frontend/data.js` by hand.
 - **End-of-change ritual:** the **`/ship`** skill does release-note → tests → rebundle →
   commit in one step.
-- **Privacy:** never commit `local/secrets.local.json` or a live-capture `prototype/data.js`
+- **Privacy:** never commit `local/secrets.local.json` or a live-capture `frontend/data.js`
   (one with `CASES_LIVE_CAPTURE = true`).
 
 ## Harness (`.claude/`)

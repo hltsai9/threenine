@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Bundles the prototype into a single self-contained standalone.html so it
+// Bundles the frontend into a single self-contained standalone.html so it
 // can be opened directly via file:// without an HTTP server.
 //
-// Usage:  node prototype/bundle.mjs
+// Usage:  node frontend/bundle.mjs
 //
 // Reads index.html / styles.css / data.js / shifts.js / app.js / tour.js from this
-// folder and writes prototype/standalone.html. The modular files remain the
+// folder and writes frontend/standalone.html. The modular files remain the
 // source of truth; re-run this script after editing them.
 
 import { readFileSync, writeFileSync } from 'node:fs';

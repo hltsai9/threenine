@@ -6,7 +6,7 @@ shared Excel workbook and makes the hand-off between the **requester (User)**, *
 app, and an optional Python backend that turns the prototype into a real multi-operator service.
 
 - **URD**: [`docs/URD.md`](docs/URD.md) — the authoritative spec.
-- **Prototype**: [`prototype/`](prototype/) — a static, no-build SPA (vanilla HTML / CSS / JS)
+- **Prototype**: [`frontend/`](frontend/) — a static, no-build SPA (vanilla HTML / CSS / JS)
   that runs the whole UI against seeded mock data. Auto-deployed to GitHub Pages on every push.
 - **Backend** (optional): [`backend/`](backend/README.md) — a decoupled **ingest → DB → API**
   pipeline so the front end needs **no API key/cookie**. An ingestion script (the only holder of
@@ -21,7 +21,7 @@ app, and an optional Python backend that turns the prototype into a real multi-o
 
 ## Run it
 
-Quickest look: open `prototype/standalone.html` via `file://` (self-contained, no server).
+Quickest look: open `frontend/standalone.html` via `file://` (self-contained, no server).
 For editing the modular sources, the deployed Pages site, the local-setup checklist after a pull,
 Case Center credentials, and the full environment-variable table, see
 **[`docs/SETUP.md`](docs/SETUP.md)** — the single source of truth for running and configuring the
@@ -30,7 +30,7 @@ app. To self-host the full stack (API + DB + login) on your own box, follow
 
 ## Demo anchor — what "now" means
 
-To keep the demo stable, the prototype freezes time (`prototype/data.js`):
+To keep the demo stable, the prototype freezes time (`frontend/data.js`):
 
 - **NOW** = `2026-06-12 13:00 UTC` (Friday afternoon UTC)
 - **Current week** = `W24 · June 7 – 13, 2026`
@@ -118,7 +118,7 @@ Statuses, the handover banner, and the "you" tag in the shift roster.
 ## The guided tour
 
 CommuGround ships a built-in tour (stepped tooltips walking each view). It is **config-gated**:
-`window.TOUR_AUTOSTART` in `prototype/config.js` controls auto-start, **default `false`** (internal
+`window.TOUR_AUTOSTART` in `frontend/config.js` controls auto-start, **default `false`** (internal
 operators don't need onboarding on every fresh browser). Set it to `true` to auto-start once per
 browser for a demo. Either way, anyone can launch it from **Take the tour →** in the sidebar
 footer. Use **← / →** to step, **Esc** to skip.
@@ -186,7 +186,7 @@ across operators and devices.
 │   ├── SELF-HOST-UBUNTU.md      # full-stack self-host runbook (MySQL)
 │   ├── RELEASE_NOTES.md         # newest-first change log (required per change)
 │   └── improvement-plan.md      # the one TODO / backlog home
-├── prototype/                   # the zero-build SPA
+├── frontend/                   # the zero-build SPA
 │   ├── index.html               # SPA shell (modular dev entry point)
 │   ├── styles.css               # all styles
 │   ├── app.js                   # router + render + handlers
@@ -204,5 +204,5 @@ across operators and devices.
 ├── backend/                     # ingest → DB → API pipeline (FastAPI + SQLAlchemy)
 ├── deploy/                      # Dockerfiles + Kubernetes manifests
 ├── slides/                      # promo deck (pptxgenjs) + screenshot capture
-└── .github/workflows/pages.yml  # deploys prototype/ to GitHub Pages
+└── .github/workflows/pages.yml  # deploys frontend/ to GitHub Pages
 ```

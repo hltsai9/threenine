@@ -24,7 +24,7 @@ commit. Two recommendations were **intentionally deferred** because they are lar
 maintainability/perf-oriented refactors with real regression risk and no test coverage of
 the rendering layer to catch breakage:
 
-- [ ] **Split `prototype/app.js` (~4.8k lines) into modules** (state / router / per-view
+- [ ] **Split `frontend/app.js` (~4.8k lines) into modules** (state / router / per-view
   renderers / live-data / persistence). Keep the zero-dependency design (plain `<script>`s
   or ES modules) and update `bundle.mjs` accordingly. Blocked on first adding render-layer
   test coverage so the split can be verified.
@@ -46,10 +46,10 @@ structured logging — _still open_; making `POST /api/save` non-blocking — �
 
 | File | Lines | Role |
 | --- | --- | --- |
-| `prototype/app.js` | ~2,893 | Monolithic SPA: router, renderers, handlers, modals, state, live-data fetch |
-| `prototype/styles.css` | ~1,432 | All styles, single file |
-| `prototype/data.js` | ~657 | Seed cases, thresholds, frozen demo `NOW` |
-| `prototype/tour.js` | ~306 | Custom guided tour |
+| `frontend/app.js` | ~2,893 | Monolithic SPA: router, renderers, handlers, modals, state, live-data fetch |
+| `frontend/styles.css` | ~1,432 | All styles, single file |
+| `frontend/data.js` | ~657 | Seed cases, thresholds, frozen demo `NOW` |
+| `frontend/tour.js` | ~306 | Custom guided tour |
 | `slides/build-deck.cjs` | ~258 | pptxgenjs deck generator |
 | `slides/capture-screenshots.cjs` | ~62 | Playwright screenshot capture |
 
@@ -104,7 +104,7 @@ headers.
 #### P2 — Tooling / safety net
 
 - **[DONE] No automated tests.** A zero-dependency characterization harness now exists under
-  `prototype/tests/` (`node prototype/tests/run.cjs`, 37 tests). `load-prototype.cjs` evaluates
+  `frontend/tests/` (`node frontend/tests/run.cjs`, 37 tests). `load-prototype.cjs` evaluates
   the browser globals in a Node `vm` with a DOM shim and a **frozen clock** (pinned to the seed
   `NOW`, so the time-shift offset is 0 and `NOW`-relative math is deterministic); `run.cjs` holds
   the tests. Verified to catch regressions (a deliberate `fmtDuration` break fails the run).
@@ -130,7 +130,7 @@ headers.
 
 ## 2. Site tour redesign spec
 
-Target files: `prototype/tour.js`, tour CSS in `prototype/styles.css:1293–1432`, plus stable
+Target files: `frontend/tour.js`, tour CSS in `frontend/styles.css:1293–1432`, plus stable
 markup hooks in `app.js` renderers. **Remains zero-dependency vanilla JS.** Direction: redesign
 both the UX *and* the robustness/accessibility.
 
@@ -166,7 +166,7 @@ both the UX *and* the robustness/accessibility.
   switcher, top band, queue toggle, reading panel, clocks, handover note, shift grid, archive
   grid) so a future CSS refactor can't silently break the tour. Switch tour steps to target these
   hooks instead of presentational class names.
-- **Bundle sync.** After editing `tour.js`/CSS, re-run `prototype/bundle.mjs` so
+- **Bundle sync.** After editing `tour.js`/CSS, re-run `frontend/bundle.mjs` so
   `standalone.html` stays current (the slide screenshots load `standalone.html`).
 
 ### Tour verification
@@ -321,7 +321,7 @@ loads every case into `STATE.cases` up front (`app.js:25`).
 
 **Plan**
 - **Storage split:** keep only the **current week + still-open carried-over cases** in `data.js`.
-  Move sealed past weeks into per-week files under `prototype/archive/<weekId>.js`, each setting
+  Move sealed past weeks into per-week files under `frontend/archive/<weekId>.js`, each setting
   e.g. `(window.CASES_ARCHIVE ||= {})['W22-2026'] = [ ... ]`. Add a precomputed
   `window.WEEK_STATS` snapshot (totals per week) so the **archive index renders without loading
   any week's full case list**.
@@ -402,7 +402,7 @@ totals from case history in `holderTotals(c)` (`app.js:884–890`), which alread
   to the detail grid.
 
 **Tests (reuse the harness):** `holderTotals` / `ownershipSegments` (`app.js:835–890`) are
-pure, history-derived functions — ideal for `prototype/tests/run.cjs`. Add characterization tests
+pure, history-derived functions — ideal for `frontend/tests/run.cjs`. Add characterization tests
 that feed a synthetic `history` (created → assigned → escalated → returned → resumed → closed) and
 assert the `triage`/`sanity`/`fit`/`hq`/`requester` splits, locking the first-line math before and
 after the UI change.
@@ -437,7 +437,7 @@ this exactly.
 **Verification (4.5–4.6)**
 - Open a case detail (e.g. one that went New → FIT → HQ → Sanity → Closed): the new **First line**
   clock shows non-zero and its value + the FIT/HQ/SLA clocks reconcile with the ownership-timeline
-  legend. `node prototype/tests/run.cjs` stays green with the new `holderTotals` tests.
+  legend. `node frontend/tests/run.cjs` stays green with the new `holderTotals` tests.
 - Navigate to `#/clocks`: the explainer renders, the worked-example timeline matches the detail
   page's component, and each clock's start/pause/bank description matches the handler behavior.
 
@@ -453,7 +453,7 @@ who Case Center says is holding the case without the operator re-assigning by ha
   mapped in `local/casecenter.py:159–160` (`map_record`). Pulled into the board via
   `normalizeLiveCase` (`app.js:2698`) and the id-keyed merges in `tryLoadLiveCases` (`app.js`,
   validated payload branch) and `addCaseById` (`app.js:2485–2514`).
-- Owner directory `window.OWNERS.{fit,hq}` (`prototype/owners.js`) — each entry has `id`, `name`,
+- Owner directory `window.OWNERS.{fit,hq}` (`frontend/owners.js`) — each entry has `id`, `name`,
   and `region`/`area`. Status enums and the existing assign/escalate transitions live in
   `handlePrompt` (`assign_fit`/`escalate_to_hq`). History logging helper `logHistory(c, op, kind,
   detail)`; `getOwner('fit'|'hq', id)`.
@@ -481,7 +481,7 @@ who Case Center says is holding the case without the operator re-assigning by ha
 
 **Tests (reuse the harness):** `applyAssigneeRouting` should be a pure function over `(case,
 OWNERS, aliases)` → mutated case + optional history entry, so it's unit-testable in
-`prototype/tests/run.cjs`: assert FIT-assignee → `with_fit`+`fitId`+history note; HQ-assignee →
+`frontend/tests/run.cjs`: assert FIT-assignee → `with_fit`+`fitId`+history note; HQ-assignee →
 `with_hq`+`hqId`; unknown assignee → unchanged; already-correct status → no duplicate history;
 closed/returned case → untouched.
 

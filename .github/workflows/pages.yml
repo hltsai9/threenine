@@ -1,4 +1,4 @@
-name: Deploy prototype to GitHub Pages
+name: Deploy frontend to GitHub Pages
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
       - claude/vigilant-knuth-slap60
       - claude/exciting-faraday-tartrr
     paths:
-      - 'prototype/**'
+      - 'frontend/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -33,15 +33,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Bundle standalone.html
-        run: node prototype/bundle.mjs
+        run: node frontend/bundle.mjs
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload prototype as Pages artifact
+      - name: Upload frontend as Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: prototype
+          path: frontend
 
   deploy:
     needs: build

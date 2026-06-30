@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// Extract the shifts + owners config blocks from prototype/shifts.js and owners.js as JSON.
+// Extract the shifts + owners config blocks from frontend/shifts.js and owners.js as JSON.
 //
 //   node backend/seed_config_extract.cjs [path/to/shifts.js] [path/to/owners.js]
 //
 // shifts.js / owners.js use JS-literal syntax (and shifts.js cross-references window.ROTA), so
 // they can't be JSON.parsed. We evaluate both in one sandbox with a stub `window`, then print
 // { shifts: {...}, owners: {...} } — the same payload shapes the SPA POSTs to /api/config/<key>
-// (see shiftsConfig() / ownersConfig() in prototype/app.js). Used by
+// (see shiftsConfig() / ownersConfig() in frontend/app.js). Used by
 // `python -m backend.ingest --seed-config` to load the bundled roster + owners into the DB.
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-const proto = path.join(__dirname, '..', 'prototype');
+const proto = path.join(__dirname, '..', 'frontend');
 const shiftsFile = process.argv[2] || path.join(proto, 'shifts.js');
 const ownersFile = process.argv[3] || path.join(proto, 'owners.js');
 

@@ -35,7 +35,7 @@ Read-only is already supported end-to-end: `local/serve.py`, `local/casecenter.p
 
 `#/archive` becomes the full Case Center overview. The week index (W21…current) and week-detail view stay — they already enumerate every case Case Center has surfaced. This is where the operator goes to find new cases to pick.
 
-Critical files: `prototype/app.js` (rewrite `renderCasesView` for the two-zone layout, new `renderRouteBoardStrip` / `renderPickedList` / reuse the existing detail panel), `renderArchiveIndex`, `renderArchiveWeek`, the sidebar nav block.
+Critical files: `frontend/app.js` (rewrite `renderCasesView` for the two-zone layout, new `renderRouteBoardStrip` / `renderPickedList` / reuse the existing detail panel), `renderArchiveIndex`, `renderArchiveWeek`, the sidebar nav block.
 
 ### 2. Make picking the central interaction — ✅ **done** (`isPicked`/`pickedCases`/`renderQueueToggleButton` reuse `agentStatus:'queued'`; UI says "Pick / Picked", Pick button in `renderArchiveWeek` table)
 
@@ -44,7 +44,7 @@ Critical files: `prototype/app.js` (rewrite `renderCasesView` for the two-zone l
 - On the Picked workspace, the toggle becomes "Unpick" (sends the case back to the archive overview).
 - Picked state persists via the existing operator layer (`agent-v1` localStorage key + `POST /api/save`). No backend schema change.
 
-Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive table renderer).
+Critical files: `frontend/app.js` (`toggleQueue`, `renderCard`, the archive table renderer).
 
 ### 3. Track Status — the operator's intent on each picked case (the core value-add) — ✅ **done** (`TRACK_STATUSES`, `c.trackStatus` in `agent-v1` (un)packing, `trackStatusPhase`/`actionDueCases`/`actionOverdueCases`, scheduled-handoff computation, 7-item picker + Clear with preconditions at `renderDetailActions` + clear-confirm at line ~4274)
 
@@ -78,7 +78,7 @@ Critical files: `prototype/app.js` (`toggleQueue`, `renderCard`, the archive tab
   - **Action overdue (N)** — `dueAt` is in the past and CC still shows the old assignee. — ✅ **done** (`actionOverdueCases`)
 - This and the route-board (section 6) are the only new state shapes; everything else reuses existing operator-layer machinery.
 
-Critical files: `prototype/app.js` (the 7-item Track Status picker on the detail panel, the watchlist banners, `agent-v1` (un)packing for `trackStatus`, the shift-aware scheduled-handoff computation).
+Critical files: `frontend/app.js` (the 7-item Track Status picker on the detail panel, the watchlist banners, `agent-v1` (un)packing for `trackStatus`, the shift-aware scheduled-handoff computation).
 
 ### 4. Remove CC-shaped actions; the only operator mutation is Track Status — ✅ **done** (`renderDetailActions` exposes only the Track Status picker + Clear + helper affordances; no CC-shaped action surface renders; `flags[]` is gone from the model. Caveat: `derivePromptsForCase`/`PROMPT_DEFS` and their `assign_core`/`escalate_to_hq`/`chase_*`/`verify_fix` handlers (lines ~3919-4005) still exist as unreferenced dead code — never wired to any rendered button)
 
@@ -106,7 +106,7 @@ The operator needs the Case Center state on picked cases to stay reasonably fres
 - If the operator is offline or `API_BASE` is empty, the toggle is shown but disabled with a tooltip ("Live mode not configured").
 - No polling in seed-only mode — the demo `data.js` is frozen.
 
-Critical files: `prototype/app.js` (toolbar control, interval loop, scoped refresh call), `local/serve.py` (accept `?ids=`), `backend/api.py` (accept `?ids=`).
+Critical files: `frontend/app.js` (toolbar control, interval loop, scoped refresh call), `local/serve.py` (accept `?ids=`), `backend/api.py` (accept `?ids=`).
 
 ### 6. Aggregate Route Board — three stations, one row per picked case — ✅ **done** (`renderRouteBoardStrip`: three stations User·Core Team·HQ, per-case lanes, dot from `assigneeDept`→`route_role`, arrow/travelling-dot/eyeball per Track Status, Sanity Check collapsible group, action-due/overdue amber/red. Caveat: the detail-panel single-case "Next stop" mirror bullet below is not implemented)
 
@@ -139,11 +139,11 @@ The top zone of the Picked workspace is a clean visualisation with minimal text:
 - **Computation.** Pure function of `(trackStatus, assigneeDept, now, ROTA, OWNERS)`. No new persisted state — `scheduledHandoff = { from, to, dueAt, dueShift }` is derived on the fly each render. Reuse existing rota / shift helpers so the "next Day shift at 17:30" lookup honours the actual schedule.
 - **Zero-dependency.** Stations + dots + arrows + animation are CSS / SVG inline; no chart library.
 
-Critical files: `prototype/app.js` (`renderRouteBoardStrip` for the aggregate view, single-case version inside the detail panel, scheduled-handoff computation, dept→role lookup), `prototype/owners.js` (per-dept `route_role` field surfaced as a small dropdown in the Owners editor), `prototype/styles.css` (stations grid, dot, arrow, travelling-dot animation, eyeball, amber/red action-due treatment).
+Critical files: `frontend/app.js` (`renderRouteBoardStrip` for the aggregate view, single-case version inside the detail panel, scheduled-handoff computation, dept→role lookup), `frontend/owners.js` (per-dept `route_role` field surfaced as a small dropdown in the Owners editor), `frontend/styles.css` (stations grid, dot, arrow, travelling-dot animation, eyeball, amber/red action-due treatment).
 
 ### 7. Analytics: split picked vs unpicked + time-on-us trend — ⬜ **open** (not implemented: `weekStats` returns single un-split totals; `renderArchiveIndex`/`renderArchiveWeek` show one stat row with no Picked-vs-Unpicked split and no time-on-us histogram)
 
-Augment the existing `weekStats` function and its renderers in `prototype/app.js`:
+Augment the existing `weekStats` function and its renderers in `frontend/app.js`:
 
 - For each week card (`renderArchiveIndex`), show two parallel mini-stat rows: **Picked** (count, open/closed/cancelled, median time-on-us) and **Unpicked** (same metrics). This makes "did picking help?" visible at a glance.
 - On the week-detail page (`renderArchiveWeek`):
@@ -161,31 +161,31 @@ Augment the existing `weekStats` function and its renderers in `prototype/app.js
 
 - Sidebar nav: rename **Board → Picked** (or **My Picks**), **Archive → Overview**. Empty-state copy on Picked should tell a new operator: "Open Overview to find cases to pick — they'll show up here."
 - Drop the language of "queue" from card buttons, banners, watchlists.
-- Update `prototype/index.html` and `prototype/standalone.html` titles/headers to match.
+- Update `frontend/index.html` and `frontend/standalone.html` titles/headers to match.
 
 ### 10. Release-note + bundle ritual (per `CLAUDE.md`) — _recurring process item, applied per change as the reframe shipped_
 
 - Add a single dated entry under **Changed** in `docs/RELEASE_NOTES.md` summarizing the reframe (overview/picked/analytics + removed CC-duplicating actions).
-- Run `node prototype/bundle.mjs` to regenerate `standalone.html`. The PostToolUse hook does this automatically on edit, but verify before commit.
+- Run `node frontend/bundle.mjs` to regenerate `standalone.html`. The PostToolUse hook does this automatically on edit, but verify before commit.
 - ~~Develop on branch `claude/vigilant-knuth-slap60`.~~ — _unapplicable: that specific branch name is from the original plan run; the reframe has since landed on other branches_
 
 ## Files to modify (most of the work concentrates here)
 
-- `prototype/app.js` — rewrite `renderCasesView` for the two-zone layout (aggregate Route Board strip on top, list + detail split 1:2 below). Add `renderRouteBoardStrip` (aggregate) and `renderRouteBoardSingle` (detail mirror). Add 7-item Track Status picker + Clear with preconditions. Delete the CC-shaped action handlers, drag-between-columns, two-band split, and validTransitions / state-machine guards. Add scheduled-handoff computation and dept→role lookup. Add archive renderers' picked-vs-unpicked split, `weekStats`. Auto-refresh toolbar + interval loop. `agent-v1` (un)packing for `trackStatus`. `+ New case` stays.
+- `frontend/app.js` — rewrite `renderCasesView` for the two-zone layout (aggregate Route Board strip on top, list + detail split 1:2 below). Add `renderRouteBoardStrip` (aggregate) and `renderRouteBoardSingle` (detail mirror). Add 7-item Track Status picker + Clear with preconditions. Delete the CC-shaped action handlers, drag-between-columns, two-band split, and validTransitions / state-machine guards. Add scheduled-handoff computation and dept→role lookup. Add archive renderers' picked-vs-unpicked split, `weekStats`. Auto-refresh toolbar + interval loop. `agent-v1` (un)packing for `trackStatus`. `+ New case` stays.
 - `local/serve.py`, `backend/api.py` — accept `?ids=` on `GET /api/cases` for scoped refresh of picked cases. — ⬜ **open** (only single `id=` is accepted today; `?ids=` multi-case scope is part of the still-open section 5)
-- `prototype/index.html` — sidebar nav labels, page title.
-- `prototype/styles.css` — Picked workspace two-zone grid (top strip / bottom 1:2 split). Three-station Route Board styling (stations, dot, arrow, travelling-dot keyframe animation, eyeball, amber / red action-due treatment, ✓ delivered marker). Track Status pill colours. Histogram bars, picked-vs-unpicked split rows.
-- `prototype/tour.js` — refresh the product tour steps so they describe the new flow ("browse Overview → Pick → analyze in Picked view").
+- `frontend/index.html` — sidebar nav labels, page title.
+- `frontend/styles.css` — Picked workspace two-zone grid (top strip / bottom 1:2 split). Three-station Route Board styling (stations, dot, arrow, travelling-dot keyframe animation, eyeball, amber / red action-due treatment, ✓ delivered marker). Track Status pill colours. Histogram bars, picked-vs-unpicked split rows.
+- `frontend/tour.js` — refresh the product tour steps so they describe the new flow ("browse Overview → Pick → analyze in Picked view").
 - `docs/RELEASE_NOTES.md` — one entry under today.
-- `prototype/standalone.html` — regenerated by `node prototype/bundle.mjs`.
+- `frontend/standalone.html` — regenerated by `node frontend/bundle.mjs`.
 
-- `prototype/owners.js` — add a `route_role` field (`Core Team` / `HQ` / `User`) on each Core Team desk and HQ Product Team row; surface it as a small dropdown in the Owners editor.
+- `frontend/owners.js` — add a `route_role` field (`Core Team` / `HQ` / `User`) on each Core Team desk and HQ Product Team row; surface it as a small dropdown in the Owners editor.
 
 No changes to `data.js`, `shifts.js`. The only backend tweak is the `?ids=` query support for scoped refresh.
 
 ## Verification
 
-1. `node prototype/tests/run.cjs` — must pass (Stop hook also runs this). Update any tests that asserted on removed actions (status transitions, create case) to reflect the new behavior.
+1. `node frontend/tests/run.cjs` — must pass (Stop hook also runs this). Update any tests that asserted on removed actions (status transitions, create case) to reflect the new behavior.
 2. `cd prototype && python3 -m http.server 8000` and walk through:
    - Land on `#/cases` (Picked) by default; if you have no picks yet, the empty-state copy directs you to **Overview**. No CC status columns appear anywhere — confirm the old kanban grid is gone.
    - Open `#/archive`; see the week index with picked-vs-unpicked split stats. Open a week; verify the table lists every CC case with a Pick button; pick 3 cases.
@@ -202,5 +202,5 @@ No changes to `data.js`, `shifts.js`. The only backend tweak is the `?ids=` quer
    - Manually clear Track Status on a delivered case via **Clear Track Status** on the detail panel. The lane collapses back to a single dot at the current station. Per the team rule, only clear once the **work is done** *and* the **handover note for the next shift** is written; the Clear action surfaces a soft confirmation when either pre-condition isn't met (for *Case Closed*: CC status is closed/cancelled; for the scheduled types: CC assignee matches the route's *To* station; others: operator judgment).
    - Refresh the page; picks, handover, reminder survive (operator layer in localStorage).
    - Switch operator via the sidebar; confirm picked state behaves as expected for the chosen operator model (today picks are global per the existing implementation — call out in the release note if we keep that vs make picks per-operator).
-3. Reopen `prototype/standalone.html` via `file://` after `node prototype/bundle.mjs`; the same walkthrough should work without a server.
+3. Reopen `frontend/standalone.html` via `file://` after `node frontend/bundle.mjs`; the same walkthrough should work without a server.
 4. With `local/serve.py` running and `local/casecenter.py` wired to a real account, run a live refresh and confirm picks/handovers/reminders survive the merge (the existing `CC_OWNED_FIELDS` overlay already guarantees this — verify, don't re-engineer).

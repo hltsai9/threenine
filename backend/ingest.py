@@ -6,10 +6,10 @@ runs as a scheduled Kubernetes CronJob; for local work run it by hand.
     # Real ingest (needs Case Center creds — see local/casecenter.py / secrets)
     python -m backend.ingest --hours 6
 
-    # Demo seed: load prototype/data.js into the DB, no Case Center access needed
+    # Demo seed: load frontend/data.js into the DB, no Case Center access needed
     python -m backend.ingest --seed-from-data-js
 
-    # Seed board config: load prototype/shifts.js + owners.js into the config table
+    # Seed board config: load frontend/shifts.js + owners.js into the config table
     python -m backend.ingest --seed-config
 
 The real path reuses the existing adapter in local/casecenter.py unchanged: it
@@ -55,8 +55,8 @@ def ingest_live(hours=None, to_hours=None, case_id=None):
 
 
 def seed_from_data_js(path=None):
-    """Load prototype/data.js CASES into the DB (full payloads). For demos only."""
-    data_js = path or os.path.join(REPO_ROOT, "prototype", "data.js")
+    """Load frontend/data.js CASES into the DB (full payloads). For demos only."""
+    data_js = path or os.path.join(REPO_ROOT, "frontend", "data.js")
     extractor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_extract.cjs")
     out = subprocess.run(
         ["node", extractor, data_js], capture_output=True, text=True, check=True
@@ -71,14 +71,14 @@ def seed_from_data_js(path=None):
 
 
 def seed_config_from_js(shifts_path=None, owners_path=None):
-    """Load prototype/shifts.js + owners.js into the config table (keys 'shifts' and 'owners').
+    """Load frontend/shifts.js + owners.js into the config table (keys 'shifts' and 'owners').
     Builds the same payload shapes the SPA POSTs to /api/config, so the board reads the bundled
     roster + owners from the DB instead of the JS fallback. Returns the keys written."""
     extractor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_config_extract.cjs")
     argv = ["node", extractor]
     if shifts_path or owners_path:
-        argv += [shifts_path or os.path.join(REPO_ROOT, "prototype", "shifts.js"),
-                 owners_path or os.path.join(REPO_ROOT, "prototype", "owners.js")]
+        argv += [shifts_path or os.path.join(REPO_ROOT, "frontend", "shifts.js"),
+                 owners_path or os.path.join(REPO_ROOT, "frontend", "owners.js")]
     out = subprocess.run(argv, capture_output=True, text=True, check=True).stdout
     cfg = json.loads(out)
     written = []
@@ -98,9 +98,9 @@ def main(argv=None):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser(description="Ingest cases into the Case Tracker DB.")
     p.add_argument("--seed-from-data-js", nargs="?", const=True, default=False,
-                   metavar="PATH", help="Demo: load prototype/data.js (or PATH) instead of Case Center.")
+                   metavar="PATH", help="Demo: load frontend/data.js (or PATH) instead of Case Center.")
     p.add_argument("--seed-config", action="store_true",
-                   help="Load prototype/shifts.js + owners.js into the config table (shifts/owners). Can combine with --seed-from-data-js.")
+                   help="Load frontend/shifts.js + owners.js into the config table (shifts/owners). Can combine with --seed-from-data-js.")
     p.add_argument("--hours", type=float, default=None, help="Older bound of the Case Center query window (hours ago).")
     p.add_argument("--to-hours", type=float, default=None, help="Newer bound (hours ago); forms a created-between band with --hours.")
     p.add_argument("--id", default=None, help="Fetch a single case id instead of a window.")

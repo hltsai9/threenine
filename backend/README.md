@@ -21,7 +21,7 @@ Case Center ──(ingest, holds creds)──▶ Database ◀──(read/write, 
 ```bash
 pip install -r backend/requirements.txt
 
-# 1. Load the seed cases from prototype/data.js into a local SQLite DB
+# 1. Load the seed cases from frontend/data.js into a local SQLite DB
 python -m backend.ingest --seed-from-data-js
 
 # 2. Serve the API + the static SPA from the same origin
@@ -53,10 +53,10 @@ kubectl apply -f deploy/k8s/                 # API Deployment+Service, ingest Cr
 ```
 
 The Ingress serves `/` (SPA) and `/api/*` (API) from one host — same origin, no CORS,
-no mixed content — so `prototype/config.js` keeps `API_BASE = ''`.
+no mixed content — so `frontend/config.js` keeps `API_BASE = ''`.
 
 For a multi-operator deployment, also set **`window.API_MODE = 'server'`** in
-`prototype/config.js`. That makes the SPA treat the DB API as the source of truth: it loads
+`frontend/config.js`. That makes the SPA treat the DB API as the source of truth: it loads
 all cases — *including* the shared operator layer (picks / Track Status / handover / reminder)
 — from `/api/cases` on boot, stops overlaying each browser's `localStorage`, and round-trips
 every edit to `POST /api/save`. With the default `API_MODE = ''` the operator layer stays
@@ -92,4 +92,4 @@ health checks at **`/healthz`** (unauthenticated).
 | `ingest.py` | Case Center → DB (+ `--seed-from-data-js` demo mode) |
 | `api.py` | FastAPI read/write API (+ optional static SPA) |
 | `alembic/` | migrations (`alembic upgrade head`) |
-| `seed_extract.cjs` | Node helper that reads `prototype/data.js` for the demo seed |
+| `seed_extract.cjs` | Node helper that reads `frontend/data.js` for the demo seed |

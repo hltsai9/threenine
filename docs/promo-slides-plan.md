@@ -22,7 +22,7 @@ was written:
 - **Ownership timeline + separated FIT/HQ time** on the case detail (see *when* a case sat
   with FIT vs HQ vs requester).
 - **In-app Shift editor** on the Shifts page (add/edit operators, foolproof operator
-  delete, generates the `shifts.js` snippet); roster split into `prototype/shifts.js`.
+  delete, generates the `shifts.js` snippet); roster split into `frontend/shifts.js`.
 - **Live sidebar clock** (current date/time).
 
 This pushes the deck to **~13–14 slides**. — ✅ **done**: built deck has 14 slides (`unzip -l slides/Case-Tracker-Overview.pptx` lists slide1…slide14).
@@ -35,7 +35,7 @@ screenshots, and the built `.pptx`. — ✅ **done**: `slides/` holds `build-dec
 - [ ] ~~Playwright/Chromium already at `/opt/node22/lib/node_modules/playwright` — launch with `chromium.launch({ args: ['--no-sandbox'] })`.~~ — _unapplicable: Playwright now installed locally (`npm install --prefix slides playwright`); the `--no-sandbox` launch flag is still used._
 - [ ] ~~LibreOffice (`/usr/bin/soffice`) for the pptx→pdf verification render.~~ — _unapplicable: soffice was not available in the build sandbox; PDF verification was dropped (README says "Save As PDF" instead)._
 
-### Brand (from `prototype/styles.css` `:root`)
+### Brand (from `frontend/styles.css` `:root`)
 Accent `#2563eb`, good `#059669`, danger `#dc2626`, warn `#d97706`, text `#111827`,
 muted `#6b7280`, border `#e5e7eb`, panel `#ffffff`, sidebar/charcoal `#1f2937`; system
 sans-serif. Accent blue + charcoal as the deck's primary palette. Holder colors for any
@@ -45,7 +45,7 @@ line indigo `#c7d2fe` (match `.tl-*` in styles.css).
 ### Files to create (all new, on the branch)
 
 1. **`slides/capture-screenshots.cjs`** — Playwright script: load
-   `prototype/standalone.html`, suppress the tour via
+   `frontend/standalone.html`, suppress the tour via
    `addInitScript(() => localStorage.setItem('case-tracker-tour-seen-v1','1'))`, 1500×950
    viewport, navigate each hash route and write PNGs to `slides/assets/`: — ✅ **done** (script exists; details evolved — tour key bumped to `…-tour-seen-v2`, 2× deviceScaleFactor added):
    - [x] `board.png` (`#/cases`, full board, incl. sidebar clock) — captured as a clip of the Picked workspace + Route Board
@@ -106,7 +106,7 @@ line indigo `#c7d2fe` (match `.tl-*` in styles.css).
   `--no-sandbox`, tour-suppress init script, element `.screenshot()` for crops). — ✅ **done** (pattern reused; module path is now local rather than global).
 - Copy from the (updated) `README.md` feature sections, `docs/URD.md` §1–2 (problem/goals),
   and `local/README.md` (live-data flow). No invented product claims. — ✅ **done**.
-- `prototype/standalone.html` is the screenshot target (no dev server needed). — ✅ **done** (`capture-screenshots.cjs` loads `file://…/prototype/standalone.html`).
+- `frontend/standalone.html` is the screenshot target (no dev server needed). — ✅ **done** (`capture-screenshots.cjs` loads `file://…/frontend/standalone.html`).
 
 ## Verification
 
