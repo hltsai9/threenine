@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Fixed (validate URL-hash route params — DOM-XSS hardening)
+
+- `currentRoute()` now runs every `location.hash`-derived segment (case id, week id, shift name)
+  through the existing `safeId()` boundary sanitizer (strips `[<>"'\`]`, lossless for real ids)
+  before it becomes a route param that `render()` builds into `innerHTML`. This closes the one id
+  input boundary — the URL hash — that wasn't yet sanitized (case ids from the API already are, via
+  `sanitizeCaseIdentity`), and clears the scanner's two DOM-XSS findings on `render()`. Added a
+  `safeDecode()` guard so a malformed `%`-escape in the hash can't throw. No behavior change for
+  valid links; a hash like `#/cases/<img onerror=…>` now resolves to the escaped "not found" view.
+
 ### Added (frontend package.json + lockfile for npm-based CI)
 
 - Added a minimal, **zero-dependency** `frontend/package.json` (scripts: `test` → `node

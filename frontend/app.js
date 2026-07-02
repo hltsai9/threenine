@@ -998,14 +998,19 @@ function navigate(hash) {
   else render();
 }
 
+// `location.hash` is attacker-controllable input: it flows into route params that later build HTML
+// assigned to innerHTML (see render()). Run every hash-derived segment through safeId() here — the
+// same boundary sanitizer used for case ids (strips [<>"'`], lossless for real ids/weeks/shifts) —
+// so no URL-supplied markup can reach the DOM. safeDecode guards against a malformed %-escape.
+function safeDecode(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
 function currentRoute() {
   const h = location.hash || '#/cases';
-  if (h.startsWith('#/cases/')) return { name: 'detail', id: h.slice('#/cases/'.length) };
+  if (h.startsWith('#/cases/')) return { name: 'detail', id: safeId(h.slice('#/cases/'.length)) };
   if (h.startsWith('#/cases')) return { name: 'cases' };
   if (h === '#/archive/bin') return { name: 'recycleBin' };
-  if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: h.slice('#/archive/'.length) };
+  if (h.startsWith('#/archive/')) return { name: 'archiveWeek', id: safeId(h.slice('#/archive/'.length)) };
   if (h.startsWith('#/archive')) return { name: 'archive' };
-  if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: decodeURIComponent(h.slice('#/shifts/'.length)) };
+  if (h.startsWith('#/shifts/')) return { name: 'shiftDetail', shift: safeId(safeDecode(h.slice('#/shifts/'.length))) };
   if (h.startsWith('#/shifts')) return { name: 'shifts' };
   if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
