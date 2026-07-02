@@ -1,0 +1,10 @@
+{
+  "name": "commuground-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CommuGround Case Tracker — zero-dependency vanilla-JS SPA. package.json exists only to give an npm-based CI template an entry point (no runtime dependencies).",
+  "scripts": {
+    "test": "node tests/run.cjs",
+    "build": "node bundle.mjs"
+  }
+}

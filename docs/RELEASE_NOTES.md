@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-06-26
 
+### Added (frontend package.json + lockfile for npm-based CI)
+
+- Added a minimal, **zero-dependency** `frontend/package.json` (scripts: `test` → `node
+  tests/run.cjs`, `build` → `node bundle.mjs`) plus an npm-generated `frontend/package-lock.json`, so
+  the app plugs into an npm-based CI template (e.g. Azure DevOps `npm ci` / `npm test`). Verified:
+  `npm ci` (exit 0), `npm test` (148 passed), `npm run build` regenerates `standalone.html`. Nothing
+  is installed — the frontend stays dependency-free; these files only give npm an entry point.
+  Added a general `node_modules/` ignore rule.
+
 ### Changed (production hardening of the Kubernetes manifests)
 
 - **Fixed a rollout-breaking probe:** the API readiness probe hit `/api/cases`, which returns 401

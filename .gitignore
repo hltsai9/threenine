@@ -25,5 +25,8 @@ casetracker.db
 # OS / editor cruft
 .DS_Store
 
+# npm install output — never commit node_modules (the frontend has zero runtime deps;
+# package.json/package-lock.json exist only to drive npm-based CI).
+node_modules/
 # Slide-deck build deps (run: npm install --prefix slides pptxgenjs)
 slides/node_modules/
