@@ -1,0 +1,234 @@
+# Azure DevOps pipeline: Case Tracker → company Kubernetes production.
+#
+#   CI (every push/PR)        Build (main only)                Deploy (main only)
+#   ├─ frontend tests         ├─ build api + ingest images     └─ kustomize-pin image tags,
+#   ├─ bundle freshness       ├─ Trivy IMAGE scan (gate)          apply to AKS, wait for
+#   ├─ Python sanity/Bandit   ├─ push to ACR                      rollout (approval-gated
+#   └─ Trivy CODE scan (gate) └─ publish SBOMs                    via the ADO Environment)
+#
+# One-time org setup (Project settings → Service connections / Pipelines → Environments):
+#   1. Docker Registry service connection to your ACR   → variable `acrServiceConnection`
+#   2. Kubernetes service connection to the prod cluster/namespace → `k8sServiceConnection`
+#   3. An Environment named `case-tracker-prod` with your approval checks.
+#   4. Create the K8s Secrets out-of-band (see deploy/k8s/secrets.example.yaml) —
+#      the pipeline never touches credentials.
+# Prefer moving the variables below into a variable group (Library) for per-env overrides.
+
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include: [backend, frontend, local, deploy, azure-pipelines.yml]
+
+pr:
+  branches:
+    include: [main]
+
+variables:
+  # ---- Adjust to your org ----
+  containerRegistry: 'YOURACR.azurecr.io'          # ACR login server
+  acrServiceConnection: 'acr-case-tracker'          # Docker Registry service connection name
+  k8sServiceConnection: 'aks-case-tracker-prod'     # Kubernetes service connection name
+  k8sNamespace: 'case-tracker'
+  # ---- Derived ----
+  imageTag: '$(Build.BuildId)-$(Build.SourceVersion)'   # immutable, traceable tag (never :latest)
+  apiImage: '$(containerRegistry)/case-tracker-api'
+  ingestImage: '$(containerRegistry)/case-tracker-ingest'
+  trivyVersion: '0.58.2'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: CI
+    displayName: Test & code scan
+    jobs:
+      - job: tests
+        displayName: Frontend tests + bundle freshness + Python sanity
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - script: node frontend/tests/run.cjs
+            displayName: Frontend test suite (zero-dependency)
+
+          # standalone.html is a build artifact committed to the repo — fail if a
+          # frontend edit was pushed without regenerating it.
+          - script: |
+              node frontend/bundle.mjs
+              git diff --exit-code -- frontend/standalone.html \
+                || { echo '##vso[task.logissue type=error]standalone.html is stale — run: node frontend/bundle.mjs'; exit 1; }
+            displayName: Bundle freshness check
+
+          # Privacy gate: a live-capture data.js (real case data) must never reach the image —
+          # the api image COPYs frontend/ in, and Pages publishes it. See CLAUDE.md/local/README.md.
+          - script: |
+              if grep -q 'window.CASES_LIVE_CAPTURE = true' frontend/data.js; then
+                echo '##vso[task.logissue type=error]frontend/data.js is a LIVE CAPTURE (real cases) — restore the demo seed before building.'
+                exit 1
+              fi
+            displayName: Privacy gate — no live-capture data.js
+
+          - script: |
+              python3 -m pip install --quiet -r backend/requirements.txt
+              python3 -m compileall -q backend local
+            displayName: Backend deps install + compile check
+
+          # Python SAST. -ll = only MEDIUM and above fail the build.
+          - script: |
+              python3 -m pip install --quiet bandit
+              python3 -m bandit -r backend local -ll
+            displayName: Bandit (Python SAST)
+
+      - job: code_scan
+        displayName: Trivy code scan (vulns, secrets, IaC misconfig)
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - script: |
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                | sh -s -- -b "$(Agent.TempDirectory)/bin" "v$(trivyVersion)"
+              echo "##vso[task.prependpath]$(Agent.TempDirectory)/bin"
+            displayName: Install Trivy
+
+          # Dependency vulns (backend/requirements.txt, package-lock.json) + committed secrets.
+          # --ignore-unfixed: don't fail on CVEs with no released fix yet.
+          - script: >
+              trivy fs --scanners vuln,secret
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+              --skip-dirs slides --skip-dirs design_handoff_commuground
+              .
+            displayName: 'Trivy fs: dependency vulns + secret scan (gate)'
+
+          # Dockerfile + Kubernetes manifest misconfiguration scan.
+          - script: >
+              trivy config --severity HIGH,CRITICAL --exit-code 1 deploy
+            displayName: 'Trivy config: Dockerfiles + K8s manifests (gate)'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Build
+    displayName: Build, image scan & push
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: build_scan_push
+        displayName: Build images → Trivy image scan → push to ACR
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - script: |
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                | sh -s -- -b "$(Agent.TempDirectory)/bin" "v$(trivyVersion)"
+              echo "##vso[task.prependpath]$(Agent.TempDirectory)/bin"
+            displayName: Install Trivy
+
+          # Build BOTH images locally first — nothing is pushed until both pass the scan.
+          - task: Docker@2
+            displayName: Build api image
+            inputs:
+              command: build
+              containerRegistry: $(acrServiceConnection)
+              repository: case-tracker-api
+              dockerfile: deploy/Dockerfile.api
+              buildContext: .
+              tags: $(imageTag)
+
+          - task: Docker@2
+            displayName: Build ingest image
+            inputs:
+              command: build
+              containerRegistry: $(acrServiceConnection)
+              repository: case-tracker-ingest
+              dockerfile: deploy/Dockerfile.ingest
+              buildContext: .
+              tags: $(imageTag)
+
+          # Image scan gate: OS packages + Python deps inside the image.
+          - script: >
+              trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+              $(apiImage):$(imageTag)
+            displayName: 'Trivy image scan: api (gate)'
+
+          - script: >
+              trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+              $(ingestImage):$(imageTag)
+            displayName: 'Trivy image scan: ingest (gate)'
+
+          # SBOMs for supply-chain audit / Defender for Cloud ingestion.
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)/sbom
+              trivy image --format cyclonedx --output $(Build.ArtifactStagingDirectory)/sbom/api.cdx.json    $(apiImage):$(imageTag)
+              trivy image --format cyclonedx --output $(Build.ArtifactStagingDirectory)/sbom/ingest.cdx.json $(ingestImage):$(imageTag)
+            displayName: Generate SBOMs (CycloneDX)
+
+          - publish: $(Build.ArtifactStagingDirectory)/sbom
+            artifact: sbom
+            displayName: Publish SBOM artifact
+
+          - task: Docker@2
+            displayName: Push api image
+            inputs:
+              command: push
+              containerRegistry: $(acrServiceConnection)
+              repository: case-tracker-api
+              tags: $(imageTag)
+
+          - task: Docker@2
+            displayName: Push ingest image
+            inputs:
+              command: push
+              containerRegistry: $(acrServiceConnection)
+              repository: case-tracker-ingest
+              tags: $(imageTag)
+
+  # ────────────────────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: Deploy to Kubernetes (prod)
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: deploy_prod
+        displayName: Apply manifests to AKS
+        environment: case-tracker-prod   # attach approval checks to this Environment in ADO
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                # Pin the scanned image digests into the manifests (replaces the
+                # :latest placeholders — see deploy/k8s/kustomization.yaml).
+                # kustomize + kubectl are preinstalled on Microsoft-hosted agents.
+                - script: |
+                    set -euo pipefail
+                    cd deploy/k8s
+                    kustomize edit set image \
+                      case-tracker-api=$(apiImage):$(imageTag) \
+                      case-tracker-ingest=$(ingestImage):$(imageTag)
+                    kustomize build . -o $(Build.ArtifactStagingDirectory)/manifests.yaml
+                  displayName: Render manifests (kustomize, pinned tags)
+
+                - task: KubernetesManifest@1
+                  displayName: kubectl apply + wait for rollout
+                  inputs:
+                    action: deploy
+                    connectionType: kubernetesServiceConnection
+                    kubernetesServiceConnection: $(k8sServiceConnection)
+                    namespace: $(k8sNamespace)
+                    manifests: $(Build.ArtifactStagingDirectory)/manifests.yaml
+
+                # Post-deploy smoke check: /healthz must answer from inside the cluster.
+                - task: Kubernetes@1
+                  displayName: Smoke check /healthz
+                  inputs:
+                    connectionType: Kubernetes Service Connection
+                    kubernetesServiceEndpoint: $(k8sServiceConnection)
+                    namespace: $(k8sNamespace)
+                    command: exec
+                    arguments: >-
+                      deploy/case-tracker-api -- python -c
+                      "import urllib.request as u; print(u.urlopen('http://localhost:8000/healthz', timeout=5).read())"

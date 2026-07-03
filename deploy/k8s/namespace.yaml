@@ -1,0 +1,10 @@
+# Dedicated namespace for the Case Tracker stack — nothing runs in `default`.
+# Pod Security Admission labels enforce the `restricted` profile cluster-side, matching
+# the securityContexts the workloads already declare (non-root, seccomp, no caps).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: case-tracker
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted

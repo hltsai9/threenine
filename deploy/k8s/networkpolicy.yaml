@@ -1,0 +1,35 @@
+# Network policies for the case-tracker namespace.
+#
+# 1. Default-deny INBOUND for every pod (ingest / seed jobs need no inbound at all).
+# 2. Explicitly re-allow inbound to the API pods on 8000 — by default from any namespace,
+#    so it works with whatever ingress controller the cluster runs. TIGHTEN the `from`
+#    clause to your ingress controller's namespace once you know it, e.g.:
+#      from:
+#        - namespaceSelector:
+#            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+#
+# Egress is left open on purpose: the API needs the DB, ingest needs the DB + Case Center,
+# and both need DNS — lock egress down per-cluster once those endpoints are known.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: case-tracker
+spec:
+  podSelector: {}          # every pod in the namespace
+  policyTypes: [Ingress]   # no ingress rules listed → all inbound traffic denied
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-inbound
+  namespace: case-tracker
+spec:
+  podSelector:
+    matchLabels: { app: case-tracker-api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: {}   # any namespace — tighten to the ingress controller's (see header)
+      ports:
+        - { protocol: TCP, port: 8000 }

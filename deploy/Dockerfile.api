@@ -1,7 +1,11 @@
 # API service image: FastAPI (uvicorn) serving /api/* and the static SPA same-origin.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
+
+# Pull in Debian security patches released since the base image was cut — keeps the
+# image scan (Trivy/Defender) clean on fixed OS CVEs. Rebuild regularly to stay patched.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 # Install deps first for layer caching. Uncomment a driver in requirements.txt
 # (psycopg / PyMySQL) to match your production DATABASE_URL.
@@ -12,14 +16,19 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ backend/
 COPY frontend/ frontend/
 
-# Run as a non-root user (defense in depth; pairs with the runAsNonRoot securityContext).
-RUN useradd -u 1000 -m app
-USER 1000
+# Run as a non-root, high-UID user (defense in depth; matches runAsUser in the K8s manifests).
+RUN useradd -u 10001 -m app
+USER 10001
 
 ENV SERVE_STATIC=1 \
     AUTO_CREATE=0 \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
+
+# Container-level health check (stdlib only — no curl in the image). Kubernetes uses its own
+# /healthz probes and ignores this, but it covers plain-docker runs and image-scan policies.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+  CMD ["python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
 
 # Production runs migrations out-of-band (initContainer/Job) and disables AUTO_CREATE.
 CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -4,6 +4,11 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: case-tracker-ingest
+  namespace: case-tracker
+  annotations:
+    # Accepted deviations, documented for the IaC scanner:
+    checkov.io/skip1: CKV_K8S_35=DB URL + Case Center creds are consumed as env vars by design (12-factor app)
+    checkov.io/skip2: CKV_K8S_43=the pipeline pins an immutable, image-scanned tag via kustomize
 spec:
   schedule: "*/5 * * * *"            # every 5 minutes — tune to taste
   concurrencyPolicy: Forbid          # don't overlap runs
@@ -17,16 +22,20 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          # Ingest never talks to the Kubernetes API — don't mount a token it could leak.
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            fsGroup: 1000
+            runAsUser: 10001    # high UID (matches the image's `app` user)
+            runAsGroup: 10001
+            fsGroup: 10001
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: ingest
-              image: case-tracker-ingest:latest   # Pin to an immutable tag/digest in production.
-              imagePullPolicy: IfNotPresent
+              # Placeholder tag — the Azure DevOps deploy stage pins the real registry +
+              # immutable tag via kustomize (see kustomization.yaml) after the image scan.
+              image: case-tracker-ingest:set-by-pipeline
+              imagePullPolicy: Always
               args: ["python", "-m", "backend.ingest", "--hours", "6"]
               envFrom:
                 - secretRef: { name: case-tracker-db }       # DATABASE_URL

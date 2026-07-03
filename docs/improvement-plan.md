@@ -24,10 +24,19 @@ commit. Two recommendations were **intentionally deferred** because they are lar
 maintainability/perf-oriented refactors with real regression risk and no test coverage of
 the rendering layer to catch breakage:
 
-- [ ] **Split `frontend/app.js` (~4.8k lines) into modules** (state / router / per-view
-  renderers / live-data / persistence). Keep the zero-dependency design (plain `<script>`s
-  or ES modules) and update `bundle.mjs` accordingly. Blocked on first adding render-layer
-  test coverage so the split can be verified.
+- [ ] **Split `frontend/app.js` (now ~6.1k lines, ~263 top-level functions) into modules.**
+  Keep the zero-dependency design: extract to additional plain `<script>` files loaded before
+  app.js (same shared global scope — no ESM churn), updating both `index.html` script order and
+  `bundle.mjs`'s file list. Seam map from the 2026-07-03 structural review, in extraction order
+  (lowest coupling first):
+  1. `util.js` — `escapeHtml`/`safeId`/`safeUrl` + time/tz formatting (~app.js:684–912; pure, used everywhere)
+  2. `casecenter-map.js` — raw CC record → board case mapping + `CC_*` maps (~app.js:1–234)
+  3. `api.js` — auth/login gate + server persistence (~app.js:252–390, 5719–5896)
+  4. per-view files: diagrams (~4290–4632), archive (~2854–3138), recycle bin (~3138–3273),
+     shifts/rota editor (~3273–3675, 3970–4156), owners editor (~3675–3970)
+  5. leave a `core` last: `STATE`, routing/`render()`, `bindHandlers`, boot — the high-coupling hub.
+  Also decompose `handlePrompt` (~app.js:4732–5198, ~466 lines) into per-prompt handlers while
+  in there. Blocked on first adding render-layer test coverage so the split can be verified.
 - [ ] **Event delegation for the render loop.** Replace the ~30 `querySelectorAll +
   addEventListener` rebinds in `bindHandlers()` with a single delegated listener on a stable
   root (`#main`) keyed off `data-action`, and move high-frequency interactions (card select,

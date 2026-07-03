@@ -3,29 +3,38 @@
 # once after the schema exists (migrations / first API start). Alternatively, sign in and use the
 # Save buttons on the Shifts / Owners pages — same destination, no Job needed.
 #
-#   kubectl apply -f seed-config-job.yaml
-#   kubectl wait --for=condition=complete job/case-tracker-seed-config --timeout=120s
-#   kubectl delete job case-tracker-seed-config        # clean up when done
+#   # Pin the image to the tag your pipeline last pushed, then:
+#   kubectl apply -n case-tracker -f seed-config-job.yaml
+#   kubectl wait -n case-tracker --for=condition=complete job/case-tracker-seed-config --timeout=120s
+#   kubectl delete -n case-tracker job case-tracker-seed-config        # clean up when done
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: case-tracker-seed-config
+  namespace: case-tracker
+  annotations:
+    # Accepted deviations, documented for the IaC scanner:
+    checkov.io/skip1: CKV_K8S_35=DATABASE_URL is consumed as an env var by design (12-factor app)
+    checkov.io/skip2: CKV_K8S_43=one-shot manual Job; pin the tag your pipeline last pushed
 spec:
   backoffLimit: 2
   ttlSecondsAfterFinished: 600      # auto-clean 10 min after completion
   template:
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: false   # never talks to the Kubernetes API
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        runAsUser: 10001    # high UID (matches the image's `app` user)
+        runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: seed-config
-          image: case-tracker-ingest:latest   # has Node + the bundled shifts.js/owners.js
-          imagePullPolicy: IfNotPresent
+          # Has Node + the bundled shifts.js/owners.js. Not managed by the pipeline (one-shot,
+          # applied by hand) — replace the tag with the one your pipeline last pushed.
+          image: case-tracker-ingest:set-by-pipeline
+          imagePullPolicy: Always
           args: ["python", "-m", "backend.ingest", "--seed-config", "--no-create"]
           envFrom:
             - secretRef: { name: case-tracker-db }   # DATABASE_URL (no Case Center creds needed)

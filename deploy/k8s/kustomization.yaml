@@ -1,0 +1,28 @@
+# Kustomize entrypoint used by the Azure DevOps deploy stage (azure-pipelines.yml).
+# The pipeline runs `kustomize edit set image ...` to replace the :latest placeholders
+# below with the immutable, Trivy-scanned tag it just pushed, then applies the render.
+#
+# Manual apply (pin your own tag first):
+#   cd deploy/k8s
+#   kustomize edit set image case-tracker-api=YOURACR.azurecr.io/case-tracker-api:TAG \
+#                            case-tracker-ingest=YOURACR.azurecr.io/case-tracker-ingest:TAG
+#   kubectl apply -k .
+#
+# NOT included (applied out-of-band, on purpose):
+#   - secrets.example.yaml   → real Secrets are created via kubectl/sealed-/external-secrets
+#   - seed-config-job.yaml   → optional one-shot seed Job, run once by hand (see README.md)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - networkpolicy.yaml
+  - api-deployment.yaml   # Deployment + Service + PodDisruptionBudget
+  - ingest-cronjob.yaml
+  - ingress.yaml
+
+images:
+  - name: case-tracker-api
+    newTag: set-by-pipeline   # overwritten by the pipeline (kustomize edit set image)
+  - name: case-tracker-ingest
+    newTag: set-by-pipeline   # overwritten by the pipeline

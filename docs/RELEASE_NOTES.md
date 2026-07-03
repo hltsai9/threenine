@@ -10,6 +10,43 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-03
 
+### Added (Azure DevOps CI/CD → company Kubernetes production)
+
+- **`azure-pipelines.yml`** (repo root): three-stage pipeline — CI (frontend tests,
+  `standalone.html` freshness check, a privacy gate that fails the build if `frontend/data.js`
+  is a live capture, Python compile check, Bandit SAST, Trivy code scan for dependency vulns +
+  committed secrets + Dockerfile/K8s misconfig — HIGH/CRITICAL block) → Build (both images
+  built, **Trivy image-scanned before any push**, CycloneDX SBOMs published, push to ACR) →
+  Deploy (kustomize pins the scanned immutable tag, `KubernetesManifest` apply + rollout wait,
+  in-cluster `/healthz` smoke check, gated by the `case-tracker-prod` ADO Environment approval).
+- **`deploy/k8s/kustomization.yaml`**: kustomize entrypoint the pipeline uses to replace the
+  image placeholders with the tag it just scanned/pushed — nothing deploys as `:latest`.
+- **`deploy/k8s/namespace.yaml`**: dedicated `case-tracker` namespace with Pod Security
+  Admission `restricted` labels; every resource now declares `namespace: case-tracker`.
+- **`deploy/k8s/networkpolicy.yaml`**: default-deny-ingress for all pods + an explicit
+  allow-inbound-8000 policy for the API pods (tighten `from` to the ingress controller's
+  namespace per cluster).
+
+### Changed (scan-driven hardening of the deploy stack)
+
+- **Dockerfiles**: base bumped `python:3.11-slim` → `python:3.12-slim` with an
+  `apt-get upgrade` patch layer (picks up fixed Debian CVEs so the image scan passes);
+  non-root user raised to high UID **10001** (matches `runAsUser` in the manifests);
+  `HEALTHCHECK` added (stdlib urllib probe on the api image, explicit `NONE` on the
+  batch ingest image).
+- **K8s manifests**: `automountServiceAccountToken: false` everywhere (nothing talks to the
+  K8s API), `imagePullPolicy: Always`, `runAsUser/Group/fsGroup` 1000 → 10001, image fields
+  changed from `:latest` to `…:set-by-pipeline` placeholders, and the two accepted scanner
+  deviations (secrets-as-env, tag-not-digest) skip-annotated with reasons. Verified clean:
+  `checkov -d deploy` 0 failed (was 29), Bandit 0 medium/high, `pip-audit` on
+  `backend/requirements.txt` 0 known CVEs.
+
+### Docs
+
+- `deploy/k8s/README.md` rewritten around the pipeline flow (manual build/apply kept as
+  fallback, now namespace- and kustomize-aware); `docs/improvement-plan.md` §0 app.js-split
+  item refreshed with the 2026-07-03 structural seam map (~6.1k lines, extraction order).
+
 ### Fixed (structurally sever the hash→innerHTML flow — DOM-XSS scanner findings)
 
 - The SAST scanner kept flagging `render()`'s two `main.innerHTML = renderX(route.id)` sinks

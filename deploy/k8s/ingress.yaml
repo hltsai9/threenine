@@ -4,6 +4,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: case-tracker
+  namespace: case-tracker
   annotations:
     # Adjust for your ingress controller / cert-manager setup.
     cert-manager.io/cluster-issuer: "internal-ca"

@@ -1,11 +1,14 @@
 # Ingestion image: pulls cases from Case Center into the DB. Runs as a CronJob.
 # Includes Node.js only because the optional --seed-from-data-js / --seed-config modes use it;
 # the real Case Center path (local/casecenter.py) is pure Python.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs \
+# `upgrade -y` pulls Debian security patches released since the base image was cut —
+# keeps the image scan (Trivy/Defender) clean on fixed OS CVEs. Rebuild regularly.
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt backend/requirements.txt
@@ -18,8 +21,13 @@ COPY frontend/data.js frontend/data.js
 COPY frontend/shifts.js frontend/shifts.js
 COPY frontend/owners.js frontend/owners.js
 
-RUN useradd -u 1000 -m app
-USER 1000
+# Non-root, high-UID user (matches runAsUser in the K8s manifests).
+RUN useradd -u 10001 -m app
+USER 10001
+
+# Batch job, not a server — there is no meaningful liveness endpoint to poll.
+# NONE declares that explicitly (and satisfies image-scan HEALTHCHECK policies).
+HEALTHCHECK NONE
 
 # CC creds (CASE_CENTER_API_KEY / CASE_CENTER_COOKIE) come from a K8s Secret at runtime.
 ENV AUTO_CREATE=0 \
