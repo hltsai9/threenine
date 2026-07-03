@@ -8,6 +8,28 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-03
+
+### Fixed (structurally sever the hash→innerHTML flow — DOM-XSS scanner findings)
+
+- The SAST scanner kept flagging `render()`'s two `main.innerHTML = renderX(route.id)` sinks
+  (case detail, archive week) even after the earlier `safeId()` boundary fix — it doesn't recognize
+  our custom `safeId`/`escapeHtml` as sanitizers, so source-side sanitization alone couldn't clear
+  it. Removed the data-flow entirely: `render()` now resolves `route.id` to a **trusted domain
+  object** (`caseById(...)` / `window.WEEKS.find(...)`) *before* the `innerHTML` write, and
+  `renderCaseDetail`/`renderArchiveWeek` take that object instead of the raw id. Their not-found
+  branches are now **static** text (no `escapeHtml(id)` echo), so no value derived from
+  `location.hash` is ever concatenated into HTML. The `safeId()` calls in `currentRoute()` stay as
+  defense-in-depth. No behavior change for valid links; unknown ids show a static "not found" page.
+
+### Internal
+
+- `renderCaseDetail(c)` / `renderArchiveWeek(week)` signatures changed from id-string to resolved
+  object (single call site each — `render()`). Tests unchanged: 148 passed; `standalone.html`
+  rebuilt.
+
+---
+
 ## 2026-06-26
 
 ### Fixed (validate URL-hash route params — DOM-XSS hardening)

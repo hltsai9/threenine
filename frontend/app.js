@@ -1061,9 +1061,12 @@ function render() {
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
   if (route.name === 'cases') main.innerHTML = renderCaseList();
-  else if (route.name === 'detail') main.innerHTML = renderCaseDetail(route.id);
+  // Resolve hash-derived route params to a trusted domain object *here*, so the render
+  // functions never receive (or reflect) the raw URL string. This keeps location.hash off the
+  // innerHTML data-flow path entirely — the hash reaches only these pure lookups as a key.
+  else if (route.name === 'detail') main.innerHTML = renderCaseDetail(caseById(route.id));
   else if (route.name === 'archive') main.innerHTML = renderArchiveIndex();
-  else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(route.id);
+  else if (route.name === 'archiveWeek') main.innerHTML = renderArchiveWeek(window.WEEKS.find(w => w.id === route.id));
   else if (route.name === 'recycleBin') main.innerHTML = renderRecycleBin();
   else if (route.name === 'shifts') main.innerHTML = renderShiftsIndex();
   else if (route.name === 'owners') main.innerHTML = renderOwnersPage();
@@ -2750,10 +2753,11 @@ function renderCaseDetailBody(c) {
   `;
 }
 
-function renderCaseDetail(id) {
-  const c = caseById(id);
+// Receives the already-resolved case object (looked up in render()), never the raw hash id —
+// so nothing derived from location.hash is concatenated into this HTML.
+function renderCaseDetail(c) {
   if (!c) {
-    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">No case with ID ${escapeHtml(id)}.</div></div></div>
+    return `<div class="page-header"><div><h1>Not found</h1><div class="subtitle">That case is no longer on the board.</div></div></div>
       <a class="btn" href="${escapeHtml(STATE.lastListRoute)}">← Back to ${escapeHtml(STATE.lastListLabel)}</a>`;
   }
   const actions = renderDetailActions(c);
@@ -3031,12 +3035,14 @@ function archiveTableData(weekId) {
 function archiveTableText(weekId) { const { headers, rows } = archiveTableData(weekId); return renderDelimited(headers, rows, '\t'); }
 function archiveTableHtml(weekId) { const { headers, rows } = archiveTableData(weekId); return renderHtmlTable(headers, rows); }
 
-function renderArchiveWeek(weekId) {
-  const week = window.WEEKS.find(w => w.id === weekId);
+// Receives the already-resolved week object (looked up in render()), never the raw hash id —
+// so nothing derived from location.hash is concatenated into this HTML.
+function renderArchiveWeek(week) {
   if (!week) {
-    return `<div class="page-header"><div><h1>Week not found</h1><div class="subtitle">No such week: ${escapeHtml(weekId)}</div></div></div>
+    return `<div class="page-header"><div><h1>Week not found</h1><div class="subtitle">That week is no longer in the archive.</div></div></div>
       <a class="btn" href="#/archive">← Back to archive</a>`;
   }
+  const weekId = week.id;
   const s = weekStats(weekId);
   const pickedOnly = !!STATE.archivePickedOnly;
   const weekHasAny = STATE.cases.some(c => !c.deletedAt && c.weekId === weekId);
