@@ -10,6 +10,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Changed (server mode never shows data.js cases; cases + roster load together after sign-in)
+
+- **No more seed cases in server mode:** `bootServerLoad()` now clears the bundled `data.js` seed
+  before the first render, so demo cases never flash behind the login gate or linger when the API
+  is down (the board stays empty with a warning instead of silently showing stale local data).
+- **Parallel load after sign-in, roster first:** accepting the access token now kicks off the
+  (bigger) `/api/cases` pull in the background and awaits only the small shifts/owners config —
+  the "Who are you?" operator picker appears as soon as the DB roster arrives, while the case
+  store keeps loading behind it (usually done by the time an operator is chosen).
+  `bootServerLoad()` reuses that in-flight fetch instead of pulling twice, and the no-gate path
+  (valid stored token / open API) starts cases + config together the same way. A
+  `__CONFIG_LOADED__` flag skips the duplicate config pull.
+
 ### Fixed (closed cases already stored with a stale open column could still be picked)
 
 - The earlier "terminal statuses win" mapping fix only applied when a case was (re-)mapped from a

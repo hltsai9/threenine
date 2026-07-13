@@ -379,9 +379,11 @@ function showLoginGate(message) {
         btn.disabled = true; errEl.hidden = true;
         if (!(await checkApiToken(token))) return fail('That token was rejected. Check it and try again.');
         setApiToken(token);
-        // Pull the shared shifts/owners config now that we hold the token, BEFORE the operator
-        // picker renders — so the "Who are you?" dropdown lists the roster saved in the database,
-        // not the bundled seed. (bootServerLoad's own call covers the no-gate path.)
+        // Kick off the (bigger) cases pull from the database in the background, and await only
+        // the small shifts/owners config — so the "Who are you?" picker shows the DB roster
+        // without waiting for the whole case store. bootServerLoad reuses the promise instead
+        // of fetching twice; the .then(render) covers a mid-session re-auth where nobody awaits.
+        window.__CASES_PROMISE__ = tryLoadLiveCases(true).then(ok => { render(); return ok; });
         await loadConfigFromServer();
         operatorStep();   // advance to "who are you?" instead of resolving immediately
       };
@@ -5895,6 +5897,8 @@ async function loadConfigFromServer() {
       if (key === 'shifts') applyShiftsConfig(payload); else applyOwnersConfig(payload);
     } catch (e) { /* keep the bundled seed */ }
   }
+  // Lets bootServerLoad skip a duplicate pull when the login gate already loaded the config.
+  window.__CONFIG_LOADED__ = true;
 }
 // Persist the shift roster/rota — to the DB (decoupled backend) or to shifts.js (serve.py).
 function persistRoster() {
@@ -6053,25 +6057,35 @@ function enterLiveMode() {
 // the full store (cases + shared operator layer) and re-render. If the API is unreachable we
 // fall back to whatever seed/local state we have, so the board still loads.
 async function bootServerLoad() {
+  // Server mode: the database is the sole source of cases — drop the bundled data.js seed so it
+  // never flashes behind the login gate (or lingers on the board if the API turns out to be down).
+  STATE.cases = [];
   render();
   // Sign in first if the API is gated (no-op when it's open), then expose Sign out.
   await ensureAuthed();
   setupSignOut();
   showLiveLoading();
-  let ok = await tryLoadLiveCases(true);
-  // A token can be rejected after boot (rotated/expired); re-gate once and retry.
+  // The login gate already started the cases pull (in parallel with the roster load) — reuse it.
+  // The no-gate path (valid stored token / open API) starts both here, cases + config together,
+  // awaiting the small config first so the sidebar/roster is right as soon as possible.
+  let casesPromise = window.__CASES_PROMISE__ || tryLoadLiveCases(true);
+  window.__CASES_PROMISE__ = null;
+  // Pull the shared shifts + owners config (decoupled backend only) unless the gate already did.
+  // Safe no-op elsewhere: a 404 / unconfigured key / unreachable API keeps the bundled seed.
+  if (!window.__CONFIG_LOADED__) await loadConfigFromServer();
+  let ok = await casesPromise;
+  // A token can be rejected after boot (rotated/expired); re-gate once and retry. The gate's
+  // submit refetches config and restarts the cases pull with the fresh token.
   if (!ok && window.__NEEDS_LOGIN__) {
     window.__NEEDS_LOGIN__ = false;
     await reauth();
-    ok = await tryLoadLiveCases(true);
+    ok = window.__CASES_PROMISE__ ? await window.__CASES_PROMISE__ : await tryLoadLiveCases(true);
+    window.__CASES_PROMISE__ = null;
   }
-  // Pull the shared shifts + owners config (decoupled backend only). Safe no-op elsewhere: a 404 /
-  // unconfigured key / unreachable API just leaves the bundled shifts.js / owners.js seed in place.
-  await loadConfigFromServer();
   hideLiveLoading();
   render();
   if (!ok) {
-    showToast('Could not reach the case API — showing local data. Use “Load New” to retry.', 'warn');
+    showToast('Could not reach the case API — the board is empty until it is back. Refresh to retry.', 'warn');
   }
 }
 
