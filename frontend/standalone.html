@@ -4226,6 +4226,10 @@ function showLoginGate(message) {
         btn.disabled = true; errEl.hidden = true;
         if (!(await checkApiToken(token))) return fail('That token was rejected. Check it and try again.');
         setApiToken(token);
+        // Pull the shared shifts/owners config now that we hold the token, BEFORE the operator
+        // picker renders — so the "Who are you?" dropdown lists the roster saved in the database,
+        // not the bundled seed. (bootServerLoad's own call covers the no-gate path.)
+        await loadConfigFromServer();
         operatorStep();   // advance to "who are you?" instead of resolving immediately
       };
       btn.addEventListener('click', submit);

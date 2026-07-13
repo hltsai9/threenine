@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Fixed (login gate's "Who are you?" dropdown showed the seed roster, not the database's)
+
+- The operator picker rendered immediately after the access token was accepted — before
+  `loadConfigFromServer()` had pulled the shifts config (operator roster) from the database — so
+  it always listed the bundled `shifts.js` seed names. The gate now loads the DB config right
+  after the token is stored and **before** the picker renders, so the dropdown reflects the roster
+  saved in the database. The no-gate path (valid stored token, open API) is unchanged —
+  `bootServerLoad()` still loads the config there.
+
 ### Fixed (dead space between the Route Board and the panels below when Sanity Check is collapsed)
 
 - The Picked workspace grid pinned its two rows to a fixed 1:2 ratio, so collapsing the Sanity
