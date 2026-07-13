@@ -1675,8 +1675,12 @@ function caseNotesText(c) {
     const who = op ? op.name : (h.who || '?');
     let text = h.detail || String(h.kind || '').replace(/[-_]/g, ' ');
     if (h.kind === 'handover' && c.handover && c.handover.at === h.at && c.handover.note) {
-      text = c.handover.note;
       handoverShown = true;
+      // New-style entries carry the note text in detail already; legacy ones logged only the
+      // generic label — append the (latest) note so its text still reaches the export.
+      if (!(h.detail || '').includes(c.handover.note)) {
+        text = `${h.detail ? h.detail + ': ' : ''}${c.handover.note}`;
+      }
     }
     items.push({ at: h.at, line: `${stamp(h.at)} ${who}: ${text}` });
   }
@@ -4921,7 +4925,9 @@ function handlePrompt(caseId, kind) {
       if (!note) return modalError('Handover note is required.');
       const target = op.shift === 'Day' ? 'Night' : 'Day';
       c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
-      logHistory(c, op, 'handover', `Handover note (${op.shift} → ${target})`);
+      // Include the note text so it survives in history after the next handover overwrites
+      // c.handover — the History panel and the export's Note column read it from here.
+      logHistory(c, op, 'handover', `Handover note (${op.shift} → ${target}): ${note}`);
       showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
       render();
       return true;
@@ -5232,7 +5238,9 @@ function handleHandoverTo(caseId, recipientOpId) {
       at: new Date(NOW).toISOString(),
       staleForCurrentShift: false,
     };
-    logHistory(c, op, 'handover', `Handover to ${recipient.name} (${op.shift} → ${recipient.shift})`);
+    // Include the note text so it survives in history after the next handover overwrites
+    // c.handover — the History panel and the export's Note column read it from here.
+    logHistory(c, op, 'handover', `Handover to ${recipient.name} (${op.shift} → ${recipient.shift}): ${note}`);
     showToast(`Handover note for ${c.id} addressed to ${recipient.name}.`, 'success');
     render();
     return true;

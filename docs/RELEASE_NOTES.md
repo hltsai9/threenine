@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Added (handover note history — every note's text is now preserved)
+
+- Writing a handover note previously **overwrote** the case's single `c.handover` object, so older
+  notes' text was lost — the History timeline showed only that a handover happened (who → whom,
+  when). The note message is now embedded in each handover **history entry**
+  (`Handover note (Day → Night): <text>` / `Handover to <name> (…): <text>`), so the case detail's
+  History panel and the Route Board export's aggregated **Note** column show the full text of every
+  past handover, newest first. The "Handover note" spotlight panel still highlights the latest one.
+  Applies to notes written from now on (already-overwritten texts are unrecoverable);
+  `caseNotesText()` still appends the latest note to legacy generic entries, without duplication.
+
 ### Fixed (a "Close" case could still be picked when its last stage was Core Team)
 
 - **Terminal Case Center statuses now win over the processType refinement** in the status→column

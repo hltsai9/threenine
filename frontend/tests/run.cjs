@@ -76,6 +76,37 @@ test('_ccMapStatus: In-Progress|Wait User pair wins over refinement', () =>
 test('_ccMapStatus: unmapped status falls back to new', () =>
   eq(app._ccMapStatus('Bogus', null, null), 'new'));
 
+/* ---------- caseNotesText (aggregated Note column / handover note history) ---------- */
+// New-style handover history entries carry the note text in `detail`, so EVERY past
+// handover's message survives in the export — not just the latest one on c.handover.
+test('caseNotesText: keeps the text of every handover note (new-style entries)', () => {
+  const txt = app.caseNotesText({
+    history: [
+      { at: iso(3 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): first note' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover to Bo (Night → Day): second note' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'second note' },
+  });
+  ok(txt.includes('first note'), 'older handover note text must survive');
+  ok(txt.includes('second note'), 'latest handover note text must be present');
+});
+test('caseNotesText: legacy generic entry gets the current note appended', () => {
+  const txt = app.caseNotesText({
+    history: [{ at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night)' }],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'watch the SLA' },
+  });
+  ok(txt.includes('Handover note (Day → Night): watch the SLA'), 'note appended to legacy label');
+  eq(txt.split('\n').length, 1, 'no duplicate line for the same handover');
+});
+test('caseNotesText: no duplication when detail already contains the note', () => {
+  const txt = app.caseNotesText({
+    history: [{ at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): watch the SLA' }],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'watch the SLA' },
+  });
+  eq(txt.split('\n').length, 1, 'single line');
+  eq((txt.match(/watch the SLA/g) || []).length, 1, 'note text appears once');
+});
+
 /* ---------- caseSlaMs ---------- */
 test('caseSlaMs: paused → accumulated only', () =>
   eq(caseSlaMs({ slaAccumulatedMs: 5 * HOUR, slaPaused: true, status: 'with_core', slaStartedAt: iso(2 * HOUR) }), 5 * HOUR));
