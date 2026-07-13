@@ -10,6 +10,21 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Added (per-case ⟳ and import-by-ID now re-ingest from Case Center in DB-backend mode)
+
+- New **`POST /api/ingest?id=…`** endpoint in `backend/api.py`: spawns the ingestion CLI
+  (`python -m backend.ingest --id <id> --no-create`) as a subprocess, so `api.py` itself still
+  holds no Case Center credentials — the ingest module loads them like a scheduled run. Validates
+  the id (`[A-Za-z0-9._:-]`, ≤64 chars), 120 s timeout → 504, non-zero exit → 502 with a log tail.
+- The board's per-case **⟳ re-fetch** button and **+ Import case by ID** now call that endpoint
+  first when running against the DB backend (`isDbBackend()`), then re-read the case — so both
+  actually pull fresh Case Center data instead of just re-reading the stored row (which is all
+  `GET /api/cases?id=` does there). `serve.py` mode is unchanged (its `?id=` fetch already goes to
+  Case Center live). A failed server-side ingest shows a specific toast (missing credentials on
+  the API host / endpoint not deployed) instead of a generic error.
+- Requires the Case Center env vars on the API host — see the env-var table in
+  [`SETUP.md`](SETUP.md).
+
 ### Changed (server mode never shows data.js cases; cases + roster load together after sign-in)
 
 - **No more seed cases in server mode:** `bootServerLoad()` now clears the bundled `data.js` seed

@@ -11,6 +11,7 @@ Endpoints (same contract the SPA already expects):
     GET  /api/auth/check       -> 200 if the token is accepted (or API open), else 401
     GET  /api/cases            -> {"cases": [...], "operatorLayer": "server"}
     GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
+    POST /api/ingest?id=C-1041 -> re-ingest ONE case from Case Center (spawns the ingest CLI)
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
     GET  /api/config/{key}     -> {"key": "shifts"|"owners", "payload": {...}|null}
     POST /api/config/{key}     -> body {"payload": {...}}  (shifts roster/rota or owner directory)
@@ -30,6 +31,9 @@ Config (env):
 import hmac
 import logging
 import os
+import re
+import subprocess
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -146,6 +150,36 @@ async def save(request: Request):
         added, updated, purged = upsert_operator(session, cases, purge_ids)
         session.commit()
     return JSONResponse({"ok": True, "added": added, "updated": updated, "purged": purged})
+
+
+@app.post("/api/ingest")
+def ingest_case_route(request: Request, id: str = ""):
+    """Re-ingest ONE case from Case Center — the SPA's per-case ⟳ button in DB-backend mode.
+
+    Runs the ingestion CLI (`python -m backend.ingest --id <id> --no-create`) as a
+    subprocess, so api.py itself still holds no Case Center credentials (see module
+    docstring): the spawned ingest module loads them exactly like a scheduled run
+    (CASE_CENTER_* env vars / local/secrets.local.json). The API host's environment must
+    therefore carry those credentials for this endpoint to work — deployments that keep
+    credentials off the API host get a 502 here and simply rely on scheduled ingestion.
+
+    Sync `def` on purpose: FastAPI runs it in a worker thread, so the subprocess wait
+    doesn't block the event loop."""
+    require_auth(request)
+    case_id = (id or "").strip()
+    if not case_id or len(case_id) > 64 or not re.fullmatch(r"[A-Za-z0-9._:-]+", case_id):
+        return JSONResponse({"ok": False, "error": "invalid case id"}, status_code=400)
+    cmd = [sys.executable, "-m", "backend.ingest", "--id", case_id, "--no-create"]
+    try:
+        proc = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        logger.warning("per-case ingest timed out for %s", case_id)
+        return JSONResponse({"ok": False, "error": "ingest timed out"}, status_code=504)
+    if proc.returncode != 0:
+        tail = (proc.stderr or proc.stdout or "").strip()[-400:]
+        logger.warning("per-case ingest failed for %s: %s", case_id, tail)
+        return JSONResponse({"ok": False, "error": "ingest failed", "detail": tail}, status_code=502)
+    return {"ok": True, "id": case_id}
 
 
 # Shared board config (shifts roster/rota and the owner directory). Saved from the Shifts / Owners

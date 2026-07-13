@@ -9173,10 +9173,39 @@ async function fetchCaseById(id) {
   return (Array.isArray(data) ? data : (data && data.cases)) || [];
 }
 
+// DB-backend mode only: GET /api/cases?id= just reads the stored row, so ask the backend to
+// re-ingest the case from Case Center first (POST /api/ingest spawns `ingest --id <id>`), then
+// the follow-up fetch returns fresh data. serve.py mode needs none of this — its ?id= fetch
+// already goes to Case Center live.
+async function triggerIngest(id) {
+  const res = await fetch(apiUrl('api/ingest?id=' + encodeURIComponent(id)), withAuth({ method: 'POST' }));
+  if (res.status === 401) onApiUnauthorized();
+  if (!res.ok) {
+    const e = new Error('ingest HTTP ' + res.status);
+    e.status = res.status;
+    e.ingest = true;
+    throw e;
+  }
+  return res.json();
+}
+
+// Shared toast for a failed server-side ingest (502 = ingest errored, likely missing Case Center
+// credentials on the API host; 404 = an older API without the endpoint).
+function ingestFailToast(id, e) {
+  showToast(
+    e.status === 404
+      ? `This backend has no per-case ingest endpoint — update backend/api.py to re-fetch ${id}.`
+      : `Server-side ingest failed for ${id} (HTTP ${e.status}) — are Case Center credentials configured on the API host?`,
+    'warn');
+}
+
 // Fetch one case by id and add/merge it into the board (the "+ New case" by-id flow).
+// DB-backend mode ingests the case server-side first — the DB read alone can't find a
+// case that was never ingested.
 async function addCaseById(id) {
   showLiveLoading();
   try {
+    if (isDbBackend()) await triggerIngest(id);
     const cases = await fetchCaseById(id);
     hideLiveLoading();
     if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
@@ -9205,14 +9234,17 @@ async function addCaseById(id) {
     showToast(`${added ? 'Added' : 'Updated'} ${firstId} from Case Center · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
-    showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
+    if (e.ingest) ingestFailToast(id, e);
+    else showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
   }
 }
 
 // Re-fetch a single stored case from Case Center (the per-card / reading-panel ⟳ button).
+// DB-backend mode re-ingests server-side first so the follow-up read returns fresh CC data.
 async function refreshCase(id) {
   showLiveLoading();
   try {
+    if (isDbBackend()) await triggerIngest(id);
     const cases = await fetchCaseById(id);
     hideLiveLoading();
     if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
@@ -9222,7 +9254,8 @@ async function refreshCase(id) {
     showToast(merged ? `Refreshed ${id} from Case Center.` : `Case ${id} returned a malformed record.`, merged ? 'success' : 'warn');
   } catch (e) {
     hideLiveLoading();
-    showToast(e.status ? `Couldn't refresh ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
+    if (e.ingest) ingestFailToast(id, e);
+    else showToast(e.status ? `Couldn't refresh ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
   }
 }
 
