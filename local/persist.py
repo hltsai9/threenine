@@ -48,6 +48,8 @@ def _data_js_overwrite_allowed():
 CC_OWNED_FIELDS = (
     "subject", "ccStatusLabel", "priority", "caseLink", "status",
     "user", "userDept", "reporter", "reporterDept", "assignee", "assigneeDept",
+    "processTimeline",   # Case Center's per-stage processing log (drives the Process timeline)
+    "waitUser",          # "Wait User" substatus detail (reason / due / last processor)
 )
 
 SENTINEL = "// === LIVE CASES (auto-written by local/serve.py — do NOT commit) ==="

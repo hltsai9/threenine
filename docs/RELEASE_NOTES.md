@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Fixed (re-ingesting an existing case never updated its processTimeline in the database)
+
+- The Python `CC_OWNED_FIELDS` lists in `backend/merge.py` and `local/persist.py` were out of sync
+  with the frontend's: they were missing **`processTimeline`** and **`waitUser`**. Since ingestion
+  overlays only CC-owned fields onto an existing case, a re-ingest (scheduled or `--id`) kept the
+  old timeline/wait-user detail forever — the DB only had the timeline from the case's very first
+  ingest. Both lists now match `frontend/app.js`, so the Process timeline (and the IT process time
+  derived from it) refreshes on every ingest. Verified with an in-memory DB: second ingest with a
+  grown timeline updates the stored payload while preserving operator fields.
+
 ### Added (per-case ⟳ and import-by-ID now re-ingest from Case Center in DB-backend mode)
 
 - New **`POST /api/ingest?id=…`** endpoint in `backend/api.py`: spawns the ingestion CLI
