@@ -5574,10 +5574,13 @@ function caseNotesText(c) {
 
 // Column model for the Route Board export — one place feeding both copy (TSV) and download (CSV),
 // so the two never drift. Every cell is PLAIN TEXT (no HTML markup).
-function routeBoardTableData() {
+// opts.excludeSanity drops the Sanity Check group (the "Copy w/o Sanity" button).
+function routeBoardTableData(opts) {
   const headers = ['Case Link', 'Subject', 'IT Process Time', 'Track Status', 'Handover Route',
     'Core Team', 'HQ Product Team', 'Note'];
-  const rows = routeBoardCases().map(c => {
+  let cases = routeBoardCases();
+  if (opts && opts.excludeSanity) cases = cases.filter(c => caseTrackStatus(c) !== 'sanity_check');
+  const rows = cases.map(c => {
     const ts = caseTrackStatus(c);
     const tsLabel = ts && TRACK_STATUS_BY_ID[ts] ? TRACK_STATUS_BY_ID[ts].label : '';
     const hq = getOwner('hq', c.hqId);
@@ -5624,9 +5627,9 @@ function renderHtmlTable(headers, rows) {
     + `</table>`;
 }
 // Tab-separated (copy), comma-separated (CSV download), and HTML (rich copy) views of the board.
-function routeBoardTableText() { const { headers, rows } = routeBoardTableData(); return renderDelimited(headers, rows, '\t'); }
-function routeBoardCsvText()   { const { headers, rows } = routeBoardTableData(); return renderDelimited(headers, rows, ','); }
-function routeBoardTableHtml() { const { headers, rows } = routeBoardTableData(); return renderHtmlTable(headers, rows); }
+function routeBoardTableText(opts) { const { headers, rows } = routeBoardTableData(opts); return renderDelimited(headers, rows, '\t'); }
+function routeBoardCsvText(opts)   { const { headers, rows } = routeBoardTableData(opts); return renderDelimited(headers, rows, ','); }
+function routeBoardTableHtml(opts) { const { headers, rows } = routeBoardTableData(opts); return renderHtmlTable(headers, rows); }
 // Copy text to the clipboard with a hidden-textarea fallback for file:// / older browsers.
 async function copyToClipboard(text) {
   try { await navigator.clipboard.writeText(text); return; }
@@ -6025,6 +6028,7 @@ function renderRouteBoardStrip() {
       <div class="rb-actions">
         <button class="rb-action-btn" id="rb-export-csv" title="Download the shown cases as a CSV file">${RB_DOWNLOAD_SVG}Export to CSV</button>
         <button class="rb-action-btn" id="rb-copy-table" title="Copy the shown cases as a table (paste into Excel / Google Sheets)">${RB_COPY_SVG}Copy as table</button>
+        <button class="rb-action-btn" id="rb-copy-table-nosanity" title="Copy the shown cases as a table, excluding the Sanity Check group">${RB_COPY_SVG}Copy w/o Sanity</button>
         <span class="rb-copied" id="rb-copied">Copied</span>
       </div>`}
     </section>
@@ -9442,6 +9446,12 @@ function bindHandlers() {
   });
   document.getElementById('rb-copy-table')?.addEventListener('click', async () => {
     await copyRichTable(routeBoardTableHtml(), routeBoardTableText());
+    const flash = document.getElementById('rb-copied');
+    if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
+  });
+  document.getElementById('rb-copy-table-nosanity')?.addEventListener('click', async () => {
+    const opts = { excludeSanity: true };
+    await copyRichTable(routeBoardTableHtml(opts), routeBoardTableText(opts));
     const flash = document.getElementById('rb-copied');
     if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
   });

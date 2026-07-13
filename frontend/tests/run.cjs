@@ -112,6 +112,17 @@ test('caseNotesText: legacy generic entry gets the current note appended', () =>
   ok(txt.includes('Handover note (Day → Night): watch the SLA'), 'note appended to legacy label');
   eq(txt.split('\n').length, 1, 'no duplicate line for the same handover');
 });
+/* ---------- routeBoardTableData (export filter) ---------- */
+test('routeBoardTableData: excludeSanity drops exactly the Sanity Check rows', () => {
+  const shown = app.routeBoardCases();
+  const sanity = shown.filter(c => (c.trackStatus || null) === 'sanity_check').length;
+  ok(sanity > 0, 'seed should contain picked Sanity Check cases');
+  const all = app.routeBoardTableData().rows.length;
+  const filtered = app.routeBoardTableData({ excludeSanity: true }).rows.length;
+  eq(all, shown.length);
+  eq(filtered, all - sanity);
+});
+
 test('caseNotesText: no duplication when detail already contains the note', () => {
   const txt = app.caseNotesText({
     history: [{ at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): watch the SLA' }],

@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Added (Route Board: "Copy w/o Sanity" button)
+
+- A third button on the Route Board's green frame, next to **Copy as table**: **Copy w/o Sanity**
+  copies the same rich table (HTML + TSV clipboard) but excludes every case in the Sanity Check
+  group. The export column model gained an `excludeSanity` option so copy/CSV/HTML all share the
+  one filter; the regular Copy/Export buttons are unchanged.
+
 ### Docs
 
 - **[`USER-GUIDE.md`](USER-GUIDE.md) rewritten as a training manual** (v1 was a shallow reference).
