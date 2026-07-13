@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Fixed (closed cases already stored with a stale open column could still be picked)
+
+- The earlier "terminal statuses win" mapping fix only applied when a case was (re-)mapped from a
+  raw Case Center record — cases **already saved** in the database / `data.js` store kept the stale
+  `with_core` column in their payload, so they stayed pickable. A new `fixStaleTerminalStatus()`
+  correction now runs at every case-load chokepoint (`buildSeedCases`, `normalizeLiveCase`,
+  `overlayLiveCase`): if the raw Case Center label says `Close`/`Drop` but the stored column is
+  still an open one, the column is re-derived (`closed`/`cancelled`). Stale stored cases are
+  corrected on load without waiting for a re-ingest; open statuses are never touched.
+
 ### Fixed (login gate's "Who are you?" dropdown showed the seed roster, not the database's)
 
 - The operator picker rendered immediately after the access token was accepted — before

@@ -176,6 +176,18 @@ function mapRawCcRecord(r) {
   return out;
 }
 
+// A stored board status can predate the "terminal statuses win" mapping rule (older ingest /
+// data.js capture), leaving a Close/Drop case parked in an open column like with_core — where
+// it could still be picked. Re-derive the terminal column from the raw Case Center label
+// (ccStatusLabel starts with the raw caseStatus), leaving every open status untouched.
+function fixStaleTerminalStatus(c) {
+  if (!c || c.status === 'closed' || c.status === 'cancelled') return c;
+  const firstWord = String(c.ccStatusLabel || '').trim().split(/\s+/)[0];
+  const mapped = CC_STATUS_MAP_BY_STATUS[firstWord];
+  if (mapped === 'closed' || mapped === 'cancelled') c.status = mapped;
+  return c;
+}
+
 // Fill in the board-shape fields the mapper leaves blank because they live in
 // the operator layer (not in Case Center). Run after `mapRawCcRecord()` so a
 // freshly seeded raw record renders straight away.
@@ -233,8 +245,9 @@ function buildSeedCases() {
   } else {
     out = window.CASES.map(c => structuredClone(c));
   }
-  // Single chokepoint: every seeded case gets its id/caseLink sanitised, whatever the shape.
-  return out.map(sanitizeCaseIdentity);
+  // Single chokepoint: every seeded case gets its id/caseLink sanitised and any stale
+  // terminal status corrected, whatever the shape.
+  return out.map(c => fixStaleTerminalStatus(sanitizeCaseIdentity(c)));
 }
 
 const STATE = {
@@ -5691,7 +5704,7 @@ setInterval(updateClock, CLOCK_TICK_MS);
 function normalizeLiveCase(c) {
   const nowIso = new Date(NOW).toISOString();
   const createdAt = c.createdAt || c.slaStartedAt || nowIso;
-  return sanitizeCaseIdentity(Object.assign({
+  return fixStaleTerminalStatus(sanitizeCaseIdentity(Object.assign({
     flags: [],
     priority: 'medium',
     caseType: 'access',
@@ -5712,7 +5725,7 @@ function normalizeLiveCase(c) {
     subject: '(no subject)',
     slaStartedAt: c.createdAt || nowIso,
     createdAt: c.slaStartedAt || nowIso,
-  }, c));
+  }, c)));
 }
 
 // Fields Case Center authoritatively owns — these are refreshed onto an existing case. Everything
@@ -5731,8 +5744,8 @@ function overlayLiveCase(existing, raw) {
     if (raw[k] !== undefined) existing[k] = raw[k];
   }
   // caseLink is CC-owned, so re-sanitise after the refresh (a hostile link must
-  // not slip in through an update either).
-  return sanitizeCaseIdentity(existing);
+  // not slip in through an update either), and correct any stale terminal status.
+  return fixStaleTerminalStatus(sanitizeCaseIdentity(existing));
 }
 
 // Push operator edits back to the local server so they get written into data.js.

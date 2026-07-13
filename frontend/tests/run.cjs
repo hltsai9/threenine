@@ -76,6 +76,20 @@ test('_ccMapStatus: In-Progress|Wait User pair wins over refinement', () =>
 test('_ccMapStatus: unmapped status falls back to new', () =>
   eq(app._ccMapStatus('Bogus', null, null), 'new'));
 
+/* ---------- fixStaleTerminalStatus (stored payloads that predate "terminal wins") ---------- */
+test('fixStaleTerminalStatus: with_core + raw Close → closed', () =>
+  eq(app.fixStaleTerminalStatus({ status: 'with_core', ccStatusLabel: 'Close' }).status, 'closed'));
+test('fixStaleTerminalStatus: label with sub-transition still detected', () =>
+  eq(app.fixStaleTerminalStatus({ status: 'with_core', ccStatusLabel: 'Close Sanity Check' }).status, 'closed'));
+test('fixStaleTerminalStatus: with_core + raw Drop → cancelled', () =>
+  eq(app.fixStaleTerminalStatus({ status: 'with_core', ccStatusLabel: 'Drop' }).status, 'cancelled'));
+test('fixStaleTerminalStatus: open raw status left untouched', () =>
+  eq(app.fixStaleTerminalStatus({ status: 'with_core', ccStatusLabel: 'In-Progress Wait User' }).status, 'with_core'));
+test('fixStaleTerminalStatus: no ccStatusLabel → untouched', () =>
+  eq(app.fixStaleTerminalStatus({ status: 'with_core' }).status, 'with_core'));
+test('normalizeLiveCase: corrects a stale stored terminal status', () =>
+  eq(app.normalizeLiveCase({ id: 'C-STALE', status: 'with_core', ccStatusLabel: 'Close' }).status, 'closed'));
+
 /* ---------- caseNotesText (aggregated Note column / handover note history) ---------- */
 // New-style handover history entries carry the note text in `detail`, so EVERY past
 // handover's message survives in the export — not just the latest one on c.handover.
