@@ -82,9 +82,14 @@ function _ccLastProcessType(r) {
 }
 function _ccMapStatus(caseStatus, sub, lastPt) {
   if (sub && CC_STATUS_MAP[`${caseStatus}|${sub}`]) return CC_STATUS_MAP[`${caseStatus}|${sub}`];
+  // Terminal CC statuses win outright — a Close/Drop case is closed/cancelled no matter which
+  // team's timeline entry is most recent (the processType refinement only disambiguates where
+  // an OPEN case currently sits). Otherwise a "Close" case whose last timeline stage was
+  // "Service Team" would land in with_core and stay pickable.
+  const byStatus = CC_STATUS_MAP_BY_STATUS[caseStatus];
+  if (byStatus === 'closed' || byStatus === 'cancelled') return byStatus;
   if (lastPt && CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt]) return CC_STATUS_MAP_BY_PROCESS_TYPE[lastPt];
-  if (CC_STATUS_MAP_BY_STATUS[caseStatus]) return CC_STATUS_MAP_BY_STATUS[caseStatus];
-  return 'new';
+  return byStatus || 'new';
 }
 function _ccStatusLabel(caseStatus, sub) {
   const a = String(caseStatus || '');
@@ -4303,8 +4308,8 @@ function renderStatusFlow() {
     { cs: 'Open',            to: 'new',       note: 'Just opened in Case Center' },
     { cs: 'In-Progress',     to: 'new',       note: 'No sub-transition, no processType match → default to triage' },
     { cs: 'Wait Resolution', to: 'with_hq',   note: 'Routed to the HQ Product Team' },
-    { cs: 'Close',           to: 'closed',    note: 'Terminal' },
-    { cs: 'Drop',            to: 'cancelled', note: 'Terminal · no resolution code' },
+    { cs: 'Close',           to: 'closed',    note: 'Terminal — wins over the processType refinement' },
+    { cs: 'Drop',            to: 'cancelled', note: 'Terminal · no resolution code — wins over the processType refinement' },
   ];
   const pill = (s) => `<span class="pill pill-${s}">${escapeHtml(statusLabel(s))}</span>`;
   const mono = (s) => `<code class="mono">${escapeHtml(s)}</code>`;
@@ -4463,7 +4468,7 @@ function renderStatusFlow() {
 
       <div class="detail-section">
         <h3>2. Last <code class="mono">processTimeline[*].processType</code> refinement</h3>
-        <p class="muted tiny" style="margin:0 0 8px;">Disambiguates an otherwise-ambiguous caseStatus (typically <code class="mono">In-Progress</code>) using the latest item in the case's process timeline.</p>
+        <p class="muted tiny" style="margin:0 0 8px;">Disambiguates an otherwise-ambiguous <strong>open</strong> caseStatus (typically <code class="mono">In-Progress</code>) using the latest item in the case's process timeline. Terminal caseStatus values (<code class="mono">Close</code>, <code class="mono">Drop</code>) skip this tier entirely — a closed/dropped case maps straight to its terminal column no matter which team's timeline entry is most recent.</p>
         <table class="transition-table">
           <thead><tr><th>Last processType</th><th>Board status</th><th>Why</th></tr></thead>
           <tbody>
@@ -5072,6 +5077,12 @@ function handlePrompt(caseId, kind) {
 
   if (kind === 'toggle_queue') {
     const nowQueued = !isQueued(c);
+    // A closed/cancelled case can be unpicked but never picked (a stale rendered button
+    // could otherwise re-pick one after a live refresh closed it).
+    if (nowQueued && ['closed', 'cancelled'].includes(c.status)) {
+      showToast(`${c.id} is ${statusLabel(c.status)} — cannot be picked.`, 'warn');
+      return;
+    }
     c.agentStatus = nowQueued ? 'queued' : 'unqueued';
     // Picking a fresh case auto-selects it in the workspace so the detail panel populates.
     if (nowQueued) STATE.kanbanSelected = c.id;

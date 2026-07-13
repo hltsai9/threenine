@@ -8,6 +8,31 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-13
+
+### Fixed (a "Close" case could still be picked when its last stage was Core Team)
+
+- **Terminal Case Center statuses now win over the processType refinement** in the status→column
+  mapping (`_ccMapStatus` in `frontend/app.js`, `map_status` in `local/casecenter.py` — kept in
+  lockstep). Previously a case with raw status `Close` (or `Drop`) whose most recent
+  `processTimeline` entry was `Service Team` mapped to `with_core`, so its pill class was
+  `pill-with_core` (while the pill text showed the raw "Close") and every pick gate — which checks
+  the mapped status — still allowed picking it. Now `Close` → `closed` and `Drop` → `cancelled`
+  regardless of the timeline, so the pill renders `pill-closed`, the "+ Pick" button disappears,
+  Import-by-ID won't auto-pick it, and an already-picked case drops out of the Picked workspace.
+  The refinement still applies to open statuses (`In-Progress` + `Service Team` → `with_core`),
+  and the `(status, substatus)` pair tier still wins overall.
+- Defense-in-depth: the pick toggle handler now refuses to *pick* a closed/cancelled case (with a
+  toast) even if a stale button is clicked; unpicking stays allowed.
+- The **#/flow Status Flow** page's mapping tables were updated to document the new precedence.
+
+### Internal
+
+- 5 new `_ccMapStatus` tests in `frontend/tests/run.cjs` (153 total) covering terminal-wins,
+  open-case refinement, pair-tier precedence, and the unmapped fallback.
+
+---
+
 ## 2026-07-03
 
 ### Fixed (structurally sever the hash→innerHTML flow — DOM-XSS scanner findings)

@@ -62,6 +62,20 @@ test('displayStatus: falls back to enum label', () => eq(displayStatus({ status:
 test('isQueued: queued → true', () => ok(isQueued({ agentStatus: 'queued' })));
 test('isQueued: unqueued → false', () => ok(!isQueued({ agentStatus: 'unqueued' })));
 
+/* ---------- _ccMapStatus (CC status → board column) ---------- */
+// Terminal caseStatus must win over the processType refinement: a "Close" case whose last
+// timeline stage was Service Team is closed, not with_core (and therefore not pickable).
+test('_ccMapStatus: Close + Service Team timeline → closed (terminal wins)', () =>
+  eq(app._ccMapStatus('Close', null, 'Service Team'), 'closed'));
+test('_ccMapStatus: Drop + Service Team timeline → cancelled (terminal wins)', () =>
+  eq(app._ccMapStatus('Drop', null, 'Service Team'), 'cancelled'));
+test('_ccMapStatus: In-Progress + Service Team → with_core (refinement for open cases)', () =>
+  eq(app._ccMapStatus('In-Progress', null, 'Service Team'), 'with_core'));
+test('_ccMapStatus: In-Progress|Wait User pair wins over refinement', () =>
+  eq(app._ccMapStatus('In-Progress', 'Wait User', 'Service Team'), 'returned_to_requester'));
+test('_ccMapStatus: unmapped status falls back to new', () =>
+  eq(app._ccMapStatus('Bogus', null, null), 'new'));
+
 /* ---------- caseSlaMs ---------- */
 test('caseSlaMs: paused → accumulated only', () =>
   eq(caseSlaMs({ slaAccumulatedMs: 5 * HOUR, slaPaused: true, status: 'with_core', slaStartedAt: iso(2 * HOUR) }), 5 * HOUR));

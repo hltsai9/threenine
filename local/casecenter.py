@@ -135,10 +135,11 @@ STATUS_MAP_BY_STATUS = {
     "Close":           "closed",
     "Drop":            "cancelled",
 }
-# Refinement layer for ambiguous caseStatus values (e.g. "In-Progress" can mean either
+# Refinement layer for ambiguous OPEN caseStatus values (e.g. "In-Progress" can mean either
 # triage or with the Core Team). The board status here is taken from the LAST item in the
 # case's processTimeline: its `processType` tells us which stage the case is currently in.
-# Consulted after the (status, substatus) pair and before the caseStatus-alone fallback.
+# Consulted after the (status, substatus) pair AND after terminal caseStatus values
+# (Close/Drop always win — see map_status), before the caseStatus-alone fallback.
 STATUS_MAP_BY_PROCESS_TYPE = {
     "1st  Line":    "new",
     "Service Team": "with_core",
@@ -171,15 +172,20 @@ def last_process_type(r):
 def map_status(case_status, case_substatus, last_pt=None):
     """Map a Case Center status into a board status column.
 
-    Lookup order: (caseStatus, sub-transition) pair → last-processType refinement →
-    caseStatus alone → fall back to "new" so an unmapped case still shows up."""
+    Lookup order: (caseStatus, sub-transition) pair → terminal caseStatus (Close/Drop win
+    outright) → last-processType refinement → caseStatus alone → fall back to "new" so an
+    unmapped case still shows up. The processType refinement only disambiguates where an
+    OPEN case currently sits — a terminal status must not be overridden by it, or a "Close"
+    case whose last timeline stage was "Service Team" would land in with_core and stay
+    pickable on the board. Keep in lockstep with _ccMapStatus() in frontend/app.js."""
     if (case_status, case_substatus) in STATUS_MAP:
         return STATUS_MAP[(case_status, case_substatus)]
+    by_status = STATUS_MAP_BY_STATUS.get(case_status)
+    if by_status in ("closed", "cancelled"):
+        return by_status
     if last_pt and last_pt in STATUS_MAP_BY_PROCESS_TYPE:
         return STATUS_MAP_BY_PROCESS_TYPE[last_pt]
-    if case_status in STATUS_MAP_BY_STATUS:
-        return STATUS_MAP_BY_STATUS[case_status]
-    return "new"
+    return by_status or "new"
 
 
 def status_label(case_status, case_substatus):
