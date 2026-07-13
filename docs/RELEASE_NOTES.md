@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Fixed (dead space between the Route Board and the panels below when Sanity Check is collapsed)
+
+- The Picked workspace grid pinned its two rows to a fixed 1:2 ratio, so collapsing the Sanity
+  Check group shrank the Route Board card but not its grid row — leaving a large empty band above
+  the list/detail panels. The top row is now content-sized (`auto`) and the bottom row takes the
+  remaining height, so the panels move up/down dynamically as the Sanity group (or anything else
+  on the board) collapses/expands. A 320px floor on the bottom section keeps the list/detail
+  panels usable when the board is very tall (the page scrolls beyond that).
+
 ### Added (handover note history — every note's text is now preserved)
 
 - Writing a handover note previously **overwrote** the case's single `c.handover` object, so older

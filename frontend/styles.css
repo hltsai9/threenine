@@ -2226,7 +2226,10 @@ table.case-table {
 
 .picked-workspace {
   display: grid;
-  grid-template-rows: 1fr 2fr;     /* 1:2 height — top strip vs bottom list+detail */
+  /* Top row hugs the Route Board (which sizes its own card to its rows), so the
+   * list+detail panels move up/down dynamically when the Sanity group is
+   * collapsed/expanded; the bottom row absorbs whatever height remains. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   min-height: 78vh;
 }
@@ -2238,13 +2241,14 @@ table.case-table {
    * horizontal scrollbar from the vertical gutter's few px of overhang. */
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 220px;
 }
 .picked-workspace-bottom {
   display: grid;
   grid-template-columns: 1fr 2fr;  /* 1:2 width — list vs detail */
   gap: 14px;
-  min-height: 0;
+  /* Floor so a fully-expanded Route Board can't squash the panels to nothing —
+   * beyond this the page itself scrolls. */
+  min-height: 320px;
 }
 .picked-workspace-list {
   background: white;
