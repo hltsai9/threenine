@@ -10,6 +10,14 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-13
 
+### Docs
+
+- New **[`USER-GUIDE.md`](USER-GUIDE.md)** — an operator-facing guide to share with the team:
+  sign-in and the operator picker, the two-status model, the daily triage → pick → track →
+  hand-over workflow, reading the Route Board, exports (Copy as table / CSV), keeping data fresh
+  (⟳ / import by ID), clocks, Shifts/Owners pages, and a troubleshooting table. Linked from the
+  README. Deployment/config stays in `SETUP.md` (no duplication).
+
 ### Fixed (re-ingesting an existing case never updated its processTimeline in the database)
 
 - The Python `CC_OWNED_FIELDS` lists in `backend/merge.py` and `local/persist.py` were out of sync

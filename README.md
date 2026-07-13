@@ -5,6 +5,8 @@ shared Excel workbook and makes the hand-off between the **requester (User)**, *
 **Core Team**, and **HQ** visible at a glance. This repo holds the requirements, a zero-build web
 app, and an optional Python backend that turns the prototype into a real multi-operator service.
 
+- **Operator guide**: [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md) — how to *use* the board
+  day-to-day (sign-in, picking, Route Board, handovers, exports). Share this with the team.
 - **URD**: [`docs/URD.md`](docs/URD.md) — the authoritative spec.
 - **Prototype**: [`frontend/`](frontend/) — a static, no-build SPA (vanilla HTML / CSS / JS)
   that runs the whole UI against seeded mock data. Auto-deployed to GitHub Pages on every push.
