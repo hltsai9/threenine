@@ -12,11 +12,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ### Docs
 
-- New **[`USER-GUIDE.md`](USER-GUIDE.md)** — an operator-facing guide to share with the team:
-  sign-in and the operator picker, the two-status model, the daily triage → pick → track →
-  hand-over workflow, reading the Route Board, exports (Copy as table / CSV), keeping data fresh
-  (⟳ / import by ID), clocks, Shifts/Owners pages, and a troubleshooting table. Linked from the
-  README. Deployment/config stays in `SETUP.md` (no duplication).
+- **[`USER-GUIDE.md`](USER-GUIDE.md) rewritten as a training manual** (v1 was a shallow reference).
+  Now 12 modules with a concept → ASCII diagram → screenshot → "try it" exercise structure: data
+  flow, sign-in, screen zones, the two-status model, triage/picking, a full Route Board anatomy
+  diagram, a Track Status decision tree, handover flow, exports, field-ownership/clock diagrams,
+  Shifts/Owners, troubleshooting, and a 10-point sign-off checklist. Includes **11 real
+  screenshots** captured from the running app (demo seed + auth-gated backend for the login gate)
+  committed under `docs/images/`. Linked from the README; deployment/config stays in `SETUP.md`.
 
 ### Fixed (re-ingesting an existing case never updated its processTimeline in the database)
 
