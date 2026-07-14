@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Added (picked list split into Cases / Sanity Check tabs)
+
+- The picked-workspace list now has two tabs with live counts — **Cases** (active work) and
+  **Sanity Check** — because Sanity Check cases are numerous and drowned out the rest. Same
+  grouping predicate as the Route Board's Sanity group and the "Copy w/o Sanity" export. Selecting
+  a case (e.g. clicking its Route Board row) auto-switches the list to the tab that contains it.
+  Empty states per tab; the pick-suggest block still appears when nothing is picked at all.
+  `STATE` is now exposed as `window.STATE` (debugging + headless test access).
+
 ### Changed (main view now fills the window width)
 
 - Removed the `max-width: 1260px` cap on `main` — on wide monitors the content area (Route Board,

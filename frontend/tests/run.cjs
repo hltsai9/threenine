@@ -112,6 +112,19 @@ test('caseNotesText: legacy generic entry gets the current note appended', () =>
   ok(txt.includes('Handover note (Day → Night): watch the SLA'), 'note appended to legacy label');
   eq(txt.split('\n').length, 1, 'no duplicate line for the same handover');
 });
+/* ---------- renderPickedList (Cases / Sanity Check tabs) ---------- */
+test('renderPickedList: tabs split Sanity Check cases from active ones', () => {
+  const picked = app.pickedCases();
+  const sanity = picked.filter(c => (c.trackStatus || null) === 'sanity_check').length;
+  ok(sanity > 0, 'seed should contain picked Sanity Check cases');
+  const rowCount = html => (html.match(/picked-row-head/g) || []).length;
+  app.STATE.pickedListTab = 'cases';
+  eq(rowCount(app.renderPickedList()), picked.length - sanity, 'Cases tab hides sanity rows');
+  app.STATE.pickedListTab = 'sanity';
+  eq(rowCount(app.renderPickedList()), sanity, 'Sanity tab shows only sanity rows');
+  app.STATE.pickedListTab = 'cases';
+});
+
 /* ---------- routeBoardTableData (export filter) ---------- */
 test('routeBoardTableData: excludeSanity drops exactly the Sanity Check rows', () => {
   const shown = app.routeBoardCases();
@@ -638,7 +651,10 @@ test('binned case is hidden from board, archive stats and week table', () => {
   const ids = app.CASES.map(r => r[idField]).filter(Boolean);
   const id = ids.find(x => {
     const c = app.caseById(x);
-    return c && !['closed', 'cancelled'].includes(c.status) && c.agentStatus === 'queued';
+    // Skip Sanity Check cases: the picked list now shows them on their own tab (hidden from
+    // the default Cases tab), so they wouldn't appear in renderCaseList() before deletion.
+    return c && !['closed', 'cancelled'].includes(c.status) && c.agentStatus === 'queued'
+      && (c.trackStatus || null) !== 'sanity_check';
   });
   const c = app.caseById(id);
   c.agentStatus = 'queued';

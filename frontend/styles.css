@@ -2961,6 +2961,31 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* Segmented tabs splitting the picked list into Cases / Sanity Check. */
+.picked-list-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+.picked-tab {
+  background: white;
+  border: 1px solid var(--border, #C5CCC1);
+  border-radius: 6px;
+  padding: 3px 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-faint, #5B6660);
+  white-space: nowrap;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.picked-tab:hover { background: #eef5ec; border-color: #2E5641; color: #2E5641; }
+.picked-tab.active {
+  background: #2E5641;
+  border-color: #2E5641;
+  color: white;
+}
 .picked-list-toggle, .picked-list-show-btn {
   background: white;
   border: 1px solid var(--border, #C5CCC1);

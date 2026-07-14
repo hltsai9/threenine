@@ -105,10 +105,10 @@ Everything happens on one main screen, the **Picked** page. Learn these four zon
 │  Clock     │ ┌───────────────┐ ┌────────────────────────────────────┐ │
 │  model     │ │ ③ PICKED      │ │ ④ READING PANEL                    │ │
 │            │ │   CASES list  │ │   clocks · timeline · routing ·    │ │
-│  16:14:56  │ │   (click a    │ │   notes · history · ALL actions    │ │
-│  MST/GMT+8 │ │    row)       │ │                                    │ │
-│  ON SHIFT: │ └───────────────┘ └────────────────────────────────────┘ │
-│  Mia (Day) │                                                          │
+│  16:14:56  │ │   [Cases]     │ │   notes · history · ALL actions    │ │
+│  MST/GMT+8 │ │   [Sanity]    │ │                                    │ │
+│  ON SHIFT: │ │   tabs        │ │                                    │ │
+│  Mia (Day) │ └───────────────┘ └────────────────────────────────────┘ │
 └────────────┴──────────────────────────────────────────────────────────┘
 ```
 
@@ -244,7 +244,7 @@ Decoding, element by element:
 | **Eye + dashed ring/arrow** | Watch mode: no deadline, but you're keeping an eye on it |
 | **👤 name tag** (left edge) | Who picked the case; an **→ arrow tag** means it was handed to that person/shift |
 | **`stays`** label | The case intentionally stays at its station |
-| **Sanity Check · N cases** | Collapsible group of sanity-check cases — click the header to fold/unfold |
+| **Sanity Check · N cases** | Collapsible group of sanity-check cases — click the header to fold/unfold. These cases also live on their own **Sanity Check tab** in the picked list, so they don't crowd out active work |
 | Green title-bar counters | `3 moving · 3 overdue · 4 watch` — the board's live summary |
 | **Mine only** checkbox | Hide everyone else's rows |
 

@@ -258,8 +258,12 @@ const STATE = {
   lookbackHours: 1,          // Case Center query window: older bound (hours ago)
   lookbackToHours: 0,        // newer bound (hours ago); 0 = up to now → "within N hours"
   archivePickedOnly: false,  // Overview week table: when true, show only picked cases
+  pickedListTab: 'cases',    // picked-workspace list tab: 'cases' (active work) | 'sanity' (Sanity Check group)
   routeMineOnly: false,      // Route Board: when true, show only the current operator's cases
 };
+// Exposed for debugging in the console and for the headless test harness (a top-level `const`
+// doesn't become a sandbox/window property on its own).
+window.STATE = STATE;
 try {
   const lb = parseFloat(localStorage.getItem('case-tracker-lookback'));
   if (lb > 0) STATE.lookbackHours = lb;
@@ -2196,8 +2200,21 @@ function renderPickedListRow(c) {
   `;
 }
 
+// The picked list is split into two tabs (STATE.pickedListTab): Sanity Check cases are numerous
+// and drown out the active work, so they live in their own tab. Same predicate as the Route
+// Board's Sanity group and the "Copy w/o Sanity" export.
+function isSanityCase(c) { return caseTrackStatus(c) === 'sanity_check'; }
+
 function renderPickedList() {
-  const all = pickedCases();
+  const picked = pickedCases();
+  const sanityTab = STATE.pickedListTab === 'sanity';
+  const all = picked.filter(c => isSanityCase(c) === sanityTab);
+  if (sanityTab && all.length === 0) {
+    return `<div class="picked-list-empty">No Sanity Check cases.</div>`;
+  }
+  if (!sanityTab && all.length === 0 && picked.length > 0) {
+    return `<div class="picked-list-empty">No active cases — see the <strong>Sanity Check</strong> tab.</div>`;
+  }
   // Sort: by Track Status group order, then due time within each group.
   const rank = id => {
     const i = TRACK_GROUP_ORDER.indexOf(id);
@@ -2328,7 +2345,10 @@ function renderCaseList() {
         <div class="picked-workspace-bottom${STATE.pickedListCollapsed ? ' is-list-collapsed' : ''}">
           <div class="picked-workspace-list">
             <div class="picked-list-header">
-              <span class="picked-list-title">Picked cases (${pickedCases().length})</span>
+              <div class="picked-list-tabs" role="tablist">
+                <button class="picked-tab${STATE.pickedListTab !== 'sanity' ? ' active' : ''}" role="tab" aria-selected="${STATE.pickedListTab !== 'sanity'}" data-action="picked-tab" data-tab="cases">Cases (${pickedCases().filter(c => !isSanityCase(c)).length})</button>
+                <button class="picked-tab${STATE.pickedListTab === 'sanity' ? ' active' : ''}" role="tab" aria-selected="${STATE.pickedListTab === 'sanity'}" data-action="picked-tab" data-tab="sanity">Sanity Check (${pickedCases().filter(isSanityCase).length})</button>
+              </div>
               <button class="picked-list-toggle" data-action="toggle-picked-list" title="Hide list">◂ Hide</button>
             </div>
             ${renderPickedList()}
@@ -5590,6 +5610,16 @@ function bindHandlers() {
     el.addEventListener('click', e => {
       if (e.target.closest('button, a, select, input, textarea')) return;
       STATE.kanbanSelected = el.dataset.caseId;
+      // Keep the picked list showing the tab that contains the selection (e.g. clicking a
+      // Sanity row on the Route Board switches the list to the Sanity Check tab).
+      const c = caseById(el.dataset.caseId);
+      if (c && isPicked(c)) STATE.pickedListTab = isSanityCase(c) ? 'sanity' : 'cases';
+      render();
+    });
+  });
+  document.querySelectorAll('[data-action="picked-tab"]').forEach(el => {
+    el.addEventListener('click', () => {
+      STATE.pickedListTab = el.dataset.tab === 'sanity' ? 'sanity' : 'cases';
       render();
     });
   });
