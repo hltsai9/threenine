@@ -9204,15 +9204,21 @@ function ingestFailToast(id, e) {
 }
 
 // Fetch one case by id and add/merge it into the board (the "+ New case" by-id flow).
-// DB-backend mode ingests the case server-side first — the DB read alone can't find a
-// case that was never ingested.
+// DB-backend mode reads ONLY the stored row (GET /api/cases?id= is a pure DB read) — no Case
+// Center ingest is triggered, so the case must already have been ingested by the schedule.
+// The per-case ⟳ button is the "get fresh data from Case Center now" action (refreshCase).
+// serve.py mode is unchanged: there the ?id= fetch IS the live proxy, its only data source.
 async function addCaseById(id) {
   showLiveLoading();
   try {
-    if (isDbBackend()) await triggerIngest(id);
     const cases = await fetchCaseById(id);
     hideLiveLoading();
-    if (!cases.length) { showToast(`Case ${id} not found in Case Center.`, 'warn'); return; }
+    if (!cases.length) {
+      showToast(isDbBackend()
+        ? `Case ${id} is not in the database yet — it arrives with the next scheduled ingest.`
+        : `Case ${id} not found in Case Center.`, 'warn');
+      return;
+    }
     let added = 0, firstId = null;
     for (const raw of cases) {
       const m = mergeLiveCase(raw);
@@ -9235,11 +9241,10 @@ async function addCaseById(id) {
     if (!firstId) { showToast(`Case ${id} returned a malformed record.`, 'warn'); return; }
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
-    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from Case Center · picked.`, 'success');
+    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from ${isDbBackend() ? 'the database' : 'Case Center'} · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
-    if (e.ingest) ingestFailToast(id, e);
-    else showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
+    showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
   }
 }
 

@@ -8,6 +8,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-14
+
+### Changed ("+ Import case by ID" is a pure database read again)
+
+- Import-by-ID no longer triggers a server-side Case Center ingest — it only reads the stored case
+  from the database (`GET /api/cases?id=`) and adds/picks it. The case must already have been
+  ingested by the schedule; a new mode-aware toast says "not in the database yet — it arrives with
+  the next scheduled ingest" when it isn't. The per-case **⟳** button keeps its ingest-now
+  behavior, and `serve.py` mode is unchanged (its `?id=` fetch is the live proxy). Docs updated
+  (USER-GUIDE Modules 4 & 9, troubleshooting row, SETUP env-var note).
+
+---
+
 ## 2026-07-13
 
 ### Added (Route Board: "Copy w/o Sanity" button)

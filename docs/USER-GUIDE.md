@@ -197,9 +197,11 @@ Rules of picking:
 - **Picking is attribution.** The case history records *picked by \<you\>*, and your name appears
   as the tracker tag on its Route Board row.
 - **A case that closes while picked** drops out of the active workspace by itself.
-- **Case not on the board at all?** (e.g. older than the sync window) — use **+ Import case by
-  ID** at the top of the Picked page: type the Case Center ID; it's fetched, added, and
-  auto-picked under your name.
+- **Case not on the board at all?** — use **+ Import case by ID** at the top of the Picked page:
+  type the Case Center ID and the case is loaded **from the team database**, added, and
+  auto-picked under your name. (It must already be in the database — anything the scheduled sync
+  has ingested. If it isn't yet, wait for the next sync; once it's on the board, the ⟳ button can
+  pull fresh Case Center data for it.)
 
 **Try it:** in Overview, open the current week, pick any open case, then go to **Picked** — your
 case is now on the Route Board and in the list, tagged with your name.
@@ -387,7 +389,7 @@ a table with the eight columns above.
 ```
   automatic:   Case Center ──▶ DB      every N minutes (scheduled ingest)
   manual  :    ⟳ on a case            re-ingests THAT case right now
-               + Import case by ID     first-time fetch of an old case
+               + Import case by ID     loads an already-stored case onto your board (DB read only)
 ```
 
 Use the **⟳** button (case toolbar / card) when you know something just changed in Case Center —
@@ -462,7 +464,7 @@ an assignee belongs to. Also saved to the shared database.
 | No **+ Pick** on a case | The case is Closed/Dropped — finished cases can't be picked |
 | *"C-… is Closed — cannot be picked."* toast | Same as above (you clicked a stale button) |
 | ⟳ shows *"Server-side ingest failed (HTTP 502)"* | The API host is missing Case Center credentials — an admin fix (see [`SETUP.md`](SETUP.md)); scheduled sync may still work |
-| *"Case … not found in Case Center"* on import | Check the ID spelling; the case may be outside your access |
+| *"Case … is not in the database yet"* on import | The scheduled sync hasn't ingested it — check the ID spelling, or wait for the next sync |
 | Wrong name on your actions | You're signed in as someone else — fix it in the sidebar **ON SHIFT** dropdown |
 | Times look shifted | Check the sidebar timezone toggle (MST / GMT+8 / UTC) |
 
