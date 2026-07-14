@@ -27,6 +27,9 @@ const app = read('app.js');
 const tour = read('tour.js');
 const indexHtml = read('index.html');
 const faviconDataUri = 'data:image/svg+xml;base64,' + Buffer.from(read('favicon.svg')).toString('base64');
+// Inline the TKMS marker icon so standalone.html works via file:// (the modular app loads it
+// by path: icons/tkms.svg — that file is the single source; replace it to change the icon).
+const tkmsIconDataUri = 'data:image/svg+xml;base64,' + Buffer.from(read(join('icons', 'tkms.svg'))).toString('base64');
 
 const bodyMatch = indexHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/);
 if (!bodyMatch) {
@@ -50,6 +53,8 @@ ${css}
 <body>
 ${bodyContent}
 <script>
+window.TKMS_ICON_SRC = '${tkmsIconDataUri}';
+
 ${config}
 
 ${data}

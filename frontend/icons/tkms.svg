@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- "Added to TKMS page" marker: blue + pink diamonds overlapped.
+       Replace this file with your own artwork (keep the filename) and rebundle. -->
+  <rect x="4" y="4" width="11" height="11" rx="1.5" transform="rotate(45 9.5 9.5)" fill="#3b82c4" opacity="0.9"/>
+  <rect x="9" y="9" width="11" height="11" rx="1.5" transform="rotate(45 14.5 14.5)" fill="#e86aa6" opacity="0.78"/>
+</svg>

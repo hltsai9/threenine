@@ -1706,15 +1706,24 @@ function caseTracker(c) {
 const TRACKER_PERSON_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 const TRACKER_ARROW_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg>`;
 
+// "Added to TKMS page" marker: the artwork lives in frontend/icons/tkms.svg — replace THAT file
+// (same name) to change the icon; no code edit needed. Served by path in every HTTP mode; the
+// standalone build injects window.TKMS_ICON_SRC as a data URI (see bundle.mjs) so file:// works.
+function tkmsIconHtml() {
+  const src = window.TKMS_ICON_SRC || 'icons/tkms.svg';
+  return `<img class="rb-tkms-ic" src="${escapeHtml(src)}" alt="" title="Added to TKMS page">`;
+}
+
 // Tracker chip pinned to the LEFT EDGE of a Route Board row — a direct child of .rb-row (so it's
 // absolutely positioned at left:2px, aligned across every row regardless of the case's station).
 // Arrow icon = handed over to that teammate/shift; person icon = picked by that operator.
+// Cases flagged "Added to TKMS page" get the diamonds icon right of the name.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
   const icon = t.kind === 'to' ? TRACKER_ARROW_SVG : TRACKER_PERSON_SVG;
   const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span></div>`;
+  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span>${c.addedToTkms ? tkmsIconHtml() : ''}</div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -2212,7 +2221,7 @@ function renderRouteBoardStrip() {
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
           <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
           <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
-          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to</span>
+          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to · ${tkmsIconHtml()} on TKMS page</span>
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">

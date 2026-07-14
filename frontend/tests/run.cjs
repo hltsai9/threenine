@@ -134,6 +134,14 @@ test('caseHandoverNotes: returns every note, prefix stripped, oldest first', () 
   });
   eq(notes.map(n => n.text), ['first', 'second']);
 });
+test('routeTrackerTag: TKMS icon appears right of the name only when flagged', () => {
+  const base = { id: 'X', agentStatus: 'queued', history: [{ at: iso(HOUR), who: opId, kind: 'picked' }] };
+  ok(!app.routeTrackerTag({ ...base }).includes('rb-tkms-ic'), 'no icon without the flag');
+  const tagged = app.routeTrackerTag({ ...base, addedToTkms: true });
+  ok(tagged.includes('rb-tkms-ic'), 'icon present when flagged');
+  ok(tagged.indexOf('rb-tracker-name') < tagged.indexOf('rb-tkms-ic'), 'icon sits after the name');
+});
+
 test('routeBoardTableData: TKMS column sits between Core Team and HQ, Yes when ticked', () => {
   const { headers, rows } = app.routeBoardTableData();
   eq(headers.indexOf('If added to TKMS page'), headers.indexOf('Core Team') + 1);

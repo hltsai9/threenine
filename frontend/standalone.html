@@ -2624,7 +2624,10 @@ table.case-table {
 /* Inline tracker icons — sized and coloured (via currentColor) like the sidebar .nav-icon SVGs. */
 .rb-tracker-ic { width: 12px; height: 12px; display: block; flex: none; }
 .rb-tracker-name { overflow: hidden; text-overflow: ellipsis; }
+/* "Added to TKMS page" marker (artwork: icons/tkms.svg) — sits right of the tracker name. */
+.rb-tkms-ic { width: 13px; height: 13px; flex: none; margin-left: 2px; vertical-align: middle; }
 .rb-legend-tracker .rb-tracker-ic { width: 13px; height: 13px; }
+.rb-legend-tracker .rb-tkms-ic { margin-left: 0; }
 .rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
 .rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
 .rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }
@@ -3152,6 +3155,8 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 </div>
 <div id="modal-root"></div>
 <script>
+window.TKMS_ICON_SRC = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+CiAgPCEtLSAiQWRkZWQgdG8gVEtNUyBwYWdlIiBtYXJrZXI6IGJsdWUgKyBwaW5rIGRpYW1vbmRzIG92ZXJsYXBwZWQuCiAgICAgICBSZXBsYWNlIHRoaXMgZmlsZSB3aXRoIHlvdXIgb3duIGFydHdvcmsgKGtlZXAgdGhlIGZpbGVuYW1lKSBhbmQgcmVidW5kbGUuIC0tPgogIDxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSIxMSIgaGVpZ2h0PSIxMSIgcng9IjEuNSIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgOS41IDkuNSkiIGZpbGw9IiMzYjgyYzQiIG9wYWNpdHk9IjAuOSIvPgogIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMSIgaGVpZ2h0PSIxMSIgcng9IjEuNSIgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMTQuNSAxNC41KSIgZmlsbD0iI2U4NmFhNiIgb3BhY2l0eT0iMC43OCIvPgo8L3N2Zz4K';
+
 // Front-end configuration. This is the ONE place that tells the static SPA where
 // the back-end API lives.
 //
@@ -5647,15 +5652,24 @@ function caseTracker(c) {
 const TRACKER_PERSON_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 const TRACKER_ARROW_SVG = `<svg class="rb-tracker-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="13 5 20 12 13 19"/></svg>`;
 
+// "Added to TKMS page" marker: the artwork lives in frontend/icons/tkms.svg — replace THAT file
+// (same name) to change the icon; no code edit needed. Served by path in every HTTP mode; the
+// standalone build injects window.TKMS_ICON_SRC as a data URI (see bundle.mjs) so file:// works.
+function tkmsIconHtml() {
+  const src = window.TKMS_ICON_SRC || 'icons/tkms.svg';
+  return `<img class="rb-tkms-ic" src="${escapeHtml(src)}" alt="" title="Added to TKMS page">`;
+}
+
 // Tracker chip pinned to the LEFT EDGE of a Route Board row — a direct child of .rb-row (so it's
 // absolutely positioned at left:2px, aligned across every row regardless of the case's station).
 // Arrow icon = handed over to that teammate/shift; person icon = picked by that operator.
+// Cases flagged "Added to TKMS page" get the diamonds icon right of the name.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
   const icon = t.kind === 'to' ? TRACKER_ARROW_SVG : TRACKER_PERSON_SVG;
   const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span></div>`;
+  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span>${c.addedToTkms ? tkmsIconHtml() : ''}</div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -6153,7 +6167,7 @@ function renderRouteBoardStrip() {
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
           <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
           <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
-          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to</span>
+          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to · ${tkmsIconHtml()} on TKMS page</span>
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">

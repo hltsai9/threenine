@@ -242,6 +242,7 @@ Decoding, element by element:
 | **Deadline chip** (`overdue 17:30`) near the arrow's end | When the hand-off is due — **red means overdue, act now** |
 | **Eye + dashed ring/arrow** | Watch mode: no deadline, but you're keeping an eye on it |
 | **👤 name tag** (left edge) | Who picked the case; an **→ arrow tag** means it was handed to that person/shift |
+| **Blue+pink diamonds** right of the name | The case is on the **TKMS page** (the "Added to TKMS page" checkbox, [Module 7](#module-7--handover)) |
 | **`stays`** label | The case intentionally stays at its station |
 | **Sanity Check · N cases** | Collapsible group of sanity-check cases — click the header to fold/unfold. These cases also live on their own **Sanity Check tab** in the picked list, so they don't crowd out active work |
 | Green title-bar counters | `3 moving · 3 overdue · 4 watch` — the board's live summary |

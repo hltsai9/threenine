@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Added (Route Board: TKMS marker icon next to the tracker name)
+
+- Cases flagged **"Added to TKMS page"** now show an icon — blue + pink diamonds overlapped —
+  immediately right of the tracker name on their Route Board row (every row type), plus a legend
+  entry ("on TKMS page") in the green title bar. The artwork lives in
+  **`frontend/icons/tkms.svg`** — replace that file (same name) and rebundle to swap the icon; no
+  code change. The app loads it by path; `bundle.mjs` inlines it as a data URI so
+  `standalone.html` keeps working via `file://`. 1 new test (175 total).
+
 ### Changed (handover notes panel + export Note column) · Added ("Added to TKMS page")
 
 - **"Handover (latest)" → "Handover notes":** the case detail panel now shows **every** handover
