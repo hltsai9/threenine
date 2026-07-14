@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Changed (main view now fills the window width)
+
+- Removed the `max-width: 1260px` cap on `main` — on wide monitors the content area (Route Board,
+  picked list, reading panel, tables) now keeps expanding with the window instead of stopping at a
+  fixed centered column. Verified at 2200px: main fills the window minus the sidebar, no
+  horizontal scrollbar. The Status Flow diagram keeps its own 980px cap (fixed-viewBox drawing).
+
 ### Changed ("+ Import case by ID": database first, Case Center ingest as fallback)
 
 - Import-by-ID now tries the **database first** (instant read); only when the case isn't stored
