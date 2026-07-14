@@ -6,6 +6,7 @@ aggregated JSON from /api/events/summary. Aggregation is done in Python over the
 rows (event volume is small — one team's clicks), which keeps it portable across
 SQLite/PostgreSQL/MySQL instead of leaning on dialect-specific SQL.
 """
+import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -16,6 +17,12 @@ from .db import Event
 MAX_BATCH = 200
 MAX_KIND_LEN = 40
 MAX_ID_LEN = 64
+
+# Operators whose activity is HIDDEN from the dashboard (their events are still stored).
+# Default: the admin. Override with ANALYTICS_EXCLUDE_OPERATORS (comma-separated ids).
+EXCLUDED_OPERATORS = {
+    s.strip() for s in os.environ.get("ANALYTICS_EXCLUDE_OPERATORS", "op-admin").split(",") if s.strip()
+}
 
 
 def _parse_at(raw):
@@ -72,6 +79,7 @@ def events_summary(session, days=30):
         select(Event).where(Event.at >= since).order_by(Event.at)
     ).scalars().all()
 
+    total = 0
     by_operator = {}
     by_kind = {}
     matrix = {}          # operator -> kind -> count
@@ -80,6 +88,9 @@ def events_summary(session, days=30):
     handoffs = []        # {caseId, operator, pickedAt, handoverAt, hours}
 
     for e in rows:
+        if e.operator_id in EXCLUDED_OPERATORS:
+            continue   # admin activity stays out of every index
+        total += 1
         op = e.operator_id or "?"
         by_operator[op] = by_operator.get(op, 0) + 1
         by_kind[e.kind] = by_kind.get(e.kind, 0) + 1
@@ -127,7 +138,7 @@ def events_summary(session, days=30):
     copy_kinds = ("copy_table", "copy_table_nosanity", "export_csv", "archive_copy_table")
     return {
         "days": days,
-        "total": len(rows),
+        "total": total,
         "operators": sorted(by_operator.keys()),
         "byOperator": by_operator,
         "byKind": by_kind,

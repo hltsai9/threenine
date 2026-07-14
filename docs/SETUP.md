@@ -81,6 +81,7 @@ Then wire your request in **`local/casecenter.py`**:
 | `CASE_CENTER_API_KEY` / `CASE_CENTER_COOKIE` | ingest / `serve.py` | — | Case Center credentials (ingestion side only). The board's per-case ⟳ button — and import-by-ID **as a fallback**, when the requested case isn't stored yet — call `POST /api/ingest?id=…`, which spawns the ingest CLI **on the API host** — so in the decoupled deployment these must also be present in the API process environment, or that endpoint answers 502 and cases update only via scheduled ingestion. |
 | `CASE_CENTER_BASE_URL` | `casecenter.py` | _(empty)_ | Builds each case's clickable link |
 | `CASE_CENTER_LOOKBACK_HOURS` | `casecenter.py` | `6` | Default look-back window for the fetch |
+| `ANALYTICS_EXCLUDE_OPERATORS` | `backend/analytics.py` | `op-admin` | Comma-separated operator ids whose activity is hidden from the `#/analytics` dashboard (events are still stored) |
 | `ALLOWED_ORIGINS` | `backend/api.py` | _(empty)_ | CORS origins — explicit allowlist (no `*`); load-bearing now that the API can be auth-gated. Only for a separate-host SPA. |
 | `SERVE_STATIC` | `backend/api.py` | `1` | Also serve `frontend/` at `/` (same origin) |
 | `AUTO_CREATE` | backend | `1` | Create tables on start (set `0` + use Alembic for production) |

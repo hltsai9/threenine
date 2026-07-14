@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Changed (analytics dashboard hides the admin's own activity)
+
+- `events_summary()` now skips events by excluded operators in **every** index (total, per-operator
+  and per-kind counts, matrix, daily series, hand-off pairs). Default exclusion: **`op-admin`**;
+  override with the `ANALYTICS_EXCLUDE_OPERATORS` env var (comma-separated ids — see `SETUP.md`).
+  Events are still stored; only the dashboard aggregation filters them.
+
 ### Added (Route Board: TKMS marker icon next to the tracker name)
 
 - Cases flagged **"Added to TKMS page"** now show an icon — blue + pink diamonds overlapped —
