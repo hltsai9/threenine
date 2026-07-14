@@ -345,8 +345,12 @@ for the next shift.**
   (`you → them`).
 - A good note answers three questions: *what's the state? what's the next step? what should they
   watch out for?*
-- Notes are **never lost**: each one is stored in the case History with author and time, even
-  after a newer note replaces it as "latest".
+- Notes are **never lost**: the case's **Handover notes** panel shows the full note history — the
+  latest one highlighted, every earlier note listed beneath it — and each is also in the History
+  log with author and time.
+- **"Added to TKMS page"** — a checkbox in the case toolbar. Tick it once the case has been added
+  to the TKMS page; the export's *If added to TKMS page* column then shows `Yes`
+  ([Module 8](#module-8--exports)).
 
 **Try it:** press **Write handover note** on a picked case and save one sentence. Find it in the
 History section, then check the Shifts page — that case no longer counts as missing a note.
@@ -375,14 +379,15 @@ these columns:
 | Track Status | Your current intent |
 | Handover Route | Latest handover as `operator A → operator B` |
 | Core Team | The **assigned member's name** ([Module 6](#module-6--track-status-in-depth)) |
+| If added to TKMS page | `Yes` when the case's **"Added to TKMS page"** checkbox is ticked ([Module 7](#module-7--handover)) |
 | HQ Product Team | Assigned HQ team |
-| Note | The case's whole history, one line per entry: `MM/DD OperatorName: text` |
+| Note | **Every handover note** on the case (and only handover notes — no picks/status actions), one per line: `MM/DD OperatorName: text` |
 
 The **Overview** week table has its own *Copy as table* button, with a *Picked only* filter beside
 it.
 
 **Try it:** press **Copy as table**, paste into a Teams chat (or Excel) and confirm it renders as
-a table with the eight columns above.
+a table with the nine columns above.
 
 ---
 

@@ -104,13 +104,46 @@ test('caseNotesText: keeps the text of every handover note (new-style entries)',
   ok(txt.includes('first note'), 'older handover note text must survive');
   ok(txt.includes('second note'), 'latest handover note text must be present');
 });
-test('caseNotesText: legacy generic entry gets the current note appended', () => {
+test('caseNotesText: legacy generic entry substitutes the current note text', () => {
   const txt = app.caseNotesText({
     history: [{ at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night)' }],
     handover: { at: iso(1 * HOUR), author: opId, note: 'watch the SLA' },
   });
-  ok(txt.includes('Handover note (Day → Night): watch the SLA'), 'note appended to legacy label');
+  ok(txt.includes('watch the SLA'), 'legacy note text reaches the export');
   eq(txt.split('\n').length, 1, 'no duplicate line for the same handover');
+});
+test('caseNotesText: only handover notes — other actions are excluded', () => {
+  const txt = app.caseNotesText({
+    history: [
+      { at: iso(5 * HOUR), who: opId, kind: 'picked', detail: 'Picked for follow-up' },
+      { at: iso(4 * HOUR), who: opId, kind: 'track-status-set', detail: 'untracked → escalate_to_core' },
+      { at: iso(2 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): only this line' },
+    ],
+    handover: { at: iso(2 * HOUR), author: opId, note: 'only this line' },
+  });
+  eq(txt.split('\n').length, 1, 'a single handover line');
+  ok(txt.includes('only this line') && !txt.includes('Picked for follow-up'), 'actions excluded');
+});
+test('caseHandoverNotes: returns every note, prefix stripped, oldest first', () => {
+  const notes = app.caseHandoverNotes({
+    history: [
+      { at: iso(3 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): first' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover to Bo (Night → Day): second' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'second' },
+  });
+  eq(notes.map(n => n.text), ['first', 'second']);
+});
+test('routeBoardTableData: TKMS column sits between Core Team and HQ, Yes when ticked', () => {
+  const { headers, rows } = app.routeBoardTableData();
+  eq(headers.indexOf('If added to TKMS page'), headers.indexOf('Core Team') + 1);
+  eq(headers.indexOf('HQ Product Team'), headers.indexOf('If added to TKMS page') + 1);
+  const c = app.routeBoardCases()[0];
+  const was = c.addedToTkms;
+  c.addedToTkms = true;
+  const row = app.routeBoardTableData().rows.find(r => r[0] === app.caseHref(c));
+  eq(row[headers.indexOf('If added to TKMS page')], 'Yes');
+  c.addedToTkms = was;
 });
 /* ---------- renderPickedList (Cases / Sanity Check tabs) ---------- */
 test('renderPickedList: tabs split Sanity Check cases from active ones', () => {

@@ -211,6 +211,7 @@ function fillBoardDefaults(c) {
   if (c.holdStartedAt == null)    c.holdStartedAt = null;
   if (c.lastOwnerContact == null) c.lastOwnerContact = null;
   if (c.handover == null)         c.handover = null;
+  if (c.addedToTkms == null)      c.addedToTkms = false;   // "Added to TKMS page" checkbox
   if (c.reminder == null)         c.reminder = null;
   if (c.history == null)          c.history = c.createdAt ? [{ at: c.createdAt, who: c.assignee || c.reporter || 'system', kind: 'created' }] : [];
   if (c.createdBy == null)        c.createdBy = c.reporter || c.assignee || 'system';
@@ -230,6 +231,7 @@ function applySeedAgentLayer(cases, overlay) {
     if (a.trackStatusDueAt !== undefined) c.trackStatusDueAt = a.trackStatusDueAt;
     if (a.handover !== undefined) c.handover = a.handover;
     if (a.reminder !== undefined) c.reminder = a.reminder;
+    if (a.addedToTkms !== undefined) c.addedToTkms = a.addedToTkms;
   }
 }
 
@@ -495,6 +497,7 @@ function agentLayerFromState() {
       trackStatus: c.trackStatus || null,
       trackStatusAt: c.trackStatusAt || null,
       trackStatusDueAt: c.trackStatusDueAt || null,
+      addedToTkms: !!c.addedToTkms,
     };
   }
   return map;
@@ -510,6 +513,7 @@ function applyAgentLayer(map) {
     if (a.trackStatus !== undefined) c.trackStatus = a.trackStatus;
     if (a.trackStatusAt !== undefined) c.trackStatusAt = a.trackStatusAt;
     if (a.trackStatusDueAt !== undefined) c.trackStatusDueAt = a.trackStatusDueAt;
+    if (a.addedToTkms !== undefined) c.addedToTkms = a.addedToTkms;
   }
 }
 
@@ -1737,36 +1741,41 @@ function caseHandoverRoute(c) {
   return `${from} -> ${to}`;
 }
 
-// All of a case's notes aggregated, oldest first, one per line as "YYYY-MM-DD HH:MM Operator: text".
-// Sourced from the operator-attributed history log; the handover entry shows the actual note message
-// rather than the generic event label (and a seeded handover with no logged event is still included).
-// Plain text only — no HTML.
-function caseNotesText(c) {
+// Every handover note on a case, oldest first, as [{at, who, text}]. The one source feeding
+// BOTH the case detail's "Handover notes" panel and the export's Note column, so they can't
+// disagree. New-style history entries carry the note in detail ("Handover … (Day → Night): text")
+// — the route prefix is stripped; a legacy generic entry matching the current c.handover gets its
+// note substituted; a seeded c.handover with no logged history entry is still included.
+function caseHandoverNotes(c) {
   const items = [];
-  let handoverShown = false;
-  // Date only — month/day in the active display zone, no year and no time (per request).
-  const stamp = at => { const p = _tzParts(at); return `${p.month}/${p.day}`; };
+  let latestShown = false;
   for (const h of (c.history || [])) {
+    if (h.kind !== 'handover') continue;
     const op = getOperator(h.who);
     const who = op ? op.name : (h.who || '?');
-    let text = h.detail || String(h.kind || '').replace(/[-_]/g, ' ');
-    if (h.kind === 'handover' && c.handover && c.handover.at === h.at && c.handover.note) {
-      handoverShown = true;
-      // New-style entries carry the note text in detail already; legacy ones logged only the
-      // generic label — append the (latest) note so its text still reaches the export.
-      if (!(h.detail || '').includes(c.handover.note)) {
-        text = `${h.detail ? h.detail + ': ' : ''}${c.handover.note}`;
-      }
-    }
-    items.push({ at: h.at, line: `${stamp(h.at)} ${who}: ${text}` });
+    const isLatest = !!(c.handover && c.handover.at === h.at);
+    if (isLatest) latestShown = true;
+    let text = String(h.detail || '');
+    const m = /^Handover[^:]*:\s*([\s\S]*)$/.exec(text);
+    if (m) text = m[1];
+    else if (isLatest && c.handover.note) text = c.handover.note;   // legacy generic label
+    if (!text) continue;
+    items.push({ at: h.at, who, text });
   }
-  if (c.handover && c.handover.note && !handoverShown) {
+  if (c.handover && c.handover.note && !latestShown) {
     const op = getOperator(c.handover.author);
-    const who = op ? op.name : (c.handover.author || '?');
-    items.push({ at: c.handover.at, line: `${stamp(c.handover.at)} ${who}: ${c.handover.note}` });
+    items.push({ at: c.handover.at, who: op ? op.name : (c.handover.author || '?'), text: c.handover.note });
   }
   items.sort((a, b) => new Date(a.at) - new Date(b.at));
-  return items.map(i => i.line).join('\n');
+  return items;
+}
+
+// The export's Note column: ONLY the handover notes (all of them — no picks/status actions),
+// oldest first, one per line as "M/D Operator: text". Plain text only — no HTML.
+function caseNotesText(c) {
+  // Date only — month/day in the active display zone, no year and no time (per request).
+  const stamp = at => { const p = _tzParts(at); return `${p.month}/${p.day}`; };
+  return caseHandoverNotes(c).map(n => `${stamp(n.at)} ${n.who}: ${n.text}`).join('\n');
 }
 
 // Column model for the Route Board export — one place feeding both copy (TSV) and download (CSV),
@@ -1774,7 +1783,7 @@ function caseNotesText(c) {
 // opts.excludeSanity drops the Sanity Check group (the "Copy w/o Sanity" button).
 function routeBoardTableData(opts) {
   const headers = ['Case Link', 'Subject', 'IT Process Time', 'Track Status', 'Handover Route',
-    'Core Team', 'HQ Product Team', 'Note'];
+    'Core Team', 'If added to TKMS page', 'HQ Product Team', 'Note'];
   let cases = routeBoardCases();
   if (opts && opts.excludeSanity) cases = cases.filter(c => caseTrackStatus(c) !== 'sanity_check');
   const rows = cases.map(c => {
@@ -1788,6 +1797,7 @@ function routeBoardTableData(opts) {
       tsLabel,
       caseHandoverRoute(c),
       coreMemberName(c) || '',
+      c.addedToTkms ? 'Yes' : '',
       hq ? hq.name : '',
       caseNotesText(c),
     ];
@@ -2767,6 +2777,18 @@ function renderCaseDetailBody(c) {
   })()
   : `<div class="muted tiny">No handover note.</div>`;
 
+  // Every earlier handover note (newest first), under the styled latest one — the full note
+  // history lives here now; the History list below still shows the raw event log.
+  const olderNotes = caseHandoverNotes(c)
+    .filter(n => !(c.handover && c.handover.at === n.at))
+    .reverse()
+    .map(n => `
+      <div class="handover-old">
+        <span class="handover-old-meta">${fmtAbsolute(n.at)} · ${escapeHtml(n.who)}:</span>
+        ${escapeHtml(n.text)}
+      </div>`).join('');
+  const allHandoversHtml = handoverHtml + olderNotes;
+
   const history = (c.history || []).slice().reverse().map(h => {
     const op = getOperator(h.who);
     const who = op ? op.name : h.who;
@@ -2817,8 +2839,8 @@ function renderCaseDetailBody(c) {
             ${renderWaitUser(c)}
           </div>` : ''}
           <div class="detail-section">
-            <h3>Handover (latest)</h3>
-            ${handoverHtml}
+            <h3>Handover notes</h3>
+            ${allHandoversHtml}
           </div>
           <div class="detail-section">
             <h3>Notes</h3>
@@ -2938,6 +2960,11 @@ function renderDetailActions(c) {
   items.push(renderBellButton(c, 'detail'));
   items.push(renderQueueToggleButton(c, 'normal'));
   items.push(renderRefreshButton(c, 'normal'));
+
+  // Operator-layer flag: has this case been added to the TKMS page? Exported as the
+  // "If added to TKMS page" column.
+  items.push(`<label class="tkms-check" title="Tick when this case has been added to the TKMS page">
+    <input type="checkbox" data-action="toggle-tkms" data-case-id="${c.id}"${c.addedToTkms ? ' checked' : ''}> Added to TKMS page</label>`);
 
   return items.join(' ');
 }
@@ -5681,6 +5708,17 @@ function bindHandlers() {
       render();
     });
   });
+  document.querySelectorAll('[data-action="toggle-tkms"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const c = caseById(el.dataset.caseId);
+      if (!c) return;
+      const op = getOperator(STATE.operatorId);
+      c.addedToTkms = el.checked;
+      if (op) logHistory(c, op, 'tkms', el.checked ? 'Added to TKMS page' : 'Removed from TKMS page');
+      track('tkms', { added: el.checked }, c.id);
+      render();
+    });
+  });
   document.getElementById('analytics-days')?.addEventListener('change', e => {
     loadAnalytics(parseInt(e.target.value, 10) || 30);
   });
@@ -5874,6 +5912,7 @@ function normalizeLiveCase(c) {
     handover: null,
     reminder: undefined,
     agentStatus: 'unqueued',
+    addedToTkms: false,
     history: [],
     // Bucket into the week that contains createdAt; auto-create one if none fits, so a
     // brand-new case from a future/past week always lands somewhere.

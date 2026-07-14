@@ -10,6 +10,20 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Changed (handover notes panel + export Note column) · Added ("Added to TKMS page")
+
+- **"Handover (latest)" → "Handover notes":** the case detail panel now shows **every** handover
+  note — the latest keeps its highlighted block (From → To, stale flag), all earlier notes are
+  listed beneath it (`caseHandoverNotes()`, one source shared with the export). History unchanged.
+- **Export Note column = handover notes only:** Copy as table / CSV now lists all handover notes
+  (`M/D Operator: text`, oldest first) and nothing else — picks, status changes and other actions
+  no longer appear in the column.
+- **"Added to TKMS page" checkbox** on every case (toolbar of the reading panel and case detail).
+  Operator-layer boolean (`addedToTkms`), persisted like picks/handover across refreshes and modes,
+  logged to History and analytics. New export column **"If added to TKMS page"** (`Yes`/empty)
+  between *Core Team* and *HQ Product Team*.
+- 4 new tests + 1 updated (174 total).
+
 ### Added (new Track Status: "Product Team Handling")
 
 - 8th Track Status for long-running cases the HQ Product Team owns outright — typically once the

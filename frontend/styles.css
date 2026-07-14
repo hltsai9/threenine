@@ -3036,3 +3036,34 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 .an-line-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint-2); margin-top: 2px; }
 .an-num { text-align: right; font-family: var(--font-mono); font-size: 12px; }
 .an-matrix th { font-size: 10.5px; }
+
+/* "Added to TKMS page" checkbox in the case-detail / reading-panel toolbar. */
+.tkms-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2E5641;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+}
+.tkms-check input { accent-color: #2E5641; cursor: pointer; margin: 0; }
+
+/* Earlier handover notes listed under the styled latest one ("Handover notes" section). */
+.handover-old {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #f4f6f3;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.handover-old-meta { color: var(--text-faint); font-weight: 600; margin-right: 4px; }
