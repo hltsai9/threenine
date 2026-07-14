@@ -2337,6 +2337,7 @@ table.case-table {
 .ts-pill.ts-hq_did_not_handle   { background: #f9d2b3; color: #6a3a13; }
 .ts-pill.ts-escalate_to_core    { background: #f6cfcf; color: #6a1c1c; }
 .ts-pill.ts-escalated_to_hq     { background: #d8e8f8; color: #1d4a73; }
+.ts-pill.ts-product_team_handling{ background: #e2e6ef; color: #3a4a6b; }
 .ts-pill.ts-need_to_contact_user{ background: #e3d6f0; color: #4a2a73; }
 .ts-pill.ts-case_closed         { background: #c8e1cf; color: #1e4a2c; }
 .ts-pill.ts-sanity_check        { background: #e1efe2; color: #3a6243; }

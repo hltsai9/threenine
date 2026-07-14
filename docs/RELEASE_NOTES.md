@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Added (new Track Status: "Product Team Handling")
+
+- 8th Track Status for long-running cases the HQ Product Team owns outright — typically once the
+  IT process time is already past the 24 h limit and the team stops racing the clock. Behavior:
+  **watch at HQ permanently** (eye + dashed ring when at HQ, intent arrow toward HQ until it lands
+  there — same treatment as *Escalated to HQ*), and the **red over-limit flag on the IT process
+  time is suppressed everywhere** via the `itProcessOver()` chokepoint (Route Board rows, time
+  labels, tables, the detail clock) — the hours themselves keep displaying and keep counting into
+  stats/exports. Suggested on the Day shift; new slate pill color; documented on the #/flow page
+  and in the training guide (decision tree + table). 3 new tests (171 total).
+
 ### Added (usage analytics: events table + hidden #/analytics dashboard)
 
 - **Collection:** a `track()` helper in the SPA buffers meaningful operator actions — `pick`/

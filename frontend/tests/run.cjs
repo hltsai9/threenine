@@ -125,6 +125,26 @@ test('renderPickedList: tabs split Sanity Check cases from active ones', () => {
   app.STATE.pickedListTab = 'cases';
 });
 
+/* ---------- product_team_handling (watch at HQ, over-limit flag off) ---------- */
+test('product_team_handling: classifies as a watch row', () =>
+  eq(app._classifyRouteRow({ id: 'X', trackStatus: 'product_team_handling', processTimeline: [] }), 'watch'));
+test('product_team_handling: case away from HQ gets an intent arrow toward HQ', () => {
+  // Latest stage Service Team → station Core Team → not at the expected HQ → intent row, arrow right.
+  const c = { id: 'X', subject: 's', trackStatus: 'product_team_handling', history: [],
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(4 * HOUR) }] };
+  const html = app._renderWatchRow(c, 0);
+  ok(html.includes('rb-row-watch-intent'), 'intent variant (not settled)');
+  ok(html.includes('rb-wi-right'), 'arrow points toward HQ');
+});
+test('itProcessOver: red flag suppressed for product_team_handling', () => {
+  const c = { id: 'X', status: 'with_hq',
+    processTimeline: [{ processType: 'Service Team', startedAt: iso(40 * HOUR), endedAt: iso(1 * HOUR) }] };
+  ok(app.itProcessOver(c), 'a 39h IT-process case is over the 24h limit normally');
+  c.trackStatus = 'product_team_handling';
+  ok(!app.itProcessOver(c), 'flag off once the Product Team owns it');
+  ok(app.itProcessMs(c) > 24 * HOUR, 'the hours themselves keep counting');
+});
+
 /* ---------- track() + analytics chart helpers ---------- */
 test('track: no-ops outside DB-backend mode', () => {
   app.__EVENT_BUFFER__.length = 0;

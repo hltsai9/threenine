@@ -2345,6 +2345,7 @@ table.case-table {
 .ts-pill.ts-hq_did_not_handle   { background: #f9d2b3; color: #6a3a13; }
 .ts-pill.ts-escalate_to_core    { background: #f6cfcf; color: #6a1c1c; }
 .ts-pill.ts-escalated_to_hq     { background: #d8e8f8; color: #1d4a73; }
+.ts-pill.ts-product_team_handling{ background: #e2e6ef; color: #3a4a6b; }
 .ts-pill.ts-need_to_contact_user{ background: #e3d6f0; color: #4a2a73; }
 .ts-pill.ts-case_closed         { background: #c8e1cf; color: #1e4a2c; }
 .ts-pill.ts-sanity_check        { background: #e1efe2; color: #3a6243; }
@@ -5134,7 +5135,7 @@ function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
 
 /* ---------- Track Status (operator's intent on each picked case) ----------
  * See docs/case-center-overview-plan.md §3 & §6.
- *   - 7-value enum, set/cleared by the operator. Never sent to Case Center.
+ *   - 8-value enum, set/cleared by the operator. Never sent to Case Center.
  *   - The first three statuses carry a scheduled handoff rule that drives the
  *     animated Route Board arrows; the next two are "watching" (eyeball icon).
  * NOTE: the dot's station now always comes from caseStation() (the CC location);
@@ -5145,6 +5146,9 @@ const TRACK_STATUSES = [
   { id: 'hq_did_not_handle',    label: 'HQ did not handle',                  short: 'HQ retry',    scheduled: { to: 'HQ',        day: null,  shift: 'Day', hh: 17, mm: 30 } },
   { id: 'escalate_to_core',     label: 'Escalate to Core Team',              short: 'To Core',     scheduled: { to: 'Core Team', day: null,  shift: 'Day', hh:  9, mm:  0 } },
   { id: 'escalated_to_hq',      label: 'Escalated to HQ — keep an eye',      short: 'Watch HQ' },
+  // Long-running case (IT process time past the limit) that HQ owns now — parked at HQ
+  // permanently, and the over-limit red flag is suppressed (see itProcessOver).
+  { id: 'product_team_handling', label: 'Product Team Handling',             short: 'Product Team' },
   { id: 'need_to_contact_user', label: 'Need to contact user',               short: 'Watch User' },
   { id: 'case_closed',          label: 'Case Closed',                        short: 'Closed' },
   { id: 'sanity_check',         label: 'Sanity Check',                       short: 'Sanity',      useSubjectTag: true, collapsible: true },
@@ -5152,7 +5156,7 @@ const TRACK_STATUSES = [
 const TRACK_STATUS_BY_ID = Object.fromEntries(TRACK_STATUSES.map(t => [t.id, t]));
 const TRACK_GROUP_ORDER = [
   'weekend_case', 'hq_did_not_handle', 'escalate_to_core',
-  'escalated_to_hq', 'need_to_contact_user', 'case_closed',
+  'escalated_to_hq', 'product_team_handling', 'need_to_contact_user', 'case_closed',
   null, // untracked picked cases
   'sanity_check', // last — collapsible bottom group
 ];
@@ -5160,7 +5164,7 @@ const TRACK_GROUP_ORDER = [
 // Heuristic suggestion: which Track Statuses make sense to set on the current shift.
 // Not gating — every value is one click away regardless of the operator's shift.
 const SUGGESTED_TRACK_STATUS_BY_SHIFT = {
-  Day:   ['hq_did_not_handle', 'escalate_to_core', 'escalated_to_hq', 'need_to_contact_user', 'case_closed', 'sanity_check'],
+  Day:   ['hq_did_not_handle', 'escalate_to_core', 'escalated_to_hq', 'product_team_handling', 'need_to_contact_user', 'case_closed', 'sanity_check'],
   Night: ['hq_did_not_handle', 'escalate_to_core'],
 };
 function suggestedTrackStatuses() {
@@ -5804,8 +5808,9 @@ function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
   if (scheduledHandoff(c)) return 'moving';   // a desired handoff → directional animation
-  // WATCH covers escalated_to_hq + need_to_contact_user; the dot position comes from caseStation(c).
-  if (ts === 'escalated_to_hq' || ts === 'need_to_contact_user') return 'watch';
+  // WATCH covers escalated_to_hq + product_team_handling + need_to_contact_user; the dot
+  // position comes from caseStation(c).
+  if (ts === 'escalated_to_hq' || ts === 'product_team_handling' || ts === 'need_to_contact_user') return 'watch';
   if (caseStation(c) === STATION_1ST_LINE) return 'firstline';   // at triage, no firm intent
   return 'stay';
 }
@@ -5924,7 +5929,7 @@ function _renderMovingRow(c, top, animDelay) {
 // Each watch Track Status has an EXPECTED station. When the case is there, the settled "watch"
 // ring applies; when it isn't, the dot stays at the real CC station and a dashed animated arrow
 // points toward where the operator wants it — the board never lies about the current location.
-const EXPECTED_STATION = { escalated_to_hq: 'HQ', need_to_contact_user: 'User' };
+const EXPECTED_STATION = { escalated_to_hq: 'HQ', product_team_handling: 'HQ', need_to_contact_user: 'User' };
 
 function _renderWatchRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
@@ -6528,6 +6533,9 @@ function itProcessLimitHours() {
   return typeof v === 'number' && isFinite(v) ? v : IT_PROCESS_HOURS_DEFAULT;
 }
 function itProcessOver(c) {
+  // "Product Team Handling" = the team accepted this case runs long (HQ owns it now) — stop
+  // flagging its IT process time red everywhere. Hours still display and count into stats.
+  if (caseTrackStatus(c) === 'product_team_handling') return false;
   return itProcessMs(c) > itProcessLimitHours() * HOUR;
 }
 // Small Route-Board / table label for a case's IT process time (red when over the limit).
@@ -6790,7 +6798,7 @@ function renderDetailActions(c) {
   // The CC-shaped action surface (Assign to Core, Escalate to HQ, Chase owner, Verify fix,
   // Return to requester, Move to sanity check, Close, Cancel, Reopen) has been removed —
   // operators do all that work in Case Center. The only operator-driven mutation here is
-  // **Track Status** (see TRACK_STATUSES). The picker shows all 7 values to every shift,
+  // **Track Status** (see TRACK_STATUSES). The picker shows all 8 values to every shift,
   // with a "Suggested for your shift" pill on the relevant ones.
   const items = [];
   const ts = caseTrackStatus(c);
@@ -8322,6 +8330,7 @@ function renderStatusFlow() {
       return `Schedules a hand-off to <strong>${escapeHtml(s.to)}</strong> at ${when}: the Route Board draws a moving arrow from the case's station toward ${escapeHtml(s.to)} with a deadline chip (red once overdue).`;
     }
     if (t.id === 'escalated_to_hq') return 'Watch at <strong>HQ</strong> — an eye + dashed ring once the case is at HQ; an intent arrow points toward HQ until it lands there.';
+    if (t.id === 'product_team_handling') return 'Long-running case the <strong>HQ Product Team</strong> owns now (IT process time already past the limit — the red over-limit flag is suppressed). Same watch treatment as Escalated to HQ: expected at HQ permanently.';
     if (t.id === 'need_to_contact_user') return 'Watch at <strong>User</strong> — the same watch treatment, expected at the User station.';
     if (t.id === 'case_closed') return 'Marks the case done in the operator layer; it drops out of the active Picked workspace.';
     if (t.id === 'sanity_check') return 'Collapses into the Route Board\'s <strong>Sanity Check</strong> group and tags the subject; no scheduled hand-off.';
@@ -8445,7 +8454,7 @@ function renderStatusFlow() {
         <tr><th>Track Status</th><th>Meaning</th><th>Route Board behaviour</th></tr>
       </thead>
       <tbody>
-        ${TRACK_STATUSES.map(t => `<tr><td>${tsPill(t)} <span class="muted tiny">${escapeHtml(t.label)}</span></td><td class="muted tiny">${t.scheduled ? 'Scheduled hand-off' : (t.id === 'escalated_to_hq' || t.id === 'need_to_contact_user') ? 'Watch (keep an eye)' : t.id === 'case_closed' ? 'Done on the operator layer' : 'Grouping / triage'}</td><td class="muted tiny">${tsBehavior(t)}</td></tr>`).join('')}
+        ${TRACK_STATUSES.map(t => `<tr><td>${tsPill(t)} <span class="muted tiny">${escapeHtml(t.label)}</span></td><td class="muted tiny">${t.scheduled ? 'Scheduled hand-off' : (t.id === 'escalated_to_hq' || t.id === 'product_team_handling' || t.id === 'need_to_contact_user') ? 'Watch (keep an eye)' : t.id === 'case_closed' ? 'Done on the operator layer' : 'Grouping / triage'}</td><td class="muted tiny">${tsBehavior(t)}</td></tr>`).join('')}
       </tbody>
     </table>
     <p class="muted tiny" style="margin:10px 0 0;">Clocks are <strong>not</strong> driven by Track Status — they're reconstructed from Case Center's process timeline and the case history (see the <a href="#/clocks">Clock model</a>).</p>

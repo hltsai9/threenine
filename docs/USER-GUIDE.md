@@ -274,10 +274,14 @@ decision tree:
  │ Escalate  │  │ Weekend Case │ │ Escalated   │ │ Need to       │ │ Case Closed  │
  │ to Core   │  │ (Fri/Sat) or │ │ to HQ —     │ │ contact user  │ │ or           │
  │ Team      │  │ HQ did not   │ │ keep an eye │ │               │ │ Sanity Check │
- └───────────┘  │ handle       │ └─────────────┘ └───────────────┘ └──────────────┘
-   arrow ▶Core  └──────────────┘   watch 👁 at HQ   watch 👁 at User   done / folded
-   due 09:00      arrow ▶ HQ                                          into group
-                  due 17:30
+ └───────────┘  │ handle       │ └──────┬──────┘ └───────────────┘ └──────────────┘
+   arrow ▶Core  └──────────────┘        │ already past 24h and
+   due 09:00      arrow ▶ HQ            │ HQ owns it for good?
+                  due 17:30             ▼
+                                 ┌──────────────┐
+                                 │ Product Team │  parked at HQ permanently;
+                                 │ Handling     │  the red over-limit time
+                                 └──────────────┘  flag switches OFF
 ```
 
 The full list — the first three schedule an animated hand-off with a deadline chip:
@@ -288,11 +292,12 @@ The full list — the first three schedule an animated hand-off with a deadline 
 | **HQ did not handle** | Arrow → HQ | Next Day shift, 17:30 MST |
 | **Escalate to Core Team** | Arrow → Core Team | Next Day shift, 09:00 MST |
 | **Escalated to HQ — keep an eye** | 👁 watch at HQ | — |
+| **Product Team Handling** | 👁 watch at HQ **permanently** — for cases already past the 24 h IT-time limit that HQ owns now; the red over-limit flag switches off (hours still display and count) | — |
 | **Need to contact user** | 👁 watch at User | — |
 | **Case Closed** | Removed from active workspace | — |
 | **Sanity Check** | Folded into the Sanity Check group | — |
 
-Notes: your shift's *suggested* statuses are marked in the picker, but all seven are always one
+Notes: your shift's *suggested* statuses are marked in the picker, but all eight are always one
 click away. When you set a scheduled status you can override its hand-off time. **Clear** removes
 the intent.
 
