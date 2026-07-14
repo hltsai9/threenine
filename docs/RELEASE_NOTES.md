@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Changed ("+ Import case by ID": database first, Case Center ingest as fallback)
+
+- Import-by-ID now tries the **database first** (instant read); only when the case isn't stored
+  does it fall back to the server-side ingest (`POST /api/ingest`) and re-read — so known cases
+  cost one cheap read and unknown ones still import without waiting for the schedule. While the
+  fallback runs, the loading overlay switches to *"… isn't in the database — retrieving it from
+  Case Center. This can take a moment…"* so the wait is explained (`showLiveLoading()` now accepts
+  a message and can update in place). The success toast names the actual source (database vs Case
+  Center), and the specific ingest-failure toast is back for the fallback path. ⟳ stays
+  ingest-always. Docs updated (USER-GUIDE Modules 4 & 9 + troubleshooting, SETUP env note).
+
 ### Changed ("+ Import case by ID" is a pure database read again)
 
 - Import-by-ID no longer triggers a server-side Case Center ingest — it only reads the stored case

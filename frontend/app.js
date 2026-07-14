@@ -5344,18 +5344,27 @@ function ingestFailToast(id, e) {
 }
 
 // Fetch one case by id and add/merge it into the board (the "+ New case" by-id flow).
-// DB-backend mode reads ONLY the stored row (GET /api/cases?id= is a pure DB read) — no Case
-// Center ingest is triggered, so the case must already have been ingested by the schedule.
-// The per-case ⟳ button is the "get fresh data from Case Center now" action (refreshCase).
+// DB-backend mode is DB-first: a cheap stored-row read (GET /api/cases?id=), and only when the
+// case isn't in the database yet does it fall back to a server-side Case Center ingest
+// (POST /api/ingest) followed by a re-read — with the loading overlay explaining the wait.
 // serve.py mode is unchanged: there the ?id= fetch IS the live proxy, its only data source.
 async function addCaseById(id) {
   showLiveLoading();
+  let ingested = false;
   try {
-    const cases = await fetchCaseById(id);
+    let cases = await fetchCaseById(id);
+    if (!cases.length && isDbBackend()) {
+      // Tell the user why this is about to take a while — the backend spawns the ingest CLI,
+      // which calls Case Center, before we can re-read the stored row.
+      showLiveLoading(`${id} isn't in the database — retrieving it from Case Center. This can take a moment…`);
+      await triggerIngest(id);
+      ingested = true;
+      cases = await fetchCaseById(id);
+    }
     hideLiveLoading();
     if (!cases.length) {
       showToast(isDbBackend()
-        ? `Case ${id} is not in the database yet — it arrives with the next scheduled ingest.`
+        ? `Case ${id} not found — not in the database, and Case Center returned nothing for it.`
         : `Case ${id} not found in Case Center.`, 'warn');
       return;
     }
@@ -5381,10 +5390,12 @@ async function addCaseById(id) {
     if (!firstId) { showToast(`Case ${id} returned a malformed record.`, 'warn'); return; }
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
-    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from ${isDbBackend() ? 'the database' : 'Case Center'} · picked.`, 'success');
+    const source = isDbBackend() && !ingested ? 'the database' : 'Case Center';
+    showToast(`${added ? 'Added' : 'Updated'} ${firstId} from ${source} · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
-    showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
+    if (e.ingest) ingestFailToast(id, e);
+    else showToast(e.status ? `Couldn't fetch ${id} (HTTP ${e.status}).` : 'Could not reach Case Center (is serve.py running?).', 'warn');
   }
 }
 
@@ -6057,13 +6068,18 @@ async function tryLoadLiveCases(allCases) {
 
 /* ---------- Boot ---------- */
 
-// Small overlay shown while the live Case Center fetch is in flight.
-function showLiveLoading() {
-  if (document.getElementById('live-loading')) return;
-  const el = document.createElement('div');
-  el.id = 'live-loading';
-  el.innerHTML = '<span class="live-spinner"></span> Loading cases from Case Center…';
-  document.body.appendChild(el);
+// Small overlay shown while a fetch is in flight. Pass a message to explain a slow step
+// (e.g. the import fallback that ingests from Case Center); calling it again while the
+// overlay is up just swaps the text.
+function showLiveLoading(message) {
+  const text = message || 'Loading cases from Case Center…';
+  let el = document.getElementById('live-loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'live-loading';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<span class="live-spinner"></span> ${escapeHtml(text)}`;
 }
 function hideLiveLoading() {
   document.getElementById('live-loading')?.remove();
