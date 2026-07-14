@@ -95,7 +95,6 @@ Everything happens on one main screen, the **Picked** page. Learn these four zon
 ```
 ┌────────────┬──────────────────────────────────────────────────────────┐
 │  SIDEBAR   │  ①  PICKED WORKSPACE header    (+ Import case by ID)     │
-│            │  ⚠  shift-ending handover banner (when notes are due)    │
 │  Picked    │ ┌──────────────────────────────────────────────────────┐ │
 │  Overview  │ │ ②  HAND-OFF ROUTE BOARD                              │ │
 │  Shifts    │ │    one row per picked case: who holds it,            │ │
@@ -321,9 +320,9 @@ for the next shift.**
 ```
     DAY SHIFT                                   NIGHT SHIFT
   ┌──────────────┐                            ┌──────────────┐
-  │ Mia works    │   1) “Shift ending” banner │ Ren reads    │
-  │ C-2407       │      lists cases missing   │ the note on  │
-  │              │      a fresh note          │ C-2407 and   │
+  │ Mia works    │   1) Shifts page shows     │ Ren reads    │
+  │ C-2407       │      which cases still     │ the note on  │
+  │              │      miss a fresh note     │ C-2407 and   │
   │              │   2) Write handover note   │ continues —  │
   │              │      (or “Hand over to…”   │ no cold      │
   │              │      a named teammate)     │ start        │
@@ -333,8 +332,8 @@ for the next shift.**
               every note is kept forever in History
 ```
 
-- The **amber banner** at the top of the Picked page counts down which cases still need a note
-  (you saw it in the Module 2 screenshot).
+- The **Shifts** page shows each shift's handover state — which picked cases still lack a fresh
+  note for the current shift.
 - **Write handover note** (reading-panel toolbar) = general end-of-shift note.
 - **Hand over to…** = the same, but addressed to a **named teammate**. Their name then appears as
   the row's tracker tag (→ name) and in the export's *Handover Route* column
@@ -345,7 +344,7 @@ for the next shift.**
   after a newer note replaces it as "latest".
 
 **Try it:** press **Write handover note** on a picked case and save one sentence. Find it in the
-History section; note the banner count went down by one.
+History section, then check the Shifts page — that case no longer counts as missing a note.
 
 ---
 

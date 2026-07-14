@@ -149,6 +149,8 @@ You don't normally create it by hand:
 - **`AUTO_CREATE=1`** (Option A) creates `config` on the next boot — just restart the service.
 - **Alembic** (Option B) creates it via revision `0002_add_config` — `alembic upgrade head` (above)
   applies it. After pulling a new version, re-run `alembic upgrade head` (see *Updating*, below).
+  Revision `0003_add_events` adds the **`events`** usage-analytics table the same way (the board
+  batches operator actions there; the hidden `#/analytics` page visualizes them).
 
 **PostgreSQL** (the schema this deployment currently uses) — if you prefer to create it manually,
 or to confirm it exists, the equivalent DDL is:

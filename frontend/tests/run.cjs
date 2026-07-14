@@ -125,6 +125,36 @@ test('renderPickedList: tabs split Sanity Check cases from active ones', () => {
   app.STATE.pickedListTab = 'cases';
 });
 
+/* ---------- track() + analytics chart helpers ---------- */
+test('track: no-ops outside DB-backend mode', () => {
+  app.__EVENT_BUFFER__.length = 0;
+  app.track('pick', null, 'C-1');
+  eq(app.__EVENT_BUFFER__.length, 0, 'demo mode must not collect events');
+});
+test('track: buffers a correctly-shaped event in DB-backend mode', () => {
+  app.__SERVER_OPERATOR_LAYER__ = true;
+  app.__EVENT_BUFFER__.length = 0;
+  app.track('copy_table', { via: 'test' }, 'C-9');
+  eq(app.__EVENT_BUFFER__.length, 1);
+  const ev = app.__EVENT_BUFFER__[0];
+  eq(ev.kind, 'copy_table');
+  eq(ev.caseId, 'C-9');
+  eq(ev.detail, { via: 'test' });
+  ok(typeof ev.at === 'string' && ev.at.includes('T'), 'ISO timestamp');
+  ok(!!ev.operatorId, 'operator attributed');
+  app.__SERVER_OPERATOR_LAYER__ = false;
+  app.__EVENT_BUFFER__.length = 0;
+});
+test('barChartHtml: one bar row per datum', () => {
+  const html = app.barChartHtml([{ label: 'Mia', value: 5 }, { label: 'Ren', value: 2 }]);
+  eq((html.match(/an-bar-row/g) || []).length, 2);
+});
+test('lineChartSvg: renders a polyline over the series', () => {
+  const svg = app.lineChartSvg([{ day: '2026-07-13', count: 1 }, { day: '2026-07-14', count: 3 }]);
+  ok(svg.includes('<polyline'), 'has a line');
+  ok(svg.includes('2026-07-13') && svg.includes('2026-07-14'), 'axis labels');
+});
+
 /* ---------- routeBoardTableData (export filter) ---------- */
 test('routeBoardTableData: excludeSanity drops exactly the Sanity Check rows', () => {
   const shown = app.routeBoardCases();

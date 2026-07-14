@@ -10,6 +10,32 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-14
 
+### Added (usage analytics: events table + hidden #/analytics dashboard)
+
+- **Collection:** a `track()` helper in the SPA buffers meaningful operator actions — `pick`/
+  `unpick`, `track_status`, `handover_note`, `assign_core_member`, `copy_table`/
+  `copy_table_nosanity`/`export_csv`/`archive_copy_table`, `import_case`, `refresh_case`,
+  `page_view`, `list_tab`, `login` — and batch-POSTs them to the API every 15 s (and on tab hide,
+  via `fetch keepalive`). **DB-backend mode only**; demo/`file://`/serve.py collect nothing.
+  Fire-and-forget: analytics can never break or slow the board.
+- **Storage:** new append-only **`events`** table (`at`, `operator_id`, `kind`, `case_id`,
+  `detail` JSON — all indexed; Alembic revision `0003_add_events`), with `POST /api/events`
+  (validated, batch-capped) and `GET /api/events/summary?days=N` (server-side aggregation in
+  `backend/analytics.py`).
+- **Dashboard:** hidden **`#/analytics`** page (no sidebar link — type the hash): KPI tiles,
+  events-per-operator and events-per-action bar charts, activity-per-day line (all zero-dependency
+  HTML/SVG), an operator × action matrix, and the requested **hand-off time per case** table
+  (pick → handover-note pairing) with avg/median per operator. Window selector 7/30/90 days.
+- Verified end-to-end: 68 synthetic events POSTed → summary aggregates correctly → dashboard
+  renders all sections through the real sign-in flow.
+
+### Removed (shift-ending handover banner)
+
+- The amber **"Shift ending: N picked cases still need a fresh handover note"** banner
+  (`kanban-handover-banner`) is gone from the Picked page, per request. The Shifts page still
+  shows each shift's handover state, and `needsHandoverNote()` still drives the Route Board ring
+  pulse. USER-GUIDE updated (wireframe + Module 7) and the workspace screenshot re-captured.
+
 ### Added (picked list split into Cases / Sanity Check tabs)
 
 - The picked-workspace list now has two tabs with live counts — **Cases** (active work) and

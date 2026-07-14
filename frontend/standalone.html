@@ -480,16 +480,6 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
   color: var(--high);
 }
 .queue-banner strong { color: var(--high); }
-.kanban-handover-banner {
-  background: var(--high-bg);
-  border: 1px solid #f5deb3;
-  border-radius: var(--r-md);
-  padding: 10px 16px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: var(--high);
-}
-.kanban-handover-banner strong { color: var(--high); }
 .kanban-live-banner {
   background: var(--accent-bg);
   border: 1px solid #cfe0d4;
@@ -3020,6 +3010,40 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
   padding-top: 38px; /* leave room for the floating "Show list" button */
 }
 
+/* ==========================================================================
+ * Usage-analytics dashboard (hidden admin page: #/analytics)
+ * ========================================================================== */
+.an-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.an-tile {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.an-tile-val { font-family: var(--font-serif); font-size: 26px; font-weight: 700; color: var(--text); }
+.an-tile-label { font-size: 11.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+.an-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 14px 0;
+}
+@media (max-width: 1000px) { .an-grid { grid-template-columns: 1fr; } }
+.an-bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.an-bar-label { flex: 0 0 130px; font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-bar-track { flex: 1; background: #eef1ee; border-radius: 5px; height: 14px; overflow: hidden; }
+.an-bar { height: 100%; background: #3f6e5e; border-radius: 5px; }
+.an-bar-val { flex: 0 0 36px; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
+.an-line { width: 100%; height: 140px; display: block; }
+.an-line-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint-2); margin-top: 2px; }
+.an-num { text-align: right; font-family: var(--font-mono); font-size: 12px; }
+.an-matrix th { font-size: 10.5px; }
+
 </style>
 </head>
 <body>
@@ -4289,6 +4313,45 @@ function signOut() {
   location.reload();
 }
 
+/* ---------- Usage analytics (admin) ----------
+ * Meaningful operator actions (pick, handover note, copy/export clicks, page views, …) are
+ * buffered here and batch-POSTed to /api/events — DB-backend mode only; demo / file:// /
+ * serve.py stay silent. The hidden #/analytics page (no nav link) renders the aggregated
+ * summary. Fire-and-forget everywhere: analytics must never break or slow the board. */
+window.__EVENT_BUFFER__ = [];
+function track(kind, detail, caseId) {
+  if (!isDbBackend()) return;
+  const buf = window.__EVENT_BUFFER__;
+  if (buf.length >= 100) buf.shift();   // cap: drop oldest rather than grow unbounded
+  buf.push({
+    at: new Date().toISOString(),
+    operatorId: STATE.operatorId,
+    kind,
+    caseId: caseId || null,
+    detail: detail || {},
+  });
+}
+function flushEvents(unloading) {
+  const buf = window.__EVENT_BUFFER__;
+  if (!buf.length || !/^https?:$/.test(location.protocol)) return;
+  const events = buf.splice(0, buf.length);
+  try {
+    // keepalive lets the final flush survive tab close/navigation (sendBeacon can't carry
+    // the Authorization header, so it's not an option here).
+    fetch(apiUrl('api/events'), withAuth({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events }),
+      keepalive: !!unloading,
+    })).catch(() => {});
+  } catch (e) { /* swallow — never break the board over analytics */ }
+}
+setInterval(() => flushEvents(false), 15000);
+window.addEventListener('pagehide', () => flushEvents(true));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushEvents(true);
+});
+
 // Build the /api/cases query for a created-between window. With a newer bound > 0 it asks for a
 // band (created between fromHours and toHours ago); otherwise the legacy "within N hours" form.
 function liveCasesUrl(from, to) {
@@ -4928,6 +4991,8 @@ function currentRoute() {
   if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
   if (h.startsWith('#/clocks')) return { name: 'clocks' };
+  // Hidden admin page — no sidebar link; reachable only by typing the hash.
+  if (h.startsWith('#/analytics')) return { name: 'analytics' };
   return { name: 'cases' };
 }
 
@@ -4943,6 +5008,7 @@ function labelForRoute(route) {
     case 'shiftDetail': return `${route.shift} shift`;
     case 'archive': return 'Overview';
     case 'recycleBin': return 'Recycle bin';
+    case 'analytics': return 'Analytics';
     case 'archiveWeek': {
       const w = window.WEEKS.find(w => w.id === route.id);
       return w ? w.label : 'Archive';
@@ -4953,9 +5019,14 @@ function labelForRoute(route) {
   }
 }
 
+let __lastViewedRoute = null;
 function render() {
   renderSidebar();
   const route = currentRoute();
+  if (route.name !== __lastViewedRoute) {
+    __lastViewedRoute = route.name;
+    track('page_view', { route: route.name });
+  }
   // Remember the last list-style view so the case detail can offer a contextual back link.
   if (route.name !== 'detail') {
     STATE.lastListRoute = location.hash || '#/cases';
@@ -4986,6 +5057,7 @@ function render() {
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
   else if (route.name === 'clocks') main.innerHTML = renderClockModel();
+  else if (route.name === 'analytics') main.innerHTML = renderAnalyticsPage();
   bindHandlers();
   saveState();
 }
@@ -5442,6 +5514,7 @@ function commitTrackStatus(c, value, prev) {
     c.trackStatusDueAt = null;             // no override → the standard rule applies
   }
   logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value || 'untracked'}`);
+  track('track_status', { value: value || 'cleared' }, c.id);
   render();
 }
 
@@ -5494,6 +5567,7 @@ function openHandoffTimeModal(c, value, prev, selectEl) {
     c.trackStatusAt = NOW.toISOString();
     c.trackStatusDueAt = iso;
     logHistory(c, op, 'track-status-set', `${prev || 'untracked'} → ${value} · hand off ${fmtAbsolute(iso)}`);
+    track('track_status', { value, dueAt: iso }, c.id);
     showToast(`${c.id} — ${def.label}. Hand off by ${fmtAbsolute(iso)}.`, 'success');
     render();
     return true;
@@ -5797,6 +5871,7 @@ function openCorePreassignModal(c, op) {
     const desk = getOwner('core', coreId);
     const mName = coreMemberName(c);
     logHistory(c, op, 'assigned', `Core Team — ${desk ? desk.name : coreId}${mName ? ' · ' + mName : ''}`);
+    track('assign_core_member', { coreId, memberId }, c.id);
     showToast(`${c.id} assigned to ${mName || (desk ? desk.name : 'Core Team')}.`, 'success');
     render();
     return true;
@@ -6162,13 +6237,6 @@ function renderCaseList() {
     STATE.kanbanSelected = activeCase.id;
   }
 
-  const handoverPending = handoverPendingCases();
-  const handoverBanner = handoverPending.length > 0 ? `
-    <div class="kanban-handover-banner">
-      <strong>Shift ending:</strong> ${handoverPending.length} picked case${handoverPending.length === 1 ? '' : 's'} still need a fresh ${escapeHtml(getOperator(STATE.operatorId).shift)}-shift handover note.
-    </div>
-  ` : '';
-
   const dueReminders = STATE.cases.filter(c =>
     !c.deletedAt && c.reminder && c.reminder.fired && !['closed', 'cancelled'].includes(c.status)
   );
@@ -6222,7 +6290,6 @@ function renderCaseList() {
       </div>
       ${liveBanner}
       ${remindersBanner}
-      ${handoverBanner}
       <div class="picked-workspace">
         <div class="picked-workspace-top">
           ${renderRouteBoardStrip()}
@@ -8856,6 +8923,7 @@ function handlePrompt(caseId, kind) {
       // Include the note text so it survives in history after the next handover overwrites
       // c.handover — the History panel and the export's Note column read it from here.
       logHistory(c, op, 'handover', `Handover note (${op.shift} → ${target}): ${note}`);
+      track('handover_note', { to: target }, c.id);
       showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
       render();
       return true;
@@ -9022,6 +9090,7 @@ function handlePrompt(caseId, kind) {
     if (nowQueued) STATE.kanbanSelected = c.id;
     logHistory(c, op, nowQueued ? 'picked' : 'unpicked',
       nowQueued ? 'Picked for follow-up' : 'Removed from Picked workspace');
+    track(nowQueued ? 'pick' : 'unpick', null, c.id);
     showToast(nowQueued ? `${c.id} picked for follow-up.` : `${c.id} unpicked.`, 'info');
     render();
     return;
@@ -9048,6 +9117,7 @@ function handlePrompt(caseId, kind) {
     c.trackStatusAt = null;
     c.trackStatusDueAt = null;
     logHistory(c, op, 'track-status-cleared', `${ts} → cleared`);
+    track('track_status', { value: 'cleared' }, c.id);
     showToast(`${c.id} Track Status cleared.`, 'info');
     render();
     return;
@@ -9169,6 +9239,7 @@ function handleHandoverTo(caseId, recipientOpId) {
     // Include the note text so it survives in history after the next handover overwrites
     // c.handover — the History panel and the export's Note column read it from here.
     logHistory(c, op, 'handover', `Handover to ${recipient.name} (${op.shift} → ${recipient.shift}): ${note}`);
+    track('handover_note', { to: recipient.shift, toOperator: recipient.id }, c.id);
     showToast(`Handover note for ${c.id} addressed to ${recipient.name}.`, 'success');
     render();
     return true;
@@ -9296,6 +9367,7 @@ async function addCaseById(id) {
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
     const source = isDbBackend() && !ingested ? 'the database' : 'Case Center';
+    track('import_case', { found: true, ingested }, firstId);
     showToast(`${added ? 'Added' : 'Updated'} ${firstId} from ${source} · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
@@ -9308,6 +9380,7 @@ async function addCaseById(id) {
 // DB-backend mode re-ingests server-side first so the follow-up read returns fresh CC data.
 async function refreshCase(id) {
   showLiveLoading();
+  track('refresh_case', null, id);
   try {
     if (isDbBackend()) await triggerIngest(id);
     const cases = await fetchCaseById(id);
@@ -9505,22 +9578,32 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="picked-tab"]').forEach(el => {
     el.addEventListener('click', () => {
       STATE.pickedListTab = el.dataset.tab === 'sanity' ? 'sanity' : 'cases';
+      track('list_tab', { tab: STATE.pickedListTab });
       render();
     });
+  });
+  document.getElementById('analytics-days')?.addEventListener('change', e => {
+    loadAnalytics(parseInt(e.target.value, 10) || 30);
+  });
+  document.getElementById('analytics-refresh')?.addEventListener('click', () => {
+    loadAnalytics(ANALYTICS.days);
   });
   document.getElementById('route-mine-only')?.addEventListener('change', e => {
     STATE.routeMineOnly = e.target.checked;
     render();
   });
   document.getElementById('rb-export-csv')?.addEventListener('click', () => {
+    track('export_csv');
     downloadTextFile('route-board.csv', routeBoardCsvText(), 'text/csv;charset=utf-8');
   });
   document.getElementById('rb-copy-table')?.addEventListener('click', async () => {
+    track('copy_table');
     await copyRichTable(routeBoardTableHtml(), routeBoardTableText());
     const flash = document.getElementById('rb-copied');
     if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
   });
   document.getElementById('rb-copy-table-nosanity')?.addEventListener('click', async () => {
+    track('copy_table_nosanity');
     const opts = { excludeSanity: true };
     await copyRichTable(routeBoardTableHtml(opts), routeBoardTableText(opts));
     const flash = document.getElementById('rb-copied');
@@ -9617,6 +9700,7 @@ function bindHandlers() {
   if (archiveCopyBtn) {
     archiveCopyBtn.addEventListener('click', async () => {
       const wk = archiveCopyBtn.dataset.weekId;
+      track('archive_copy_table', { weekId: wk });
       await copyRichTable(archiveTableHtml(wk), archiveTableText(wk));
       const flash = document.getElementById('archive-copied');
       if (flash) { flash.classList.add('show'); setTimeout(() => flash.classList.remove('show'), 1200); }
@@ -9981,6 +10065,169 @@ async function tryLoadLiveCases(allCases) {
   return true;
 }
 
+/* ---------- Usage-analytics dashboard (hidden admin page: #/analytics) ---------- */
+
+const ANALYTICS = { days: 30, data: null, loading: false, error: null };
+
+async function loadAnalytics(days) {
+  ANALYTICS.days = days;
+  ANALYTICS.loading = true;
+  ANALYTICS.error = null;
+  render();
+  try {
+    const res = await fetch(apiUrl('api/events/summary?days=' + encodeURIComponent(days)),
+      withAuth({ headers: { Accept: 'application/json' } }));
+    if (res.status === 401) onApiUnauthorized();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    ANALYTICS.data = await res.json();
+  } catch (e) {
+    ANALYTICS.error = String((e && e.message) || e);
+  }
+  ANALYTICS.loading = false;
+  render();
+}
+
+// Zero-dependency horizontal bar chart: [{label, value}] → stacked rows with proportional bars.
+function barChartHtml(items) {
+  if (!items.length) return '<div class="muted tiny">No data yet.</div>';
+  const max = Math.max(...items.map(i => i.value), 1);
+  return items.map(i => `
+    <div class="an-bar-row">
+      <span class="an-bar-label" title="${escapeHtml(i.label)}">${escapeHtml(i.label)}</span>
+      <div class="an-bar-track"><div class="an-bar" style="width:${Math.max(2, Math.round(i.value / max * 100))}%"></div></div>
+      <span class="an-bar-val">${i.value}</span>
+    </div>`).join('');
+}
+
+// Zero-dependency line/area chart for the per-day series: [{day, count}] → inline SVG.
+function lineChartSvg(series) {
+  if (!series.length) return '<div class="muted tiny">No data yet.</div>';
+  const W = 640, H = 140, PAD = 6;
+  const max = Math.max(...series.map(p => p.count), 1);
+  const x = i => PAD + i * (W - 2 * PAD) / Math.max(series.length - 1, 1);
+  const y = v => H - PAD - v * (H - 2 * PAD) / max;
+  const pts = series.map((p, i) => `${x(i).toFixed(1)},${y(p.count).toFixed(1)}`).join(' ');
+  const area = `${PAD},${H - PAD} ${pts} ${(W - PAD).toFixed(1)},${H - PAD}`;
+  const first = series[0].day, last = series[series.length - 1].day;
+  return `
+    <svg class="an-line" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="events per day">
+      <polygon points="${area}" fill="#3f6e5e22"></polygon>
+      <polyline points="${pts}" fill="none" stroke="#3f6e5e" stroke-width="2"></polyline>
+    </svg>
+    <div class="an-line-axis"><span>${escapeHtml(first)}</span><span>peak ${max}/day</span><span>${escapeHtml(last)}</span></div>`;
+}
+
+function renderAnalyticsPage() {
+  const header = `
+    <div class="page-header">
+      <div>
+        <h1>Usage analytics</h1>
+        <div class="subtitle">Operator behavior collected by the board (admin page — not linked from the sidebar). Events are batched to the database; this view aggregates the selected window.</div>
+      </div>
+      <div class="toolbar">
+        <label class="muted tiny">Window
+          <select id="analytics-days">
+            ${[7, 30, 90].map(d => `<option value="${d}"${ANALYTICS.days === d ? ' selected' : ''}>Last ${d} days</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn" id="analytics-refresh">↻ Refresh</button>
+      </div>
+    </div>`;
+
+  if (!isDbBackend()) {
+    return header + `<div class="card"><div class="card-body muted">
+      Analytics needs the DB backend (events are stored in the database). This deployment is running
+      in demo / proxy mode, so nothing is collected here.</div></div>`;
+  }
+  if (ANALYTICS.loading) return header + `<div class="card"><div class="card-body muted">Loading…</div></div>`;
+  if (ANALYTICS.error) return header + `<div class="card"><div class="card-body muted">Could not load the summary (${escapeHtml(ANALYTICS.error)}). Try Refresh.</div></div>`;
+  if (!ANALYTICS.data) {
+    // First visit: kick off the fetch after this render settles.
+    setTimeout(() => { if (!ANALYTICS.data && !ANALYTICS.loading) loadAnalytics(ANALYTICS.days); }, 0);
+    return header + `<div class="card"><div class="card-body muted">Loading…</div></div>`;
+  }
+
+  const d = ANALYTICS.data;
+  const opName = id => { const o = getOperator(id); return o ? o.name : id; };
+  const copies = Object.values(d.copyCounts || {}).reduce((a, b) => a + b, 0);
+  const tiles = [
+    { label: 'Events', value: d.total },
+    { label: 'Active operators', value: (d.operators || []).length },
+    { label: 'Picks', value: (d.byKind || {}).pick || 0 },
+    { label: 'Handover notes', value: (d.byKind || {}).handover_note || 0 },
+    { label: 'Copies + exports', value: copies },
+  ].map(t => `<div class="an-tile"><div class="an-tile-val">${t.value}</div><div class="an-tile-label">${escapeHtml(t.label)}</div></div>`).join('');
+
+  const opBars = barChartHtml((d.operators || [])
+    .map(id => ({ label: opName(id), value: (d.byOperator || {})[id] || 0 }))
+    .sort((a, b) => b.value - a.value));
+  const kindBars = barChartHtml(Object.entries(d.byKind || {})
+    .map(([k, v]) => ({ label: k.replace(/_/g, ' '), value: v }))
+    .sort((a, b) => b.value - a.value));
+
+  const kinds = Object.keys(d.byKind || {}).sort();
+  const matrixRows = (d.operators || []).map(id => `
+    <tr><td>${escapeHtml(opName(id))}</td>${kinds.map(k =>
+      `<td class="an-num">${((d.matrix || {})[id] || {})[k] || ''}</td>`).join('')}</tr>`).join('');
+
+  const handoffRows = (d.handoffs || []).slice().reverse().map(h => `
+    <tr>
+      <td class="mono">${escapeHtml(h.caseId)}</td>
+      <td>${escapeHtml(opName(h.operator))}</td>
+      <td class="muted tiny">${escapeHtml(fmtAbsolute(h.pickedAt))}</td>
+      <td class="muted tiny">${escapeHtml(fmtAbsolute(h.handoverAt))}</td>
+      <td class="an-num">${h.hours}h</td>
+    </tr>`).join('');
+  const handoffStatRows = (d.handoffStats || []).map(s => `
+    <tr><td>${escapeHtml(opName(s.operator))}</td><td class="an-num">${s.count}</td>
+        <td class="an-num">${s.avgHours}h</td><td class="an-num">${s.medianHours}h</td></tr>`).join('');
+
+  return header + `
+    <div class="an-tiles">${tiles}</div>
+
+    <div class="an-grid">
+      <div class="card"><div class="card-body">
+        <h3>Events per operator</h3>${opBars}
+      </div></div>
+      <div class="card"><div class="card-body">
+        <h3>Events per action</h3>${kindBars}
+      </div></div>
+    </div>
+
+    <div class="card"><div class="card-body">
+      <h3>Activity per day</h3>${lineChartSvg(d.byDay || [])}
+    </div></div>
+
+    <div class="card"><div class="card-body">
+      <h3>Operator × action matrix</h3>
+      <div style="overflow-x:auto;">
+      <table class="transition-table an-matrix">
+        <thead><tr><th>Operator</th>${kinds.map(k => `<th>${escapeHtml(k.replace(/_/g, ' '))}</th>`).join('')}</tr></thead>
+        <tbody>${matrixRows || '<tr><td class="muted">No data yet.</td></tr>'}</tbody>
+      </table>
+      </div>
+    </div></div>
+
+    <div class="an-grid">
+      <div class="card"><div class="card-body">
+        <h3>Hand-off time per case <span class="muted tiny">(pick → handover note)</span></h3>
+        <div style="overflow-x:auto; max-height:340px; overflow-y:auto;">
+        <table class="transition-table">
+          <thead><tr><th>Case</th><th>Operator</th><th>Picked</th><th>Handover</th><th>Hours</th></tr></thead>
+          <tbody>${handoffRows || '<tr><td colspan="5" class="muted">No pick → handover pairs in this window yet.</td></tr>'}</tbody>
+        </table>
+        </div>
+      </div></div>
+      <div class="card"><div class="card-body">
+        <h3>Hand-off stats per operator</h3>
+        <table class="transition-table">
+          <thead><tr><th>Operator</th><th>Hand-offs</th><th>Avg</th><th>Median</th></tr></thead>
+          <tbody>${handoffStatRows || '<tr><td colspan="4" class="muted">No data yet.</td></tr>'}</tbody>
+        </table>
+      </div></div>
+    </div>`;
+}
+
 /* ---------- Boot ---------- */
 
 // Small overlay shown while a fetch is in flight. Pass a message to explain a slow step
@@ -10066,6 +10313,9 @@ async function bootServerLoad() {
   if (!ok) {
     showToast('Could not reach the case API — the board is empty until it is back. Refresh to retry.', 'warn');
   }
+  // One session-start event per boot, recorded once the server-layer flag is known
+  // (track() no-ops before isDbBackend() turns true).
+  track('login');
 }
 
 // Reveal + wire the sidebar "Sign out" link (hidden by default; only meaningful in server mode).

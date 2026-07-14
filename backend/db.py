@@ -15,7 +15,7 @@ live together, and the merge rules in backend/merge.py decide who may write what
 """
 import os
 
-from sqlalchemy import DateTime, String, create_engine
+from sqlalchemy import DateTime, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.types import JSON
 
@@ -73,6 +73,25 @@ class Config(Base):
     # The full config block (board-shaped), e.g. {operators, shifts, currentOperatorId, rota,
     # rotaByWeek} for "shifts" or {owners, ccCoreDepartments, …} for "owners".
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class Event(Base):
+    """Usage-analytics events: one row per meaningful operator action (pick, handover note,
+    copy/export click, …), POSTed in batches by the SPA (POST /api/events) and aggregated for
+    the hidden #/analytics dashboard (GET /api/events/summary). Append-only."""
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # When the action happened (client-stamped ISO time, parsed server-side).
+    at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    # Operator who performed the action (board operator id, e.g. "mia").
+    operator_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    # Action kind: 'pick', 'handover_note', 'copy_table', 'page_view', … (see track() in app.js).
+    kind: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    # The case acted on, when the action targets one.
+    case_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    # Kind-specific extras ({route}, {value}, {to, toOperator}, …).
+    detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
 
 def init_db() -> None:

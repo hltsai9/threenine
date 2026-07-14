@@ -15,6 +15,9 @@ Endpoints (same contract the SPA already expects):
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
     GET  /api/config/{key}     -> {"key": "shifts"|"owners", "payload": {...}|null}
     POST /api/config/{key}     -> body {"payload": {...}}  (shifts roster/rota or owner directory)
+    POST /api/events           -> body {"events":[{at, operatorId, kind, caseId, detail}...]}
+                                  usage-analytics batch from the SPA's track() helper
+    GET  /api/events/summary?days=30 -> aggregated indices for the hidden #/analytics dashboard
 
 Config (env):
     DATABASE_URL      see backend/db.py (default SQLite)
@@ -41,6 +44,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .analytics import events_summary, insert_events
 from .db import REPO_ROOT, SessionLocal, init_db
 from .merge import all_cases, case_by_id, get_config, set_config, upsert_operator
 
@@ -211,6 +215,31 @@ async def set_config_route(key: str, request: Request):
         result = set_config(session, key, payload)
         session.commit()
     return JSONResponse({"ok": True, "result": result})
+
+
+# ---- Usage analytics (events table; see backend/analytics.py) --------------------------------
+
+@app.post("/api/events")
+async def post_events(request: Request):
+    """Batch-insert usage events from the SPA's track() helper. Best-effort: malformed rows
+    are skipped, the batch is capped (MAX_BATCH), and the SPA fires-and-forgets."""
+    require_auth(request)
+    data = await request.json()
+    events = data.get("events") if isinstance(data, dict) else None
+    if not isinstance(events, list):
+        raise HTTPException(status_code=400, detail='Body must be {"events": [...]}')
+    with SessionLocal() as session:
+        added = insert_events(session, events)
+        session.commit()
+    return JSONResponse({"ok": True, "added": added})
+
+
+@app.get("/api/events/summary")
+def get_events_summary(request: Request, days: int = 30):
+    """Aggregated usage indices for the hidden #/analytics dashboard."""
+    require_auth(request)
+    with SessionLocal() as session:
+        return events_summary(session, days=days)
 
 
 # Optionally serve the static SPA from the same origin (no CORS, no mixed content).
