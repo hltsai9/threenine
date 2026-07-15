@@ -631,3 +631,24 @@ right columns. (Public Pages site stays on seed data; live mode is local only.)
   instead.
 - Implementation of §2, §3, and §4 is intended for follow-up sessions; this document is the agreed
   scope and reference for that work.
+
+---
+
+## 6. Backlog — noted 2026-07-14 (for tomorrow)
+
+- [ ] **Improve database loading time — plan first.** Boot currently pulls the ENTIRE store
+  (`GET /api/cases` → `all_cases()`, every payload including full history + process timeline) and
+  it has become slow. Direction the user suggested: a **"picked cases" index table** (or a lifted
+  `picked` column) linked to the main `cases` table, so the board loads the active working set
+  first and lazy-loads the rest (e.g. archive weeks on demand). Also worth measuring while
+  planning: response size (history dominates the payload), gzip on the API, and a `?since=` delta
+  endpoint so refreshes only carry changed cases.
+- [ ] **Let operators delete their own handover notes.** Notes live as `kind: 'handover'` history
+  entries (plus the latest in `c.handover`); needs a small ✕ on one's OWN notes in the case
+  detail's "Handover notes" panel (author-only guard), with consistency rules: deleting the
+  latest note falls back to the previous one (or clears `c.handover`); `caseHandoverNotes()` /
+  exports follow automatically since they read from history.
+- [ ] **Separate the time chip and the Core Team member chip on the Route Board.** Today one chip
+  at the arrow end doubles as the deadline text AND the assign-member button (`rb-chip`,
+  `_renderMovingRow` ~app.js:2000) — once a member is assigned the deadline is hidden. Split into
+  two adjacent chips: deadline stays readable, member chip stays clickable for re-assign.
