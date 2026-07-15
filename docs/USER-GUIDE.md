@@ -349,6 +349,8 @@ for the next shift.**
 - Notes are **never lost**: the case's **Handover notes** panel shows the full note history — the
   latest one highlighted, every earlier note listed beneath it — and each is also in the History
   log with author and time.
+- **You can delete your own notes** — a ✕ appears on notes you wrote (confirmation asked; the
+  deletion itself is recorded in History). You can't delete anyone else's.
 - **"Added to TKMS page"** — a checkbox in the case toolbar. Tick it once the case has been added
   to the TKMS page; the export's *If added to TKMS page* column then shows `Yes`
   ([Module 8](#module-8--exports)).
@@ -382,7 +384,7 @@ these columns:
 | Core Team | The **assigned member's name** ([Module 6](#module-6--track-status-in-depth)) |
 | If added to TKMS page | `Yes` when the case's **"Added to TKMS page"** checkbox is ticked ([Module 7](#module-7--handover)) |
 | HQ Product Team | Assigned HQ team |
-| Note | **Every handover note** on the case (and only handover notes — no picks/status actions), one per line: `MM/DD OperatorName: text` |
+| Note | **Every handover note** on the case (and only handover notes — no picks/status actions; the admin's notes are excluded), all in **one cell** on separate lines: `MM/DD OperatorName: text` |
 
 The **Overview** week table has its own *Copy as table* button, with a *Picked only* filter beside
 it.

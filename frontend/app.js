@@ -1769,22 +1769,64 @@ function caseHandoverNotes(c) {
     if (m) text = m[1];
     else if (isLatest && c.handover.note) text = c.handover.note;   // legacy generic label
     if (!text) continue;
-    items.push({ at: h.at, who, text });
+    items.push({ at: h.at, who, whoId: h.who || null, text });
   }
   if (c.handover && c.handover.note && !latestShown) {
     const op = getOperator(c.handover.author);
-    items.push({ at: c.handover.at, who: op ? op.name : (c.handover.author || '?'), text: c.handover.note });
+    items.push({ at: c.handover.at, who: op ? op.name : (c.handover.author || '?'), whoId: c.handover.author || null, text: c.handover.note });
   }
   items.sort((a, b) => new Date(a.at) - new Date(b.at));
   return items;
 }
 
+// Delete ONE handover note (identified by its history timestamp) from a case. Pure mutation —
+// the UI handler adds the confirm dialog / audit entry around it. When the deleted note was the
+// CURRENT c.handover, the newest remaining note is promoted back into c.handover (from → to
+// parsed back out of its history detail; marked stale so the shift-handover discipline still
+// asks for a fresh note); with no notes left, c.handover clears. Returns true when it deleted.
+function deleteHandoverNote(c, at) {
+  const idx = (c.history || []).findIndex(h => h.kind === 'handover' && h.at === at);
+  const wasCurrent = !!(c.handover && c.handover.at === at);
+  if (idx === -1 && !wasCurrent) return false;
+  if (idx !== -1) c.history.splice(idx, 1);
+  if (wasCurrent) {
+    // Clear FIRST — caseHandoverNotes has a fallback that re-adds c.handover when no matching
+    // history entry exists, which would resurrect the note we just deleted.
+    c.handover = null;
+    const rest = caseHandoverNotes(c);
+    const last = rest[rest.length - 1] || null;
+    if (!last) {
+      c.handover = null;
+    } else {
+      const h = (c.history || []).find(x => x.kind === 'handover' && x.at === last.at);
+      const route = h && /\((\w+) → (\w+)\)/.exec(h.detail || '');
+      const toName = h && /^Handover to (.+?) \(/.exec(h.detail || '');
+      const toOp = toName ? (window.OPERATORS || []).find(o => o.name === toName[1]) : null;
+      c.handover = {
+        note: last.text,
+        author: last.whoId,
+        from: route ? route[1] : (getOperator(last.whoId)?.shift || 'Day'),
+        to: route ? route[2] : 'Day',
+        ...(toOp ? { toOperator: toOp.id } : {}),
+        at: last.at,
+        staleForCurrentShift: true,
+      };
+    }
+  }
+  return true;
+}
+
 // The export's Note column: ONLY the handover notes (all of them — no picks/status actions),
 // oldest first, one per line as "M/D Operator: text". Plain text only — no HTML.
+// Notes authored by excluded operators (the admin, per config.js EXPORT_EXCLUDE_OPERATORS)
+// are dropped from the EXPORT only — the case detail panel still shows them.
 function caseNotesText(c) {
+  const excluded = new Set(window.EXPORT_EXCLUDE_OPERATORS || ['op-admin']);
   // Date only — month/day in the active display zone, no year and no time (per request).
   const stamp = at => { const p = _tzParts(at); return `${p.month}/${p.day}`; };
-  return caseHandoverNotes(c).map(n => `${stamp(n.at)} ${n.who}: ${n.text}`).join('\n');
+  return caseHandoverNotes(c)
+    .filter(n => !excluded.has(n.whoId))
+    .map(n => `${stamp(n.at)} ${n.who}: ${n.text}`).join('\n');
 }
 
 // Column model for the Route Board export — one place feeding both copy (TSV) and download (CSV),
@@ -1818,8 +1860,10 @@ function routeBoardTableData(opts) {
 // Excel / Google Sheets, which honour quoted fields for both CSV and tab-separated paste.
 function renderDelimited(headers, rows, delim) {
   const esc = v => {
-    let s = String(v == null ? '' : v);
-    if (s.indexOf('"') >= 0 || s.indexOf(delim) >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0) {
+    // Normalize any CR out of cell values first: \r\n / stray \r would read as ROW breaks in
+    // some consumers even inside quotes — in-cell line breaks must be bare \n only.
+    let s = String(v == null ? '' : v).replace(/\r\n?/g, '\n');
+    if (s.indexOf('"') >= 0 || s.indexOf(delim) >= 0 || s.indexOf('\n') >= 0) {
       s = '"' + s.replace(/"/g, '""') + '"';
     }
     return s;
@@ -1835,7 +1879,9 @@ function renderHtmlTable(headers, rows) {
   const cell = (v, i) => {
     const body = esc(v).replace(/\n/g, '<br>');
     const inner = (i === 0 && v && /^https?:\/\//i.test(String(v))) ? `<a href="${esc(v)}">${body}</a>` : body;
-    return `<td style="border:1px solid #c8c8c8;padding:4px 8px;vertical-align:top;">${inner}</td>`;
+    // mso-data-placement:same-cell — Excel's flag to keep <br> lines INSIDE one cell when
+    // pasting clipboard HTML (otherwise a multi-line Note spills into extra rows).
+    return `<td style="border:1px solid #c8c8c8;padding:4px 8px;vertical-align:top;mso-data-placement:same-cell;">${inner}</td>`;
   };
   return `<table style="border-collapse:collapse;font-family:sans-serif;font-size:13px;">`
     + `<thead><tr>${headers.map(th).join('')}</tr></thead>`
@@ -2001,13 +2047,14 @@ function _renderMovingRow(c, top, animDelay) {
   const originPct = ROUTE_STATION_POS[handoff.from] ?? ROUTE_STATION_POS['User'];
   const destPct = ROUTE_STATION_POS[handoff.to];
   const widthPct = destPct - originPct;
-  // Core-bound cases (escalate to Core Team) let the operator pre-assign a Core Team member from the
-  // chip — before Case Center moves the case — to shorten IT process time. Once assigned, the chip
-  // shows the member's name (and stays clickable to change it); otherwise it's the deadline.
+  // Core-bound cases (escalate to Core Team) let the operator pre-assign a Core Team member from
+  // the chip — before Case Center moves the case — to shorten IT process time. The deadline chip
+  // and the member chip are SEPARATE: assigning a member never hides the deadline. Unassigned
+  // core-bound cases keep the deadline chip itself clickable (the entry point to assign).
   const coreBound = handoff.to === 'Core Team';
   const memberName = coreBound ? coreMemberName(c) : null;
-  const chipText = memberName || formatDeadlineChip(handoff, phase);
-  const chipCls = memberName ? 'rb-chip rb-chip-assigned' : (overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber');
+  const deadlineText = formatDeadlineChip(handoff, phase);
+  const deadlineCls = overdue ? 'rb-chip rb-chip-overdue' : 'rb-chip rb-chip-amber';
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
 
   // When origin and destination resolve to the same station the travel line has
@@ -2028,9 +2075,12 @@ function _renderMovingRow(c, top, animDelay) {
       <div class="rb-dest-ring"       style="left:${destPct}%; border-color:${color};"></div>
       ${routeTrackerTag(c)}
       <div class="rb-id"              style="left:calc(${originPct}% + 14px);">${escapeHtml(c.id)} · ${itTimeLabel(c)}</div>
-      ${coreBound
-        ? `<button type="button" class="${chipCls} rb-chip-btn" style="left:calc(${destPct}% - 12px);" data-action="assign-core-member" data-case-id="${escapeHtml(c.id)}" title="${escapeHtml(memberName ? 'Assigned to ' + memberName + ' — click to change' : 'Click to assign a Core Team member')}">${escapeHtml(chipText)}</button>`
-        : `<div class="${chipCls}" style="left:calc(${destPct}% - 12px);">${escapeHtml(chipText)}</div>`}
+      ${coreBound && memberName
+        ? `<div class="${deadlineCls}" style="left:calc(${destPct}% - 12px);">${escapeHtml(deadlineText)}</div>
+           <button type="button" class="rb-chip rb-chip-assigned rb-chip-btn rb-chip-member" style="left:calc(${destPct}% - 12px);" data-action="assign-core-member" data-case-id="${escapeHtml(c.id)}" title="${escapeHtml('Assigned to ' + memberName + ' — click to change')}">${escapeHtml(memberName)}</button>`
+        : coreBound
+        ? `<button type="button" class="${deadlineCls} rb-chip-btn" style="left:calc(${destPct}% - 12px);" data-action="assign-core-member" data-case-id="${escapeHtml(c.id)}" title="Click to assign a Core Team member">${escapeHtml(deadlineText)}</button>`
+        : `<div class="${deadlineCls}" style="left:calc(${destPct}% - 12px);">${escapeHtml(deadlineText)}</div>`}
     </div>
   `;
 }
@@ -2774,6 +2824,7 @@ function renderCaseDetailBody(c) {
       : c.handover.to;
     return `
     <div class="handover-note ${c.handover.staleForCurrentShift ? 'handover-stale' : ''}">
+      ${c.handover.author === STATE.operatorId ? `<button class="handover-del" data-action="delete-handover-note" data-case-id="${c.id}" data-at="${escapeHtml(c.handover.at)}" title="Delete this note (you wrote it)">✕</button>` : ''}
       ${escapeHtml(c.handover.note)}
       <div class="meta">
         <span class="handover-from"><strong>From</strong> ${escapeHtml(fromLabel)}</span>
@@ -2793,6 +2844,7 @@ function renderCaseDetailBody(c) {
     .reverse()
     .map(n => `
       <div class="handover-old">
+        ${n.whoId === STATE.operatorId ? `<button class="handover-del" data-action="delete-handover-note" data-case-id="${c.id}" data-at="${escapeHtml(n.at)}" title="Delete this note (you wrote it)">✕</button>` : ''}
         <span class="handover-old-meta">${fmtAbsolute(n.at)} · ${escapeHtml(n.who)}:</span>
         ${escapeHtml(n.text)}
       </div>`).join('');
@@ -3251,7 +3303,7 @@ function renderArchiveWeek(week) {
       </div>
       ${cases.length === 0
         ? `<div class="queue-empty">No picked cases in this week.</div>`
-        : `<table class="case-table">
+        : `<div class="table-scroll"><table class="case-table">
         <thead>
           <tr>
             <th>ID</th>
@@ -3268,7 +3320,7 @@ function renderArchiveWeek(week) {
           </tr>
         </thead>
         <tbody>${rows}</tbody>
-      </table>`}
+      </table></div>`}
     `}
   `;
 }
@@ -5502,7 +5554,9 @@ async function addCaseById(id) {
     if (!location.hash.startsWith('#/cases')) location.hash = '#/cases';
     render();
     const source = isDbBackend() && !ingested ? 'the database' : 'Case Center';
-    track('import_case', { found: true, ingested }, firstId);
+    // Analytics semantics (per admin): pulling a stored case from the DATABASE counts as a
+    // "pick"; only a real Case Center ingest counts as an import.
+    track(ingested ? 'import_case' : 'pick', { via: 'import' }, firstId);
     showToast(`${added ? 'Added' : 'Updated'} ${firstId} from ${source} · picked.`, 'success');
   } catch (e) {
     hideLiveLoading();
@@ -5717,6 +5771,30 @@ function bindHandlers() {
       render();
     });
   });
+  document.querySelectorAll('[data-action="delete-handover-note"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const c = caseById(el.dataset.caseId);
+      const at = el.dataset.at;
+      if (!c || !at) return;
+      showModal(`
+        <h3>Delete this handover note?</h3>
+        <div class="modal-sub">Only your own notes can be deleted. The deletion is recorded in the case history.</div>
+        <div class="modal-actions">
+          <button class="btn" data-modal-cancel>Cancel</button>
+          <button class="btn btn-primary" data-modal-submit>Delete note</button>
+        </div>
+      `, () => {
+        const op = getOperator(STATE.operatorId);
+        if (!deleteHandoverNote(c, at)) return true;
+        if (op) logHistory(c, op, 'handover-deleted', `Deleted own handover note from ${fmtAbsolute(at)}`);
+        track('handover_delete', null, c.id);
+        showToast('Handover note deleted.', 'info');
+        render();
+        return true;
+      });
+    });
+  });
   document.querySelectorAll('[data-action="toggle-tkms"]').forEach(el => {
     el.addEventListener('change', () => {
       const c = caseById(el.dataset.caseId);
@@ -5733,6 +5811,9 @@ function bindHandlers() {
   });
   document.getElementById('analytics-refresh')?.addEventListener('click', () => {
     loadAnalytics(ANALYTICS.days);
+  });
+  document.querySelectorAll('[data-action="analytics-day"]').forEach(el => {
+    el.addEventListener('click', () => { ANALYTICS.day = el.dataset.day; render(); });
   });
   document.getElementById('route-mine-only')?.addEventListener('change', e => {
     STATE.routeMineOnly = e.target.checked;
@@ -6214,7 +6295,7 @@ async function tryLoadLiveCases(allCases) {
 
 /* ---------- Usage-analytics dashboard (hidden admin page: #/analytics) ---------- */
 
-const ANALYTICS = { days: 30, data: null, loading: false, error: null };
+const ANALYTICS = { days: 30, data: null, loading: false, error: null, day: null };
 
 async function loadAnalytics(days) {
   ANALYTICS.days = days;
@@ -6246,22 +6327,37 @@ function barChartHtml(items) {
     </div>`).join('');
 }
 
-// Zero-dependency line/area chart for the per-day series: [{day, count}] → inline SVG.
+// Zero-dependency line/area chart for the per-day series: [{day, count}] → inline SVG with a
+// y-axis (0 / mid / max gridlines + tick labels) and native hover tooltips: each day gets a
+// full-height invisible hit band carrying <title>DAY — N event(s)</title> plus a visible dot.
 function lineChartSvg(series) {
   if (!series.length) return '<div class="muted tiny">No data yet.</div>';
-  const W = 640, H = 140, PAD = 6;
+  const W = 640, H = 150, PAD = 8, AXIS = 34, BOT = 10;
   const max = Math.max(...series.map(p => p.count), 1);
-  const x = i => PAD + i * (W - 2 * PAD) / Math.max(series.length - 1, 1);
-  const y = v => H - PAD - v * (H - 2 * PAD) / max;
+  const x = i => AXIS + PAD + i * (W - AXIS - 2 * PAD) / Math.max(series.length - 1, 1);
+  const y = v => H - BOT - v * (H - BOT - PAD) / max;
   const pts = series.map((p, i) => `${x(i).toFixed(1)},${y(p.count).toFixed(1)}`).join(' ');
-  const area = `${PAD},${H - PAD} ${pts} ${(W - PAD).toFixed(1)},${H - PAD}`;
+  const area = `${x(0).toFixed(1)},${H - BOT} ${pts} ${x(series.length - 1).toFixed(1)},${H - BOT}`;
+  const mid = Math.round(max / 2);
+  const ticks = [...new Set([0, mid, max])].map(v => `
+      <line x1="${AXIS}" y1="${y(v).toFixed(1)}" x2="${W - PAD}" y2="${y(v).toFixed(1)}" stroke="#d8ded8" stroke-width="1"${v ? ' stroke-dasharray="3 3"' : ''}></line>
+      <text x="${AXIS - 5}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#8a958f">${v}</text>`).join('');
+  const band = (W - AXIS - 2 * PAD) / Math.max(series.length - 1, 1);
+  const hover = series.map((p, i) => `
+      <g class="an-pt">
+        <title>${escapeHtml(p.day)} — ${p.count} event${p.count === 1 ? '' : 's'}</title>
+        <rect x="${(x(i) - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${H}" fill="transparent"></rect>
+        <circle cx="${x(i).toFixed(1)}" cy="${y(p.count).toFixed(1)}" r="3" fill="#3f6e5e"></circle>
+      </g>`).join('');
   const first = series[0].day, last = series[series.length - 1].day;
   return `
-    <svg class="an-line" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="events per day">
+    <svg class="an-line" viewBox="0 0 ${W} ${H}" role="img" aria-label="events per day">
+      ${ticks}
       <polygon points="${area}" fill="#3f6e5e22"></polygon>
       <polyline points="${pts}" fill="none" stroke="#3f6e5e" stroke-width="2"></polyline>
+      ${hover}
     </svg>
-    <div class="an-line-axis"><span>${escapeHtml(first)}</span><span>peak ${max}/day</span><span>${escapeHtml(last)}</span></div>`;
+    <div class="an-line-axis"><span>${escapeHtml(first)}</span><span>hover a day for its count</span><span>${escapeHtml(last)}</span></div>`;
 }
 
 function renderAnalyticsPage() {
@@ -6344,6 +6440,33 @@ function renderAnalyticsPage() {
     <div class="card"><div class="card-body">
       <h3>Activity per day</h3>${lineChartSvg(d.byDay || [])}
     </div></div>
+
+    ${(() => {
+      // "Actions by day" — a tab per day (newest first), each showing that day's operator ×
+      // action table. ANALYTICS.day tracks the active tab; default = the most recent day.
+      const daysList = d.byDayMatrix || [];
+      if (!daysList.length) return '';
+      const active = daysList.some(x => x.day === ANALYTICS.day) ? ANALYTICS.day : daysList[0].day;
+      const tabLabel = day => { const p = day.split('-'); return `${p[1]}/${p[2]}`; };
+      const tabs = daysList.map(x => `
+        <button class="picked-tab${x.day === active ? ' active' : ''}" data-action="analytics-day" data-day="${escapeHtml(x.day)}" title="${escapeHtml(x.day)}">${escapeHtml(tabLabel(x.day))}</button>`).join('');
+      const dayM = (daysList.find(x => x.day === active) || {}).matrix || {};
+      const dayKinds = [...new Set(Object.values(dayM).flatMap(m => Object.keys(m)))].sort();
+      const dayRows = Object.keys(dayM).sort().map(id => `
+        <tr><td>${escapeHtml(opName(id))}</td>${dayKinds.map(k =>
+          `<td class="an-num">${dayM[id][k] || ''}</td>`).join('')}</tr>`).join('');
+      return `
+        <div class="card"><div class="card-body">
+          <h3>Actions by day <span class="muted tiny">· ${escapeHtml(active)}</span></h3>
+          <div class="an-day-tabs">${tabs}</div>
+          <div style="overflow-x:auto;">
+          <table class="transition-table an-matrix">
+            <thead><tr><th>Operator</th>${dayKinds.map(k => `<th>${escapeHtml(k.replace(/_/g, ' '))}</th>`).join('')}</tr></thead>
+            <tbody>${dayRows}</tbody>
+          </table>
+          </div>
+        </div></div>`;
+    })()}
 
     <div class="card"><div class="card-body">
       <h3>Operator × action matrix</h3>

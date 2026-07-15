@@ -84,24 +84,33 @@ def events_summary(session, days=30):
     by_kind = {}
     matrix = {}          # operator -> kind -> count
     by_day = {}          # YYYY-MM-DD -> count
+    day_matrix = {}      # YYYY-MM-DD -> operator -> kind -> count (the per-day tabs)
     picks = {}           # case_id -> {operator, at} — most recent pick, for hand-off pairing
     handoffs = []        # {caseId, operator, pickedAt, handoverAt, hours}
 
     for e in rows:
         if e.operator_id in EXCLUDED_OPERATORS:
             continue   # admin activity stays out of every index
+        # Reclassify: an import that came from the DATABASE (not ingested from Case Center)
+        # counts as a "pick" — matches the collection change in the SPA; this remap also
+        # covers rows recorded before that change.
+        kind = e.kind
+        if kind == "import_case" and not (e.detail or {}).get("ingested"):
+            kind = "pick"
         total += 1
         op = e.operator_id or "?"
         by_operator[op] = by_operator.get(op, 0) + 1
-        by_kind[e.kind] = by_kind.get(e.kind, 0) + 1
-        matrix.setdefault(op, {})[e.kind] = matrix.setdefault(op, {}).get(e.kind, 0) + 1
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        matrix.setdefault(op, {})[kind] = matrix.setdefault(op, {}).get(kind, 0) + 1
         day = e.at.date().isoformat()
         by_day[day] = by_day.get(day, 0) + 1
+        dm = day_matrix.setdefault(day, {}).setdefault(op, {})
+        dm[kind] = dm.get(kind, 0) + 1
 
         # Hand-off time per case: pair each handover note with the latest pick before it.
-        if e.kind == "pick" and e.case_id:
+        if kind == "pick" and e.case_id:
             picks[e.case_id] = {"operator": op, "at": e.at}
-        elif e.kind == "handover_note" and e.case_id and e.case_id in picks:
+        elif kind == "handover_note" and e.case_id and e.case_id in picks:
             p = picks.pop(e.case_id)
             hours = (e.at - p["at"]).total_seconds() / 3600.0
             handoffs.append({
@@ -147,4 +156,10 @@ def events_summary(session, days=30):
         "copyCounts": {k: by_kind.get(k, 0) for k in copy_kinds},
         "handoffs": handoffs[-100:],   # newest last; cap the table
         "handoffStats": handoff_stats,
+        # Per-day operator × kind breakdown for the dashboard's day tabs — only days with
+        # events, newest first, capped so a 365-day window can't bloat the response.
+        "byDayMatrix": [
+            {"day": d, "matrix": day_matrix[d]}
+            for d in sorted(day_matrix.keys(), reverse=True)
+        ][:31],
     }

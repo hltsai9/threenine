@@ -636,19 +636,16 @@ right columns. (Public Pages site stays on seed data; live mode is local only.)
 
 ## 6. Backlog — noted 2026-07-14 (for tomorrow)
 
-- [ ] **Improve database loading time — plan first.** Boot currently pulls the ENTIRE store
-  (`GET /api/cases` → `all_cases()`, every payload including full history + process timeline) and
-  it has become slow. Direction the user suggested: a **"picked cases" index table** (or a lifted
-  `picked` column) linked to the main `cases` table, so the board loads the active working set
-  first and lazy-loads the rest (e.g. archive weeks on demand). Also worth measuring while
-  planning: response size (history dominates the payload), gzip on the API, and a `?since=` delta
-  endpoint so refreshes only carry changed cases.
-- [ ] **Let operators delete their own handover notes.** Notes live as `kind: 'handover'` history
+- [x] **Improve database loading time — plan first.** ✅ Planned 2026-07-15 → see
+  [`db-loading-plan.md`](db-loading-plan.md). Measured: 400 cases = 965 KB raw / 19.5 KB gzipped
+  (49×). **Stage 0 (gzip middleware) shipped**; Stage 1 (lifted `picked` column + working-set-first
+  boot) and Stage 2 (`?since=` delta refresh) await sign-off; Stage 3 (payload slimming) in reserve.
+- [ ] **Bug (found while measuring): `ingest --seed-from-data-js` inserts 0 rows** when data.js is
+  raw-CC shape (`CASES_RAW_CC`): extractor emits `caseId`, `upsert_operator` requires `id`.
+- [x] **Let operators delete their own handover notes.** ✅ Shipped 2026-07-15. Notes live as `kind: 'handover'` history
   entries (plus the latest in `c.handover`); needs a small ✕ on one's OWN notes in the case
   detail's "Handover notes" panel (author-only guard), with consistency rules: deleting the
   latest note falls back to the previous one (or clears `c.handover`); `caseHandoverNotes()` /
   exports follow automatically since they read from history.
-- [ ] **Separate the time chip and the Core Team member chip on the Route Board.** Today one chip
-  at the arrow end doubles as the deadline text AND the assign-member button (`rb-chip`,
-  `_renderMovingRow` ~app.js:2000) — once a member is assigned the deadline is hidden. Split into
-  two adjacent chips: deadline stays readable, member chip stays clickable for re-assign.
+- [x] **Separate the time chip and the Core Team member chip on the Route Board.** ✅ Shipped
+  2026-07-15 — deadline chip stays; member chip stacks beneath it, still clickable to re-assign.

@@ -729,6 +729,9 @@ h2 { font-family: var(--font-serif); font-size: 17px; margin: 24px 0 12px; font-
 .priority-low    { color: var(--text-faint-2); font-weight: 500; }
 
 /* ---------- Table ---------- */
+/* Guard for genuinely-too-narrow windows: the week table scrolls inside this wrapper
+ * instead of forcing the whole page to scroll horizontally. */
+.table-scroll { overflow-x: auto; }
 table.case-table {
   width: 100%;
   border-collapse: collapse;
@@ -744,6 +747,7 @@ table.case-table {
   padding: 11px 14px;
   border-bottom: 1px solid var(--hairline);
   vertical-align: top;
+  overflow-wrap: break-word;   /* no cell content can force the table past the window */
 }
 .case-table th {
   background: var(--chip-soft-2);
@@ -755,7 +759,13 @@ table.case-table {
 }
 .case-table tbody tr:hover { background: var(--chip-soft-2); cursor: pointer; }
 .case-table .col-id { font-family: var(--font-mono); color: var(--text-faint); font-size: 11.5px; font-weight: 600; }
-.case-table .subject { font-weight: 600; color: var(--text-deep); }
+.case-table .subject {
+  font-weight: 600; color: var(--text-deep);
+  /* A long/unbroken subject must WRAP, not widen its column past the window: cap the
+   * auto-layout column via the inner div and allow breaks anywhere (URLs, long tokens). */
+  overflow-wrap: anywhere;
+  max-width: 520px;
+}
 .case-table a.link-inline { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600; }
 
 /* ---------- Kanban ---------- */
@@ -2717,6 +2727,9 @@ table.case-table {
 button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-family: 'IBM Plex Mono', monospace; }
 .rb-chip-btn { cursor: pointer; }
 .rb-chip-btn:hover { filter: brightness(1.08); }
+/* Member chip stacked UNDER the deadline chip (same right anchor) — the deadline stays visible
+ * after a member is assigned; the moving row is 66px tall so both fit. */
+.rb-chip-member { top: 30px; }
 
 /* ---- WATCH row (60px tall) ---- */
 
@@ -3035,10 +3048,12 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 .an-bar-track { flex: 1; background: #eef1ee; border-radius: 5px; height: 14px; overflow: hidden; }
 .an-bar { height: 100%; background: #3f6e5e; border-radius: 5px; }
 .an-bar-val { flex: 0 0 36px; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
-.an-line { width: 100%; height: 140px; display: block; }
+.an-line { width: 100%; height: auto; display: block; }
+.an-pt:hover circle { fill: #8A3434; r: 4.5; }
 .an-line-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint-2); margin-top: 2px; }
 .an-num { text-align: right; font-family: var(--font-mono); font-size: 12px; }
 .an-matrix th { font-size: 10.5px; }
+.an-day-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
 
 /* "Added to TKMS page" checkbox in the case-detail / reading-panel toolbar. */
 .tkms-check {
@@ -3070,3 +3085,17 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
   color: var(--text);
 }
 .handover-old-meta { color: var(--text-faint); font-weight: 600; margin-right: 4px; }
+/* ✕ on one's OWN handover notes (author-only; the click handler confirms first). */
+.handover-del {
+  float: right;
+  margin-left: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 20px; height: 20px;
+  line-height: 1;
+  font-size: 11px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.handover-del:hover { color: #8A3434; border-color: #8A3434; background: #f7ecec; }

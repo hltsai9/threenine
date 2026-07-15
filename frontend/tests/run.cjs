@@ -153,6 +153,31 @@ test('routeBoardTableData: TKMS column sits between Core Team and HQ, Yes when t
   eq(row[headers.indexOf('If added to TKMS page')], 'Yes');
   c.addedToTkms = was;
 });
+test('caseNotesText: admin-authored notes are excluded from the export only', () => {
+  const c = {
+    history: [
+      { at: iso(3 * HOUR), who: 'op-admin', kind: 'handover', detail: 'Handover note (Day → Night): admin note' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): operator note' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'operator note' },
+  };
+  const txt = app.caseNotesText(c);
+  ok(!txt.includes('admin note'), 'admin note dropped from export');
+  ok(txt.includes('operator note'), 'operator note kept');
+  ok(app.caseHandoverNotes(c).some(n => n.text === 'admin note'), 'panel source still includes it');
+});
+test('renderDelimited: CR normalized; multi-line cell stays quoted in one field', () => {
+  const out = app.renderDelimited(['A', 'B'], [['x', 'line1\r\nline2\rline3']], '\t');
+  const dataRow = out.split('\r\n').slice(1).join('\r\n');
+  eq(dataRow, 'x\t"line1\nline2\nline3"', 'CRs become bare LFs inside one quoted field');
+});
+test('renderHtmlTable: one <tr> per case, same-cell flag for Excel', () => {
+  const html = app.renderHtmlTable(['A'], [['l1\nl2'], ['solo']]);
+  eq((html.match(/<tr>/g) || []).length, 3, 'header + 2 rows');
+  ok(html.includes('mso-data-placement:same-cell'), 'Excel same-cell flag present');
+  ok(html.includes('l1<br>l2'), 'in-cell line break');
+});
+
 /* ---------- renderPickedList (Cases / Sanity Check tabs) ---------- */
 test('renderPickedList: tabs split Sanity Check cases from active ones', () => {
   const picked = app.pickedCases();
@@ -186,6 +211,58 @@ test('itProcessOver: red flag suppressed for product_team_handling', () => {
   ok(app.itProcessMs(c) > 24 * HOUR, 'the hours themselves keep counting');
 });
 
+/* ---------- deleteHandoverNote ---------- */
+test('deleteHandoverNote: deleting the latest falls back to the previous note', () => {
+  const c = {
+    history: [
+      { at: iso(3 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): first' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): second' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'second', from: 'Day', to: 'Night' },
+  };
+  ok(app.deleteHandoverNote(c, iso(1 * HOUR)));
+  eq(c.handover.note, 'first', 'previous note promoted');
+  eq(c.handover.from, 'Day'); eq(c.handover.to, 'Night');
+  ok(c.handover.staleForCurrentShift, 'restored note marked stale');
+  eq(app.caseHandoverNotes(c).length, 1, 'one note left');
+});
+test('deleteHandoverNote: deleting the only note clears c.handover', () => {
+  const c = {
+    history: [{ at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): solo' }],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'solo', from: 'Day', to: 'Night' },
+  };
+  ok(app.deleteHandoverNote(c, iso(1 * HOUR)));
+  eq(c.handover, null);
+  eq(app.caseNotesText(c), '', 'export empties too');
+});
+test('deleteHandoverNote: deleting an older note keeps the current one', () => {
+  const c = {
+    history: [
+      { at: iso(3 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): first' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): second' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'second', from: 'Day', to: 'Night' },
+  };
+  ok(app.deleteHandoverNote(c, iso(3 * HOUR)));
+  eq(c.handover.note, 'second', 'current untouched');
+  eq(app.caseHandoverNotes(c).length, 1);
+});
+
+test('moving row: assigned core-bound case shows BOTH deadline and member chips', () => {
+  // Find a core-bound moving case in the seed and assign a member with a known name.
+  const c = app.pickedCases().find(x => (x.trackStatus || null) === 'escalate_to_core');
+  ok(c, 'seed has an escalate_to_core case');
+  const desk = app.OWNERS.core.find(d => Array.isArray(d.members) && d.members.length);
+  ok(desk, 'a core desk with members exists');
+  const prevCore = c.coreId, prevMember = c.coreMemberId;
+  c.coreId = desk.id; c.coreMemberId = desk.members[0].id;
+  const html = app._renderMovingRow(c, 0, 0);
+  ok(html.includes('rb-chip-member'), 'member chip present');
+  ok(html.includes(desk.members[0].name.replace(/&/g, '&amp;').slice(0, 8)) || html.includes(desk.members[0].name), 'member name shown');
+  ok(/rb-chip rb-chip-(amber|overdue)/.test(html), 'deadline chip still present');
+  c.coreId = prevCore; c.coreMemberId = prevMember;
+});
+
 /* ---------- track() + analytics chart helpers ---------- */
 test('track: no-ops outside DB-backend mode', () => {
   app.__EVENT_BUFFER__.length = 0;
@@ -214,6 +291,13 @@ test('lineChartSvg: renders a polyline over the series', () => {
   const svg = app.lineChartSvg([{ day: '2026-07-13', count: 1 }, { day: '2026-07-14', count: 3 }]);
   ok(svg.includes('<polyline'), 'has a line');
   ok(svg.includes('2026-07-13') && svg.includes('2026-07-14'), 'axis labels');
+});
+test('lineChartSvg: y-axis ticks and per-day hover titles', () => {
+  const svg = app.lineChartSvg([{ day: '2026-07-13', count: 2 }, { day: '2026-07-14', count: 4 }]);
+  ok((svg.match(/<title>/g) || []).length === 2, 'one hover title per day');
+  ok(svg.includes('2026-07-14 — 4 events'), 'hover title carries the count');
+  ok(svg.includes('text-anchor="end"') && svg.includes('>0<'), 'y-axis tick labels incl. 0');
+  ok((svg.match(/<circle/g) || []).length === 2, 'a visible dot per day');
 });
 
 /* ---------- routeBoardTableData (export filter) ---------- */

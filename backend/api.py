@@ -41,6 +41,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -89,6 +90,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Case Tracker API", lifespan=lifespan)
+
+# Compress large JSON responses (GET /api/cases is the whole store and dominated by repetitive
+# text — history/timelines — which gzips ~10×). First lever of docs/db-loading-plan.md.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # ALLOWED_ORIGINS must be an explicit allowlist (no "*"): it is load-bearing now that the
 # API can be auth-gated — a permissive origin would let any site drive an authenticated

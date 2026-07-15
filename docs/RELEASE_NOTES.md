@@ -8,6 +8,62 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-15
+
+### Fixed (weekly-archive table no longer overflows the window)
+
+- Long/unbroken case subjects widened `table.case-table` past the window (horizontal page
+  scroll). Cells now `overflow-wrap: break-word`, the subject wraps (`anywhere`, column capped at
+  520px), and the week table sits in an `overflow-x:auto` wrapper as a guard for genuinely narrow
+  windows — the page itself never scrolls sideways (verified at 1280px and 2200px).
+
+### Changed (export/copy: admin notes excluded; guaranteed one row per case)
+
+- The **Note column drops notes authored by excluded operators** (default `op-admin`; override
+  via `window.EXPORT_EXCLUDE_OPERATORS` in `config.js`). The case-detail panel still shows them.
+- **One row per case, notes in one cell:** the HTML clipboard flavor now carries Excel's
+  `mso-data-placement:same-cell` flag so multi-line Note cells paste as in-cell line breaks
+  instead of spilling extra rows; the TSV/CSV flavor normalizes CRs so in-cell breaks are bare
+  quoted `\n` only.
+
+### Changed (analytics: import reclassification, real trend axis, per-day tabs)
+
+- **Import semantics:** importing a case that was already **in the database counts as a `pick`**;
+  only a real Case Center ingest counts as `import_case`. Applied at collection (`addCaseById`)
+  and retroactively in `events_summary()` (legacy `import_case {ingested:false}` rows remap), so
+  hand-off pairing also honors DB-imports as picks.
+- **Activity-per-day chart** gained a y-axis (0/mid/max gridlines + tick labels), a visible dot
+  per day, and **hover tooltips** showing `date — N events`.
+- **"Actions by day" card:** a tab per day (newest first, up to 31) showing that day's
+  operator × action table (`byDayMatrix` in the summary API).
+
+### Added (Route Board: deadline and Core-member chips separated)
+
+- Assigning a Core Team member no longer hides the deadline: core-bound moving rows now show the
+  amber/red **deadline chip** and the green **member chip** stacked beneath it (still clickable to
+  re-assign). Unassigned core-bound cases keep the clickable deadline chip as the assign entry point.
+
+### Added (operators can delete their own handover notes)
+
+- A ✕ appears on notes **you authored** in the "Handover notes" panel (confirm dialog). Deleting
+  the current note promotes the previous one back into `c.handover` (marked stale so the shift
+  ritual still asks for a fresh note) or clears it when none remain; the deletion is recorded in
+  History (`handover-deleted`) and analytics. Exports follow automatically.
+
+### Added (DB loading: gzip + staged plan)
+
+- **`GZipMiddleware`** on the API — measured on a 400-case store: `GET /api/cases` 965 KB → 19.5 KB
+  (49×). The staged plan (lifted `picked` column + working-set-first boot, `?since=` delta,
+  payload slimming) is written up in **[`db-loading-plan.md`](db-loading-plan.md)** awaiting
+  sign-off. Found & filed while measuring: `ingest --seed-from-data-js` inserts 0 rows for raw-CC
+  data.js (extractor emits `caseId`, upsert wants `id`).
+
+### Internal
+
+- 9 new tests + 1 updated (183 total); improvement-plan §6 statuses updated.
+
+---
+
 ## 2026-07-14
 
 ### Changed (analytics dashboard hides the admin's own activity)

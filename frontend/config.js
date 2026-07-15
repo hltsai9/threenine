@@ -26,6 +26,10 @@ window.API_BASE = '';
 // works at '' because it serves /healthz.
 window.API_MODE = '';
 
+// Operators whose handover notes are HIDDEN from the export/copy Note column (the case detail
+// panel still shows them). Mirrors the backend's ANALYTICS_EXCLUDE_OPERATORS convention.
+window.EXPORT_EXCLUDE_OPERATORS = ['op-admin'];
+
 // Guided tour: whether it auto-starts on a visitor's first load.
 //   false (default) -> never auto-start; the sidebar "Take the tour" link still works.
 //   true            -> auto-start once per browser (the demo/Pages onboarding experience).
