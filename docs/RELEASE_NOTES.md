@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-15
 
+### Changed (picked flag survives closing — visible in the archive, not on the board)
+
+- A case that closes after being picked now stays identifiable for analysis: the **Overview week
+  "Picked only" filter matches the retained pick flag** (`isQueued`) so closed picked cases remain
+  listed, and closed rows show a **static "✓ Picked" badge** (non-interactive — closed cases still
+  can't be picked/unpicked). The **Hand-off Route Board and picked list are unchanged** — closed
+  cases keep dropping off the working views (`isPicked`). No data change was needed: closing never
+  cleared `agentStatus`; this makes the retained flag visible. The planned lifted `picked` DB
+  column inherits the same retention (note added to `db-loading-plan.md`).
+
 ### Fixed (weekly-archive table no longer overflows the window)
 
 - Long/unbroken case subjects widened `table.case-table` past the window (horizontal page

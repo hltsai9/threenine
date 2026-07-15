@@ -195,7 +195,9 @@ Rules of picking:
   isn't offered — the case is finished.
 - **Picking is attribution.** The case history records *picked by \<you\>*, and your name appears
   as the tracker tag on its Route Board row.
-- **A case that closes while picked** drops out of the active workspace by itself.
+- **A case that closes while picked** drops off the Route Board and the picked list by itself —
+  but it **keeps its ✓ Picked mark** in Overview (visible with the *Picked only* filter), so
+  previously picked cases stay available for analysis.
 - **Case not on the board at all?** — use **+ Import case by ID** at the top of the Picked page:
   type the Case Center ID. The case is loaded **from the team database first** (instant); if it
   isn't stored yet, the board asks the backend to **ingest it from Case Center on the spot** —

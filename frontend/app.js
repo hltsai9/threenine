@@ -1217,7 +1217,13 @@ function renderSidebar() {
 const BELL_SVG = `<svg class="bell-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>`;
 
 function renderQueueToggleButton(c, size /* 'tiny' | 'normal' */) {
-  if (['closed', 'cancelled'].includes(c.status)) return '';
+  if (['closed', 'cancelled'].includes(c.status)) {
+    // Closed cases can't be (un)picked, but one that WAS picked keeps a static badge so
+    // previously picked cases stay identifiable in the archive views (kept for analysis).
+    return isQueued(c)
+      ? `<span class="queue-kept" title="Was picked before it closed — kept for analysis">✓ Picked</span>`
+      : '';
+  }
   const cls = size === 'tiny' ? 'btn-tiny' : 'btn';
   const inQ = isQueued(c);
   const label = size === 'tiny'
@@ -1271,6 +1277,9 @@ function suggestedTrackStatuses() {
 }
 
 function caseTrackStatus(c) { return c?.trackStatus || null; }
+// Deliberate distinction: isQueued = WAS picked (pure data — survives the case closing, so
+// previously picked cases stay analyzable in the archive); isPicked = ACTIVELY picked (drives
+// the Route Board / picked workspace, so closed cases drop off the working views).
 function isPicked(c) { return isQueued(c) && !['closed', 'cancelled'].includes(c.status); }
 function pickedCases() { return STATE.cases.filter(c => !c.deletedAt && isPicked(c)); }
 
@@ -3185,8 +3194,11 @@ function renderArchiveIndex() {
 // clipboard always matches what's on screen.
 function archiveWeekCases(weekId) {
   const pickedOnly = !!STATE.archivePickedOnly;
+  // "Picked only" matches by the RETAINED pick flag (isQueued), not isPicked: a case that
+  // closed after being picked stays in this analysis view (it does drop off the Route Board /
+  // picked workspace, which filter through isPicked).
   return STATE.cases
-    .filter(c => !c.deletedAt && c.weekId === weekId && (!pickedOnly || isPicked(c)))
+    .filter(c => !c.deletedAt && c.weekId === weekId && (!pickedOnly || isQueued(c)))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 

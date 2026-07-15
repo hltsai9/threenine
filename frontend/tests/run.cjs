@@ -211,6 +211,32 @@ test('itProcessOver: red flag suppressed for product_team_handling', () => {
   ok(app.itProcessMs(c) > 24 * HOUR, 'the hours themselves keep counting');
 });
 
+/* ---------- picked flag survives closing (analysis views) ---------- */
+test('closed picked case: off the board (isPicked) but flag retained (isQueued)', () => {
+  const c = app.pickedCases()[0];
+  ok(c, 'a picked case exists');
+  const prev = c.status;
+  c.status = 'closed';
+  ok(!app.isPicked(c), 'drops off the Route Board / picked workspace');
+  ok(app.isQueued(c), 'pick flag retained for analysis');
+  c.status = prev;
+});
+test('archive "Picked only" still lists a case that closed after being picked', () => {
+  const c = app.pickedCases()[0];
+  const prevStatus = c.status, prevFilter = app.STATE.archivePickedOnly;
+  c.status = 'closed';
+  app.STATE.archivePickedOnly = true;
+  ok(app.archiveWeekCases(c.weekId).some(x => x.id === c.id), 'kept in the picked-only week view');
+  c.status = prevStatus;
+  app.STATE.archivePickedOnly = prevFilter;
+});
+test('renderQueueToggleButton: closed+picked → static kept badge; closed+unpicked → nothing', () => {
+  const kept = app.renderQueueToggleButton({ id: 'X', status: 'closed', agentStatus: 'queued' }, 'tiny');
+  ok(kept.includes('queue-kept') && kept.includes('✓ Picked'), 'static badge');
+  ok(!kept.includes('<button'), 'not interactive');
+  eq(app.renderQueueToggleButton({ id: 'X', status: 'closed', agentStatus: 'unqueued' }, 'tiny'), '');
+});
+
 /* ---------- deleteHandoverNote ---------- */
 test('deleteHandoverNote: deleting the latest falls back to the previous note', () => {
   const c = {

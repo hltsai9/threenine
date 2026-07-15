@@ -37,7 +37,9 @@ indexed scalar column** on `cases` (exactly how `status`/`created_at` are alread
 `backend/db.py`), maintained on every write from `payload.agentStatus == 'queued'`.
 
 - Migration `0004`: `picked Boolean` + index; backfill from payloads.
-- `backend/merge.py` `_scalars_from()`: also derive `picked`.
+- `backend/merge.py` `_scalars_from()`: also derive `picked`. Note it lifts the RETAINED flag
+  (`payload.agentStatus == 'queued'`), which survives a case closing — so previously picked
+  closed cases stay queryable for analysis (matches the SPA's isQueued/isPicked distinction).
 - API: `GET /api/cases?scope=picked` → only picked cases; `?scope=rest` → the remainder.
 - SPA boot: fetch `scope=picked` first → **board renders as soon as the working set arrives**
   (tens of cases, not thousands); then fetch `scope=rest` in the background and merge (Overview /
