@@ -211,6 +211,87 @@ test('itProcessOver: red flag suppressed for product_team_handling', () => {
   ok(app.itProcessMs(c) > 24 * HOUR, 'the hours themselves keep counting');
 });
 
+/* ---------- caseTracker: handover route with current-shift invariant ---------- */
+const dayOp = app.OPERATORS.find(o => o.shift === 'Day');
+const nightOp = app.OPERATORS.find(o => o.shift === 'Night');
+// The harness's current operator is on the Day shift — assert so route tests stay valid.
+test('tracker: harness current operator is Day shift', () =>
+  eq(app.getOperator(app.STATE.operatorId).shift, 'Day'));
+test('tracker route: previous-shift note addressed to a current-shift operator → "A → B"', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued', history: [],
+    handover: { author: nightOp.id, toOperator: app.STATE.operatorId, from: 'Night', to: 'Day', at: iso(HOUR), staleForCurrentShift: false } };
+  const t = app.caseTracker(c);
+  eq(t.kind, 'route');
+  eq(t.from, app.shortOpName(nightOp.name));
+  eq(t.to, app.shortOpName(app.getOperator(app.STATE.operatorId).name));
+});
+test('tracker route: current shift handing forward to the next → "A → B"', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued', history: [],
+    handover: { author: app.STATE.operatorId, toOperator: nightOp.id, from: 'Day', to: 'Night', at: iso(HOUR), staleForCurrentShift: false } };
+  const t = app.caseTracker(c);
+  eq(t.kind, 'route');
+  eq(t.to, app.shortOpName(nightOp.name));
+});
+test('tracker gap: picked by the previous shift, no handover → "A → ?"', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued',
+    history: [{ at: iso(9 * HOUR), who: nightOp.id, kind: 'picked' }], handover: null };
+  const t = app.caseTracker(c);
+  eq(t.kind, 'gap');
+  eq(t.from, app.shortOpName(nightOp.name));
+  eq(t.to, '?');
+});
+test('tracker gap: stale note whose recipient is off-shift names the previous HOLDER', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued',
+    history: [{ at: iso(20 * HOUR), who: dayOp.id, kind: 'picked' }],
+    handover: { author: dayOp.id, toOperator: nightOp.id, from: 'Day', to: 'Night', at: iso(18 * HOUR), staleForCurrentShift: true } };
+  const t = app.caseTracker(c);
+  eq(t.kind, 'gap');
+  eq(t.from, app.shortOpName(nightOp.name), 'previous-shift holder (recipient), not the author');
+});
+test('tracker by: picked by a current-shift operator, nothing to route', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued',
+    history: [{ at: iso(HOUR), who: dayOp.id, kind: 'picked' }], handover: null };
+  const t = app.caseTracker(c);
+  eq(t.kind, 'by');
+  eq(t.from, app.shortOpName(dayOp.name));
+  eq(t.to, null);
+});
+test('routeTrackerTag: gap renders the highlighted "?" chip', () => {
+  const c = { id: 'X', status: 'with_core', agentStatus: 'queued',
+    history: [{ at: iso(9 * HOUR), who: nightOp.id, kind: 'picked' }] };
+  const html = app.routeTrackerTag(c);
+  ok(html.includes('rb-tracker-gap'), 'gap styling');
+  ok(html.includes('rb-tracker-q'), 'question mark styled');
+  ok(html.includes('→'), 'arrow shown');
+});
+
+/* ---------- computeCurrentShift (sidebar "Ends" fix) ---------- */
+test('computeCurrentShift: inside Day (08–20 UTC) → ends 20:00 same day', () => {
+  const cs = app.computeCurrentShift(new Date(Date.UTC(2026, 6, 15, 12, 0, 0)));
+  eq(cs.name, 'Day');
+  eq(cs.endsAtUtc, '2026-07-15T20:00:00.000Z');
+});
+test('computeCurrentShift: Night wraps midnight → ends 08:00 NEXT day', () => {
+  const cs = app.computeCurrentShift(new Date(Date.UTC(2026, 6, 15, 23, 0, 0)));
+  eq(cs.name, 'Night');
+  eq(cs.endsAtUtc, '2026-07-16T08:00:00.000Z');
+});
+test('computeCurrentShift: after midnight still Night → ends 08:00 same day', () => {
+  const cs = app.computeCurrentShift(new Date(Date.UTC(2026, 6, 16, 0, 30, 0)));
+  eq(cs.name, 'Night');
+  eq(cs.endsAtUtc, '2026-07-16T08:00:00.000Z');
+});
+test('computeCurrentShift: exactly at a boundary belongs to the NEXT shift', () => {
+  const cs = app.computeCurrentShift(new Date(Date.UTC(2026, 6, 15, 20, 0, 0)));
+  eq(cs.name, 'Night');
+});
+test('computeCurrentShift: unparseable roster → null (caller keeps the old value)', () => {
+  const prev = app.SHIFTS;
+  app.SHIFTS = [{ name: 'X', hoursUtc: 'whenever' }];
+  eq(app.computeCurrentShift(new Date()), null);
+  app.SHIFTS = prev;
+});
+
 /* ---------- operator pick survives a refresh (DB-roster race) ---------- */
 test('operator pick: unresolvable stored id goes pending and is never clobbered', () => {
   const prevOp = app.STATE.operatorId;

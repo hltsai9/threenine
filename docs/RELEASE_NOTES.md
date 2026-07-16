@@ -8,6 +8,30 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-17
+
+### Added (Route Board tracker tag shows the handover route)
+
+- The left-edge name tag on every Route Board row now shows the **handover route**, keyed to the
+  current shift: **`Mia → Ren`** (previous-shift author → current-shift holder; also shown for a
+  note handed forward by the current shift), plain **`Mia`** when the case is owned by someone on
+  the current shift, and a highlighted amber **`Ren → ?`** when the shift rolled over and **no one
+  on the current shift has taken the case** (gap = retained owner off-shift + no fresh note).
+  The right side of a route always resolves to the current shift. Legend + training guide updated;
+  the TKMS diamonds stay at the tag's end. 7 new tests.
+
+### Fixed (sidebar "Ends" showed a page-load-anchored time, not the real shift end)
+
+- `CURRENT_SHIFT.endsAtUtc` came from the frozen demo seed, offset-anchored at boot — so "Ends"
+  trailed the page-load moment and the shift-ending logic (`handoverPendingCases`, hand-off
+  anchors, Shifts-page highlight) inherited the drift. Live mode now derives the active shift and
+  its true end each clock tick from the roster's `hoursUtc` (`computeCurrentShift()` — parses both
+  the `"08:00 – 20:00 UTC"` string form and `[start, end]` arrays, handles midnight wrap), updates
+  the sidebar in place and re-renders when the shift actually flips. Demo mode keeps the frozen
+  seed for stability. 5 new tests (200 total).
+
+---
+
 ## 2026-07-16
 
 ### Fixed (operator choice from the DB roster survives a page refresh)

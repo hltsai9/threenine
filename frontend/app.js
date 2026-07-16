@@ -787,13 +787,58 @@ function fmtHours(ms) {
 function realNow() { return new Date(); }
 
 // Live wall-clock shown in the sidebar — local-first (UTC kept on hover for reference).
+// Parse a shift's hoursUtc into [startHour, endHour] (fractional hours, UTC). Accepts both the
+// roster string form ("08:00 – 20:00 UTC" — what shifts.js and the saved DB config carry) and a
+// plain [start, end] array. Returns null when unparseable.
+function shiftHoursUtc(s) {
+  if (Array.isArray(s.hoursUtc) && s.hoursUtc.length === 2) return [Number(s.hoursUtc[0]), Number(s.hoursUtc[1])];
+  const m = /(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/.exec(String(s.hoursUtc || ''));
+  if (!m) return null;
+  return [+m[1] + (+m[2]) / 60, +m[3] + (+m[4]) / 60];
+}
+
+// Which shift is active at `d` — and when it really ends — from SHIFTS[].hoursUtc (possibly
+// wrapping midnight). Returns {name, endsAtUtc, date}, or null when no shift window contains
+// `d` (mis-configured roster → caller keeps the old value).
+function computeCurrentShift(d) {
+  const h = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  for (const s of (window.SHIFTS || [])) {
+    const hours = shiftHoursUtc(s);
+    if (!hours) continue;
+    const [a, b] = hours;
+    const inside = a < b ? (h >= a && h < b) : (h >= a || h < b);
+    if (!inside) continue;
+    const end = new Date(d);
+    end.setUTCHours(Math.floor(b), Math.round((b % 1) * 60), 0, 0);
+    if (end <= d) end.setUTCDate(end.getUTCDate() + 1);   // wraps midnight (or ends at 0h)
+    return { name: s.name, endsAtUtc: end.toISOString(), date: d.toISOString().slice(0, 10) };
+  }
+  return null;
+}
+
 function updateClock() {
   const now = realNow();
   // In live mode, keep NOW tracking the wall clock so any action (history entry, Track Status,
   // handover, reminder) is stamped at the REAL current time — matching this sidebar clock — rather
   // than the time the page was first loaded. Both update on the same tick, so they always agree.
   // The static demo deliberately freezes NOW for stability, so only advance it when live.
-  if (window.__LIVE__) NOW = now;
+  if (window.__LIVE__) {
+    NOW = now;
+    // Keep CURRENT_SHIFT tracking reality too: the seed value is only offset-anchored to boot
+    // time, so the sidebar "Ends" (and the shift-ending logic reading endsAtUtc) drifts. Derive
+    // the active shift + its true end from the roster's hoursUtc; re-render on a shift change
+    // so the ON SHIFT facts, handover indicators and Shifts page flip at the boundary.
+    const cs = computeCurrentShift(now);
+    if (cs && (cs.name !== window.CURRENT_SHIFT.name || cs.endsAtUtc !== window.CURRENT_SHIFT.endsAtUtc)) {
+      const shiftChanged = cs.name !== window.CURRENT_SHIFT.name;
+      window.CURRENT_SHIFT = cs;
+      if (shiftChanged) render();
+      else {
+        const ends = document.getElementById('op-ends');
+        if (ends) ends.textContent = fmtLocalTime(cs.endsAtUtc);
+      }
+    }
+  }
   const t = document.getElementById('clock-time');
   const d = document.getElementById('clock-date');
   if (!t || !d) return;
@@ -1706,22 +1751,46 @@ function shortOpName(name) {
 // ("→ name"). Otherwise the tracker is whoever picked the case into the workspace: the most
 // recent 'picked' history entry, falling back to the current operator. Returns
 // { label, kind: 'to' | 'by' } or null when nothing is known.
+// True when the case's current owner (handover recipient or last picker) is NOT on the current
+// shift and no fresh handover note exists — the shift rolled over and nobody on this shift has
+// taken the case. This is the gap the Route Board must make obvious ("A → ?").
+function trackerShiftGap(c) {
+  if (!needsHandoverNote(c)) return false;
+  const cur = getOperator(STATE.operatorId);
+  const owner = getOperator(caseTrackerOperatorId(c));
+  return !owner || !cur || owner.shift !== cur.shift;
+}
+
+// The tracker tag's content — the HANDOVER ROUTE integrated with the operator name:
+//   { from, to, kind: 'route' | 'gap' | 'by' }
+//   route: "A → B" — A (previous-shift operator) handed the case to B. Invariant: the RIGHT
+//          side belongs to the CURRENT shift (or is this shift's forward-looking note).
+//   gap:   "A → ?" — the shift changed and no one on the current shift has it; A is the
+//          previous-shift HOLDER (last recipient/picker, not necessarily the note author).
+//   by:    "A"     — picked by A, who is on the current shift (nothing to route yet).
 function caseTracker(c) {
-  if (c.handover) {
-    if (c.handover.toOperator) {
-      const r = getOperator(c.handover.toOperator);
-      if (r) return { label: shortOpName(r.name), kind: 'to' };
+  const cur = getOperator(STATE.operatorId);
+  const curShift = cur ? cur.shift : null;
+  if (c.handover && !c.handover.staleForCurrentShift) {
+    const author = getOperator(c.handover.author);
+    const from = author ? shortOpName(author.name) : (c.handover.from || '?');
+    const recipient = c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+    // Route resolves when the recipient side is on the CURRENT shift…
+    if (recipient && recipient.shift === curShift) return { from, to: shortOpName(recipient.name), kind: 'route' };
+    if (!recipient && c.handover.to && c.handover.to === curShift) return { from, to: c.handover.to, kind: 'route' };
+    // …or when the note was written BY the current shift, handing forward to the next one.
+    if (author && author.shift === curShift) {
+      const to = recipient ? shortOpName(recipient.name) : (c.handover.to || null);
+      if (to) return { from, to, kind: 'route' };
     }
-    if (c.handover.to) return { label: c.handover.to, kind: 'to' };
   }
-  const picks = (c.history || []).filter(h => h.kind === 'picked');
-  if (picks.length) {
-    const op = getOperator(picks[picks.length - 1].who);
-    if (op) return { label: shortOpName(op.name), kind: 'by' };
+  if (trackerShiftGap(c)) {
+    const owner = getOperator(caseTrackerOperatorId(c));
+    return { from: owner ? shortOpName(owner.name) : '?', to: '?', kind: 'gap' };
   }
-  const me = getOperator(STATE.operatorId);
-  if (me) return { label: shortOpName(me.name), kind: 'by' };
-  return null;
+  const owner = getOperator(caseTrackerOperatorId(c)) || getOperator(STATE.operatorId);
+  if (!owner) return null;
+  return { from: shortOpName(owner.name), to: null, kind: 'by' };
 }
 
 // Tracker icons drawn as inline SVG (stroke=currentColor, like the sidebar nav icons) rather than
@@ -1740,14 +1809,20 @@ function tkmsIconHtml() {
 
 // Tracker chip pinned to the LEFT EDGE of a Route Board row — a direct child of .rb-row (so it's
 // absolutely positioned at left:2px, aligned across every row regardless of the case's station).
-// Arrow icon = handed over to that teammate/shift; person icon = picked by that operator.
-// Cases flagged "Added to TKMS page" get the diamonds icon right of the name.
+// Shows the HANDOVER ROUTE: "A → B" (previous-shift op → current-shift holder), a highlighted
+// "A → ?" when the shift changed and nobody current has the case, or just "A" (picked by, on the
+// current shift). Cases flagged "Added to TKMS page" get the diamonds icon at the end.
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
-  const icon = t.kind === 'to' ? TRACKER_ARROW_SVG : TRACKER_PERSON_SVG;
-  const title = t.kind === 'to' ? `Hand over to ${t.label}` : `Picked by ${t.label}`;
-  return `<div class="rb-tracker rb-tracker-${t.kind}" style="left:2px;" title="${escapeHtml(title)}">${icon}<span class="rb-tracker-name">${escapeHtml(t.label)}</span>${c.addedToTkms ? tkmsIconHtml() : ''}</div>`;
+  const cls = t.kind === 'route' ? 'rb-tracker-to' : t.kind === 'gap' ? 'rb-tracker-by rb-tracker-gap' : 'rb-tracker-by';
+  const title = t.kind === 'route' ? `Handover: ${t.from} → ${t.to}`
+    : t.kind === 'gap' ? `Shift changed — no one on the current shift has this case yet (last: ${t.from})`
+    : `Picked by ${t.from}`;
+  const toHtml = t.to
+    ? `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`
+    : '';
+  return `<div class="rb-tracker ${cls}" style="left:2px;" title="${escapeHtml(title)}">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>${toHtml}${c.addedToTkms ? tkmsIconHtml() : ''}</div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -2295,7 +2370,7 @@ function renderRouteBoardStrip() {
           <span><span class="rb-legend-swatch rb-legend-solid"></span>Solid dot = holding now</span>
           <span><span class="rb-legend-swatch rb-legend-ring"></span>Ring = hand over to</span>
           <span><span class="rb-legend-swatch rb-legend-red"></span>Red = overdue</span>
-          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} picked by · ${TRACKER_ARROW_SVG} handed to · ${tkmsIconHtml()} on TKMS page</span>
+          <span class="rb-legend-tracker">${TRACKER_PERSON_SVG} A → B handover route · <span class="rb-tracker-q">→ ?</span> no one on this shift · ${tkmsIconHtml()} on TKMS page</span>
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">

@@ -2645,6 +2645,19 @@ table.case-table {
 .rb-legend-tracker .rb-tkms-ic { margin-left: 0; }
 .rb-tracker-by { color: var(--text-faint, #6b7a72); background: rgba(107, 122, 114, 0.12); }
 .rb-tracker-to { color: #8A3434; background: rgba(138, 52, 52, 0.10); }
+/* Route pieces: "A → B" (handover route) / "A → ?" (shift changed, nobody current has it). */
+.rb-tracker-arrow { flex: none; opacity: 0.75; }
+.rb-tracker-q { font-weight: 800; }
+.rb-tracker-gap {
+  color: #7a3512;
+  background: #f6dfb9;
+  box-shadow: 0 0 0 1px #e0b25e;
+  animation: rb-gap-pulse 2.2s ease-in-out infinite;
+}
+@keyframes rb-gap-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px #e0b25e; }
+  50%      { box-shadow: 0 0 0 3px rgba(224, 178, 94, 0.45); }
+}
 .rb-legend-tracker { color: var(--text-faint-2, #8a958f); font-size: 11px; }
 
 /* "Mine only" toggle in the dark band titlebar — light text to match the band chrome. */
