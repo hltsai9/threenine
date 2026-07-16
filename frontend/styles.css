@@ -2636,18 +2636,21 @@ table.case-table {
   max-width: calc(20% - 6px);   /* tracker gutter = left of the User station (20%) */
   overflow: hidden;
 }
-/* ONE shared pill for the route pair: previous-shift name flush LEFT, current-shift name flush
- * RIGHT — aligned vertically across every row, reading as a single unit. A gap ("→ ?") colors
- * the whole pill amber via .rb-tracker-gap on the wrap. */
+/* ONE shared pill for the route pair that HUGS its content ("prev → curr" adjacent, no dead
+ * space between short names). Its inline `left` sits just before the User station and the
+ * translateX(-100%) anchors the pill's RIGHT edge there — so the current-shift names align
+ * vertically across rows, and long names grow leftward until the gutter edge, then ellipsize.
+ * A gap ("→ ?") colors the whole pill amber via .rb-tracker-gap on the wrap. */
 .rb-tracker-wrap {
-  display: flex; align-items: center; justify-content: space-between; gap: 3px;
+  display: inline-flex; align-items: center; gap: 5px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-100%, -50%);
   z-index: 4;
-  width: calc(20% - 28px);   /* right edge stops well short of the User dot (station at 20%) */
+  width: max-content;
+  max-width: calc(20% - 24px);   /* never grows past the row's left edge / into the dot */
   background: rgba(107, 122, 114, 0.12);
   border-radius: 8px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 11px; font-weight: 600;
 }
@@ -2655,7 +2658,8 @@ table.case-table {
   position: static;
   top: auto;
   transform: none;
-  max-width: 58%;
+  min-width: 0;              /* both chips shrink + ellipsize when the pair is too long */
+  max-width: 100%;
   background: transparent;   /* the wrap carries the shared background */
   padding: 0;
 }
@@ -3107,7 +3111,28 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 .an-gantt-bar { fill: #3f6e5e; opacity: 0.85; }
 .an-gantt-bar:hover { fill: #8A3434; opacity: 1; }
 .an-gantt-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 10px; }
-.an-gantt-controls select, .an-gantt-controls input[type="date"] { margin-left: 4px; }
+/* Gantt controls share the toolbar-picker look (soft chip background, rounded border, accent
+   focus) so the date inputs don't sit there in raw browser chrome. */
+.an-gantt-controls select, .an-gantt-controls input[type="date"] {
+  margin-left: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  background: var(--chip-soft-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.an-gantt-controls select:focus, .an-gantt-controls input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent-soft);
+  background: white;
+}
+.an-gantt-controls input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.55; }
+/* Case-id row labels are Case Center links when a link can be built. */
+.an-gantt a { cursor: pointer; }
+.an-gantt a:hover .an-gantt-id { fill: #8A3434; text-decoration: underline; }
 
 /* "Added to TKMS page" checkbox in the case-detail / reading-panel toolbar. */
 .tkms-check {

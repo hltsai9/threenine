@@ -1821,19 +1821,19 @@ function routeTrackerTag(c) {
     : t.kind === 'gap' ? `Shift changed — no one on the current shift has this case yet (last: ${t.from})`
     : `Picked by ${t.from}`;
   const tkms = c.addedToTkms ? tkmsIconHtml() : '';
-  // ONE shared pill spanning the tracker gutter, with two aligned columns inside: PREVIOUS shift
-  // flush LEFT, CURRENT shift flush RIGHT — names line up vertically across rows and the pair
-  // reads as one unit. A "picked by a current-shift operator" tag has only the right column.
-  // A gap ("→ ?") colors the WHOLE pill amber.
+  // ONE shared pill that hugs its content — "prev → curr" sit right next to each other — with
+  // its RIGHT edge anchored just before the User station, so the current-shift names line up
+  // vertically across rows whether the names are short or long (long ones grow leftward and
+  // ellipsize at the gutter edge). A gap ("→ ?") colors the WHOLE pill amber.
   const wrapCls = t.kind === 'gap' ? ' rb-tracker-gap' : '';
   const prev = (t.kind === 'route' || t.kind === 'gap')
     ? `<span class="rb-tracker rb-tracker-by rb-tracker-prev">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span></span>`
-    : '<span></span>';
+    : '';
   const currCls = t.kind === 'route' ? 'rb-tracker-to' : 'rb-tracker-by';
   const currBody = t.kind === 'by'
     ? `${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>`
     : `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`;
-  return `<div class="rb-tracker-wrap${wrapCls}" style="left:2px;" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
+  return `<div class="rb-tracker-wrap${wrapCls}" style="left: calc(${ROUTE_STATION_POS['User']}% - 20px);" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -6674,7 +6674,12 @@ function operatorGanttSvg(opId, fromStr, toStr) {
   };
   const bars = rows.map((r, i) => {
     const y = TOP + i * ROW;
-    const label = `<text x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    const href = caseHref(r.c);
+    const idText = `<text class="an-gantt-id" x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    // Row label opens the case in Case Center when a link can be built (SVG <a> = native anchor).
+    const label = href
+      ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer"><title>Open ${escapeHtml(r.c.id)} in Case Center</title>${idText}</a>`
+      : idText;
     const segs = r.segs.map(s => `
       <rect class="an-gantt-bar" x="${x(s.from).toFixed(1)}" y="${y + 3}" width="${Math.max(2, x(s.to) - x(s.from)).toFixed(1)}" height="12" rx="3">
         <title>${escapeHtml(r.c.id)} · ${escapeHtml(s.type)} · ${fmtT(s.from)}–${fmtT(s.to)} ${escapeHtml(displayTzLabel())} · ${fmtHours(s.to - s.from)}</title>

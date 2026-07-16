@@ -345,12 +345,14 @@ test('operatorGanttData: from/to range includes earlier days; a single day exclu
 });
 test('operatorGanttSvg: renders labelled bars + the summary line; huge ranges are refused', () => {
   const fake = { id: 'GANTT-3', status: 'in_it', agentStatus: 'none', history: [],
+    caseLink: 'https://cc.example/case/GANTT-3',
     processTimeline: [{ processor: dayOp.id, processType: 'Service Team', startedAt: iso(2 * HOUR), endedAt: iso(HOUR) }] };
   app.STATE.cases.push(fake);
   try {
     const html = app.operatorGanttSvg(dayOp.id, ganttDay, ganttDay);
     ok(html.includes('an-gantt-bar'), 'segment bar rendered');
     ok(html.includes('GANTT-3'), 'case id row label');
+    ok(html.includes('href="https://cc.example/case/GANTT-3"'), 'row label links to Case Center');
     ok(html.includes('handled'), 'summary line present');
     const wide = app.operatorGanttSvg(dayOp.id, '2026-01-01', ganttDay);
     ok(wide.includes('31 days or fewer'), 'over-wide range refused with a hint');

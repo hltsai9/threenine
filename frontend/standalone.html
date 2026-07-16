@@ -2644,18 +2644,21 @@ table.case-table {
   max-width: calc(20% - 6px);   /* tracker gutter = left of the User station (20%) */
   overflow: hidden;
 }
-/* ONE shared pill for the route pair: previous-shift name flush LEFT, current-shift name flush
- * RIGHT — aligned vertically across every row, reading as a single unit. A gap ("→ ?") colors
- * the whole pill amber via .rb-tracker-gap on the wrap. */
+/* ONE shared pill for the route pair that HUGS its content ("prev → curr" adjacent, no dead
+ * space between short names). Its inline `left` sits just before the User station and the
+ * translateX(-100%) anchors the pill's RIGHT edge there — so the current-shift names align
+ * vertically across rows, and long names grow leftward until the gutter edge, then ellipsize.
+ * A gap ("→ ?") colors the whole pill amber via .rb-tracker-gap on the wrap. */
 .rb-tracker-wrap {
-  display: flex; align-items: center; justify-content: space-between; gap: 3px;
+  display: inline-flex; align-items: center; gap: 5px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-100%, -50%);
   z-index: 4;
-  width: calc(20% - 28px);   /* right edge stops well short of the User dot (station at 20%) */
+  width: max-content;
+  max-width: calc(20% - 24px);   /* never grows past the row's left edge / into the dot */
   background: rgba(107, 122, 114, 0.12);
   border-radius: 8px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 11px; font-weight: 600;
 }
@@ -2663,7 +2666,8 @@ table.case-table {
   position: static;
   top: auto;
   transform: none;
-  max-width: 58%;
+  min-width: 0;              /* both chips shrink + ellipsize when the pair is too long */
+  max-width: 100%;
   background: transparent;   /* the wrap carries the shared background */
   padding: 0;
 }
@@ -3115,7 +3119,28 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 .an-gantt-bar { fill: #3f6e5e; opacity: 0.85; }
 .an-gantt-bar:hover { fill: #8A3434; opacity: 1; }
 .an-gantt-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 10px; }
-.an-gantt-controls select, .an-gantt-controls input[type="date"] { margin-left: 4px; }
+/* Gantt controls share the toolbar-picker look (soft chip background, rounded border, accent
+   focus) so the date inputs don't sit there in raw browser chrome. */
+.an-gantt-controls select, .an-gantt-controls input[type="date"] {
+  margin-left: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  background: var(--chip-soft-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.an-gantt-controls select:focus, .an-gantt-controls input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent-soft);
+  background: white;
+}
+.an-gantt-controls input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.55; }
+/* Case-id row labels are Case Center links when a link can be built. */
+.an-gantt a { cursor: pointer; }
+.an-gantt a:hover .an-gantt-id { fill: #8A3434; text-decoration: underline; }
 
 /* "Added to TKMS page" checkbox in the case-detail / reading-panel toolbar. */
 .tkms-check {
@@ -5854,19 +5879,19 @@ function routeTrackerTag(c) {
     : t.kind === 'gap' ? `Shift changed — no one on the current shift has this case yet (last: ${t.from})`
     : `Picked by ${t.from}`;
   const tkms = c.addedToTkms ? tkmsIconHtml() : '';
-  // ONE shared pill spanning the tracker gutter, with two aligned columns inside: PREVIOUS shift
-  // flush LEFT, CURRENT shift flush RIGHT — names line up vertically across rows and the pair
-  // reads as one unit. A "picked by a current-shift operator" tag has only the right column.
-  // A gap ("→ ?") colors the WHOLE pill amber.
+  // ONE shared pill that hugs its content — "prev → curr" sit right next to each other — with
+  // its RIGHT edge anchored just before the User station, so the current-shift names line up
+  // vertically across rows whether the names are short or long (long ones grow leftward and
+  // ellipsize at the gutter edge). A gap ("→ ?") colors the WHOLE pill amber.
   const wrapCls = t.kind === 'gap' ? ' rb-tracker-gap' : '';
   const prev = (t.kind === 'route' || t.kind === 'gap')
     ? `<span class="rb-tracker rb-tracker-by rb-tracker-prev">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span></span>`
-    : '<span></span>';
+    : '';
   const currCls = t.kind === 'route' ? 'rb-tracker-to' : 'rb-tracker-by';
   const currBody = t.kind === 'by'
     ? `${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>`
     : `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`;
-  return `<div class="rb-tracker-wrap${wrapCls}" style="left:2px;" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
+  return `<div class="rb-tracker-wrap${wrapCls}" style="left: calc(${ROUTE_STATION_POS['User']}% - 20px);" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -10707,7 +10732,12 @@ function operatorGanttSvg(opId, fromStr, toStr) {
   };
   const bars = rows.map((r, i) => {
     const y = TOP + i * ROW;
-    const label = `<text x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    const href = caseHref(r.c);
+    const idText = `<text class="an-gantt-id" x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    // Row label opens the case in Case Center when a link can be built (SVG <a> = native anchor).
+    const label = href
+      ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer"><title>Open ${escapeHtml(r.c.id)} in Case Center</title>${idText}</a>`
+      : idText;
     const segs = r.segs.map(s => `
       <rect class="an-gantt-bar" x="${x(s.from).toFixed(1)}" y="${y + 3}" width="${Math.max(2, x(s.to) - x(s.from)).toFixed(1)}" height="12" rx="3">
         <title>${escapeHtml(r.c.id)} · ${escapeHtml(s.type)} · ${fmtT(s.from)}–${fmtT(s.to)} ${escapeHtml(displayTzLabel())} · ${fmtHours(s.to - s.from)}</title>

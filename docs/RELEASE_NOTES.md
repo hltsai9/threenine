@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Changed (tracker pill hugs its content; Gantt pickers themed + case ids link out)
+
+- The route pill no longer stretches across the whole gutter (short names left the two chips
+  stranded far apart): it now **hugs its content** — `prev → curr` sit right next to each other —
+  with its **right edge anchored** just before the User station, so current-shift names still
+  align vertically across rows and long names grow leftward, ellipsizing at the gutter edge.
+- The Operator-timeline **date pickers (and operator select) now match the app's picker theme**
+  (soft chip background, rounded border, accent focus) instead of raw browser chrome.
+- Gantt **case-id row labels are links to Case Center** (same `caseHref` the case pages use —
+  plain text when no link can be built).
+
 ### Changed (analytics Gantt takes a From/To date range; tracker pill clears the User dot)
 
 - The **Operator timeline** card's single day picker became **From / To date inputs** — the Gantt
