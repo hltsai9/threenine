@@ -30,7 +30,12 @@ At a few thousand cases the raw payload reaches several MB — on a slow link th
 is almost certainly the biggest single win. **Re-test the felt loading time after deploying this
 before investing in the stages below.**
 
-## Stage 1 — load the working set first (the "picked table" idea)
+## Stage 1 — load the working set first (the "picked table" idea) — ✅ SHIPPED 2026-07-16
+
+Implemented exactly as below (migration `0004_add_picked`; boot fetches `?scope=picked` →
+board renders → `?scope=rest` fills in the background). Stage 2 shipped alongside: a 60 s
+visible-tab delta poll on `?since=<asOf>` keeps the board current at a few-KB cost — it also
+pulls teammates' edits in near-real-time as a side benefit.
 
 The user's suggestion, adapted: rather than a separate linked table, **lift `picked` into an
 indexed scalar column** on `cases` (exactly how `status`/`created_at` are already lifted — see
@@ -49,7 +54,7 @@ indexed scalar column** on `cases` (exactly how `status`/`created_at` are alread
 Why a lifted column instead of a second table: same query power, no join, no dual-write
 consistency problem, and it follows the codebase's existing lifted-scalar pattern.
 
-## Stage 2 — delta refreshes
+## Stage 2 — delta refreshes — ✅ SHIPPED 2026-07-16 (see above)
 
 `updated_at` is already a lifted, indexed column. Add `GET /api/cases?since=<ISO>`: rows with
 `updated_at > since`. The SPA remembers the newest `updated_at` it has seen and polls/refreshes

@@ -9,7 +9,9 @@ Ingress) and never configure an API key or cookie.
 Endpoints (same contract the SPA already expects):
     GET  /healthz              -> {"ok": true}   (unauthenticated liveness probe)
     GET  /api/auth/check       -> 200 if the token is accepted (or API open), else 401
-    GET  /api/cases            -> {"cases": [...], "operatorLayer": "server"}
+    GET  /api/cases            -> {"cases": [...], "operatorLayer": "server", "asOf": <ISO>}
+    GET  /api/cases?scope=picked|rest -> working set / remainder (staged board loading)
+    GET  /api/cases?since=<ISO>       -> delta: only cases updated after the cursor
     GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
     POST /api/ingest?id=C-1041 -> re-ingest ONE case from Case Center (spawns the ingest CLI)
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
@@ -125,19 +127,25 @@ def auth_check(request: Request):
 
 
 @app.get("/api/cases")
-def get_cases(request: Request, id: str | None = None):
+def get_cases(request: Request, id: str | None = None, scope: str | None = None, since: str | None = None):
     require_auth(request)
     # NOTE: time-windowing (hours/fromHours/toHours) is now an ingestion concern — the
-    # DB is the accumulated store, so a read returns everything (or one case by id).
-    # The legacy query params are accepted and ignored so old SPA URLs keep working.
+    # DB is the accumulated store. The legacy query params are accepted and ignored so old
+    # SPA URLs keep working. New loading params (see docs/db-loading-plan.md):
+    #   scope=picked|rest  — working set first, archive later (indexed on the lifted column)
+    #   since=<ISO>        — delta refresh: only rows updated after the cursor
+    # The response's asOf is the max updated_at seen — the client's next `since` cursor.
     with SessionLocal() as session:
-        cases = case_by_id(session, id) if id else all_cases(session)
+        if id:
+            cases, as_of = case_by_id(session, id), None
+        else:
+            cases, as_of = all_cases(session, scope=scope, since=since)
     # operatorLayer="server" tells the SPA that these payloads carry the AUTHORITATIVE
     # operator layer (picks / Track Status / handover / reminder) straight from the DB, so
     # it must NOT overlay its browser-local (localStorage) copy on top. That's what makes the
     # board shared across operators/devices. serve.py's proxy omits this flag, so the SPA keeps
     # its single-user localStorage behavior there.
-    return {"cases": cases, "operatorLayer": "server"}
+    return {"cases": cases, "operatorLayer": "server", "asOf": as_of}
 
 
 @app.post("/api/save")

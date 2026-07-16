@@ -211,6 +211,45 @@ test('itProcessOver: red flag suppressed for product_team_handling', () => {
   ok(app.itProcessMs(c) > 24 * HOUR, 'the hours themselves keep counting');
 });
 
+/* ---------- operator pick survives a refresh (DB-roster race) ---------- */
+test('operator pick: unresolvable stored id goes pending and is never clobbered', () => {
+  const prevOp = app.STATE.operatorId;
+  const prevKey = app.localStorage.getItem('case-tracker-operator-v1');
+  app.localStorage.setItem('case-tracker-operator-v1', 'op-db-only');
+  app.__PENDING_OPERATOR__ = null;
+  app.restoreOperatorChoice();                       // seed roster: id unknown → pending
+  eq(app.__PENDING_OPERATOR__, 'op-db-only');
+  eq(app.STATE.operatorId, prevOp, 'operator unchanged while pending');
+  app.saveOperatorChoice();                          // early render's save must NOT clobber
+  eq(app.localStorage.getItem('case-tracker-operator-v1'), 'op-db-only', 'stored pick preserved');
+  // DB roster lands (as applyShiftsConfig would do) → the pick resolves.
+  app.OPERATORS.push({ id: 'op-db-only', name: 'Dana (DB)', shift: 'Day' });
+  app.restoreOperatorChoice();
+  eq(app.STATE.operatorId, 'op-db-only');
+  eq(app.__PENDING_OPERATOR__, null);
+  app.saveOperatorChoice();
+  eq(app.localStorage.getItem('case-tracker-operator-v1'), 'op-db-only');
+  // restore globals
+  app.OPERATORS.pop();
+  app.STATE.operatorId = prevOp;
+  app.__PENDING_OPERATOR__ = null;
+  if (prevKey == null) app.localStorage.removeItem('case-tracker-operator-v1');
+  else app.localStorage.setItem('case-tracker-operator-v1', prevKey);
+});
+test('operator pick: explicit pick clears pending and wins', () => {
+  const prevOp = app.STATE.operatorId;
+  const prevKey = app.localStorage.getItem('case-tracker-operator-v1');
+  app.__PENDING_OPERATOR__ = 'op-gone';
+  app.STATE.operatorId = opId;
+  app.__PENDING_OPERATOR__ = null;                   // what the switcher / gate handlers do
+  app.saveOperatorChoice();
+  eq(app.localStorage.getItem('case-tracker-operator-v1'), opId);
+  app.STATE.operatorId = prevOp;
+  if (prevKey == null) app.localStorage.removeItem('case-tracker-operator-v1');
+  else app.localStorage.setItem('case-tracker-operator-v1', prevKey);
+  app.saveOperatorChoice();
+});
+
 /* ---------- picked flag survives closing (analysis views) ---------- */
 test('closed picked case: off the board (isPicked) but flag retained (isQueued)', () => {
   const c = app.pickedCases()[0];

@@ -4253,6 +4253,7 @@ const STATE = {
   lookbackToHours: 0,        // newer bound (hours ago); 0 = up to now → "within N hours"
   archivePickedOnly: false,  // Overview week table: when true, show only picked cases
   pickedListTab: 'cases',    // picked-workspace list tab: 'cases' (active work) | 'sanity' (Sanity Check group)
+  _casesAsOf: null,          // server mode: max updated_at seen — the ?since= delta-refresh cursor
   routeMineOnly: false,      // Route Board: when true, show only the current operator's cases
 };
 // Exposed for debugging in the console and for the headless test harness (a top-level `const`
@@ -4347,6 +4348,7 @@ function showLoginGate(message) {
       const go = () => {
         if (window.OPERATORS.some(o => o.id === sel.value)) {
           STATE.operatorId = sel.value;
+          window.__PENDING_OPERATOR__ = null;   // an explicit pick always wins
           saveOperatorChoice();
         }
         el.remove();
@@ -4468,13 +4470,24 @@ const AGENT_KEY = 'case-tracker-agent-v1';
 // pick still belongs to this browser). Kept in its own key so it survives a refresh regardless of
 // how the case data is sourced.
 const OPERATOR_KEY = 'case-tracker-operator-v1';
+// __PENDING_OPERATOR__ holds a stored pick we could NOT validate yet — typically an operator that
+// exists only in the DB roster, read at script-load time while OPERATORS is still the bundled
+// seed. While pending, saveOperatorChoice() refuses to write, so an early render's fallback can
+// never clobber the real pick; applyShiftsConfig() re-runs the restore once the DB roster lands.
 function saveOperatorChoice() {
+  if (window.__PENDING_OPERATOR__) return;   // don't overwrite the real pick with a fallback
   try { localStorage.setItem(OPERATOR_KEY, STATE.operatorId || ''); } catch (e) { /* ignore */ }
 }
 function restoreOperatorChoice() {
   try {
-    const id = localStorage.getItem(OPERATOR_KEY);
-    if (id && window.OPERATORS.some(o => o.id === id)) STATE.operatorId = id;
+    const id = window.__PENDING_OPERATOR__ || localStorage.getItem(OPERATOR_KEY);
+    if (!id) return;
+    if (window.OPERATORS.some(o => o.id === id)) {
+      STATE.operatorId = id;
+      window.__PENDING_OPERATOR__ = null;   // resolved
+    } else {
+      window.__PENDING_OPERATOR__ = id;     // roster (DB config) not loaded yet — keep waiting
+    }
   } catch (e) { /* ignore */ }
 }
 
@@ -5164,6 +5177,8 @@ function renderSidebar() {
     if (sw.dataset.bound !== '1') {
       sw.addEventListener('change', () => {
         STATE.operatorId = sw.value;
+        window.__PENDING_OPERATOR__ = null;   // an explicit pick always wins
+        saveOperatorChoice();
         render();
       });
       sw.dataset.bound = '1';
@@ -10147,6 +10162,9 @@ function applyShiftsConfig(cfg) {
   SEED_ROSTER.currentOperatorId = window.CURRENT_OPERATOR_ID;
   SEED_ROSTER.rota = structuredClone(window.ROTA || []);
   SEED_ROSTER.rotaByWeek = structuredClone(window.ROTA_BY_WEEK || {});
+  // The roster just changed (DB config landed): a stored operator pick that couldn't be
+  // validated against the seed roster can resolve now (see __PENDING_OPERATOR__).
+  restoreOperatorChoice();
 }
 function applyOwnersConfig(cfg) {
   if (!cfg || typeof cfg !== 'object') return;
@@ -10221,15 +10239,109 @@ function persistChangedCases() {
   saveCasesToServer(changed);
 }
 
+// Validate a raw /api/cases payload list: a usable case is a plain object with a non-empty
+// string id. Malformed rows would otherwise render as ghost cards, or collapse together under
+// the id-keyed merges (every id-less row sharing the `undefined` key).
+function validCaseRows(cases) {
+  const valid = [];
+  let dropped = 0;
+  for (const raw of cases) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)
+        && typeof raw.id === 'string' && raw.id.trim()) valid.push(raw);
+    else dropped++;
+  }
+  if (dropped) {
+    console.warn(`Case Center: ignored ${dropped} malformed case record(s) (missing id or not an object).`);
+    showToast(`Ignored ${dropped} malformed case record${dropped === 1 ? '' : 's'} from Case Center.`, 'warn');
+  }
+  return valid;
+}
+
+// Fetch one /api/cases page (server mode) with an optional query string. Returns
+// {valid, asOf} or null on any failure (auth failures also flag __NEEDS_LOGIN__).
+async function fetchServerCasesPage(query) {
+  let res;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), LIVE_FETCH_TIMEOUT_MS);
+    res = await fetch(apiUrl('api/cases' + (query || '')), withAuth({ signal: ctrl.signal, headers: { Accept: 'application/json' } }));
+    clearTimeout(t);
+  } catch (e) { return null; }
+  window.__NEEDS_LOGIN__ = res.status === 401;
+  if (!res.ok) return null;
+  let data;
+  try { data = await res.json(); } catch (e) { return null; }
+  if (data && data.operatorLayer === 'server') window.__SERVER_OPERATOR_LAYER__ = true;
+  const cases = Array.isArray(data) ? data : (data && data.cases);
+  if (!Array.isArray(cases)) return null;
+  const valid = validCaseRows(cases);
+  if (cases.length && !valid.length) return null;   // rows came back but none usable
+  return { valid, asOf: (data && data.asOf) || null };
+}
+
+// Upsert server payloads into STATE by id. In server mode the payload is AUTHORITATIVE
+// (it carries the shared operator layer), so a fetched case replaces the local copy whole.
+function upsertServerCases(valid) {
+  const byId = new Map(STATE.cases.map(c => [c.id, c]));
+  for (const raw of valid) byId.set(raw.id, normalizeLiveCase(raw));
+  STATE.cases = [...byId.values()];
+}
+
+// Server-mode STAGED load (docs/db-loading-plan.md Stage 1): the picked working set first —
+// the board renders as soon as those few cases arrive — then the rest (archive weeks) in the
+// background. An older backend ignores `scope` and returns everything twice; the id-keyed
+// upsert makes that harmless.
+async function loadServerCasesStaged() {
+  const first = await fetchServerCasesPage('?scope=picked');
+  if (!first) return false;
+  window.__LIVE__ = true;
+  NOW = new Date(); // real time for SLA math against live timestamps
+  upsertServerCases(first.valid);
+  if (first.asOf) STATE._casesAsOf = first.asOf;
+  if (!window.__SERVER_OPERATOR_LAYER__) applyStoredAgentLayer();
+  restoreOperatorChoice();
+  syncWeeksToNow();
+  snapshotSavedCases();
+  hideLiveLoading();
+  render();   // board usable now, with the working set
+  fetchServerCasesPage('?scope=rest').then(rest => {
+    if (!rest) return;
+    upsertServerCases(rest.valid);
+    if (rest.asOf && (!STATE._casesAsOf || rest.asOf > STATE._casesAsOf)) STATE._casesAsOf = rest.asOf;
+    syncWeeksToNow();
+    snapshotSavedCases();
+    render();
+  });
+  return true;
+}
+
+// Stage-2 delta refresh: poll for cases changed since the asOf cursor (server mode only,
+// visible tab only, and never while the operator is typing in a field). Pulls teammates'
+// edits in near-real-time at a few-KB cost instead of refetching the store.
+setInterval(async () => {
+  if (!window.__SERVER_OPERATOR_LAYER__ || !STATE._casesAsOf) return;
+  if (document.visibilityState !== 'visible') return;
+  const ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+  const delta = await fetchServerCasesPage('?since=' + encodeURIComponent(STATE._casesAsOf));
+  if (!delta) return;
+  if (delta.asOf && (!STATE._casesAsOf || delta.asOf > STATE._casesAsOf)) STATE._casesAsOf = delta.asOf;
+  if (!delta.valid.length) return;
+  upsertServerCases(delta.valid);
+  syncWeeksToNow();
+  snapshotSavedCases();
+  render();
+}, 60000);
+
 // Try the local backend. Returns true if live Case Center data was loaded; false otherwise
 // (public Pages demo, file://, or backend down) — in which case the seed data stays.
 async function tryLoadLiveCases(allCases) {
   // Only meaningful when served over http(s) (i.e. by local/serve.py or backend/api.py). Skip
   // for file:// and avoid a noisy console error when someone just opens standalone.html directly.
   if (!/^https?:$/.test(location.protocol)) return false;
-  // allCases=true (server-mode boot) pulls the whole DB store — no Case Center look-back window,
-  // which is an ingestion concern for the DB backend. Otherwise use the look-back query (serve.py).
-  const url = allCases ? apiUrl('api/cases') : liveCasesUrl(STATE.lookbackHours, STATE.lookbackToHours);
+  // allCases=true (server-mode boot) → staged DB load; otherwise the serve.py look-back query.
+  if (allCases) return loadServerCasesStaged();
+  const url = liveCasesUrl(STATE.lookbackHours, STATE.lookbackToHours);
   let res;
   try {
     const ctrl = new AbortController();
@@ -10249,21 +10361,7 @@ async function tryLoadLiveCases(allCases) {
   if (data && data.operatorLayer === 'server') window.__SERVER_OPERATOR_LAYER__ = true;
   const cases = Array.isArray(data) ? data : (data && data.cases);
   if (!Array.isArray(cases)) return false;
-
-  // Validate the payload before trusting it: a usable case is a plain object with a
-  // non-empty string id. Malformed rows would otherwise render as ghost cards, or collapse
-  // together under the id-keyed merge below (every id-less row sharing the `undefined` key).
-  const valid = [];
-  let dropped = 0;
-  for (const raw of cases) {
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)
-        && typeof raw.id === 'string' && raw.id.trim()) valid.push(raw);
-    else dropped++;
-  }
-  if (dropped) {
-    console.warn(`Case Center: ignored ${dropped} malformed case record(s) (missing id or not an object).`);
-    showToast(`Ignored ${dropped} malformed case record${dropped === 1 ? '' : 's'} from Case Center.`, 'warn');
-  }
+  const valid = validCaseRows(cases);
   // Rows came back but none were usable → keep what we already have rather than blanking the board.
   if (cases.length && !valid.length) return false;
 

@@ -15,7 +15,7 @@ live together, and the merge rules in backend/merge.py decide who may write what
 """
 import os
 
-from sqlalchemy import DateTime, Integer, String, create_engine
+from sqlalchemy import Boolean, DateTime, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.types import JSON
 
@@ -54,7 +54,10 @@ class Case(Base):
     # record had no parseable createdAt.
     status: Mapped[str | None] = mapped_column(String(40), index=True, nullable=True)
     created_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
-    updated_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+    # Lifted RETAINED pick flag (payload.agentStatus == 'queued' — survives the case closing).
+    # Lets the board load the working set first: GET /api/cases?scope=picked is an indexed WHERE.
+    picked: Mapped[bool | None] = mapped_column(Boolean, index=True, default=False)
     # The full board-shaped case object. JSON maps to native JSON on PG/MySQL and to
     # TEXT-encoded JSON on SQLite — same code, every backend.
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

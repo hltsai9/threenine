@@ -8,6 +8,37 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-07-16
+
+### Fixed (operator choice from the DB roster survives a page refresh)
+
+- Refreshing forgot the chosen operator whenever it existed only in the **DB roster**: the
+  restore ran at script load against the bundled seed roster, failed to validate the stored id,
+  and the first render's `saveOperatorChoice()` then **overwrote the stored pick with the seed
+  default**. Now an unresolvable stored id is kept **pending** (`__PENDING_OPERATOR__`) — saves
+  are suppressed while pending so nothing clobbers it — and `applyShiftsConfig()` re-runs the
+  restore the moment the DB roster lands. Explicit picks (login gate, sidebar switcher) always
+  win. E2E-verified: pick a DB-only operator, reload → still selected.
+
+### Added (DB loading Stages 1 & 2: working-set-first boot + delta refresh)
+
+- **Lifted `picked` column** on `cases` (migration `0004_add_picked`, indexed, backfilled from
+  payloads in the migration; `updated_at` indexed too). Lifts the *retained* flag
+  (`agentStatus == 'queued'`) so previously picked closed cases stay queryable.
+- **`GET /api/cases` gains `scope=picked|rest` and `since=<ISO>`**, and returns `asOf` (the max
+  `updated_at` cursor). Absent params keep the full-store behavior.
+- **Staged boot:** server mode fetches `?scope=picked` first — the board renders as soon as the
+  working set arrives — then `?scope=rest` fills Overview/archive in the background. Old backends
+  ignore `scope`; the id-keyed upsert makes the double-fetch harmless.
+- **Delta poll:** every 60 s (visible tab only, never while typing) the SPA fetches
+  `?since=<asOf>` and upserts just the changed cases — steady-state refreshes cost a few KB and
+  pull teammates' edits in near-real-time. E2E-verified: boot issues exactly
+  `?scope=picked` → `?scope=rest`; an edited case comes back alone via `?since=`.
+- **Deploy note:** this one needs `alembic upgrade head` (AUTO_CREATE can't add columns to an
+  existing table) — see SELF-HOST-UBUNTU.md.
+
+---
+
 ## 2026-07-15
 
 ### Changed (picked flag survives closing — visible in the archive, not on the board)

@@ -638,8 +638,8 @@ right columns. (Public Pages site stays on seed data; live mode is local only.)
 
 - [x] **Improve database loading time — plan first.** ✅ Planned 2026-07-15 → see
   [`db-loading-plan.md`](db-loading-plan.md). Measured: 400 cases = 965 KB raw / 19.5 KB gzipped
-  (49×). **Stage 0 (gzip middleware) shipped**; Stage 1 (lifted `picked` column + working-set-first
-  boot) and Stage 2 (`?since=` delta refresh) await sign-off; Stage 3 (payload slimming) in reserve.
+  (49×). **Stages 0–2 shipped** (gzip · lifted `picked` column + working-set-first boot ·
+  `?since=` delta poll, 2026-07-16); Stage 3 (payload slimming) in reserve.
 - [ ] **Bug (found while measuring): `ingest --seed-from-data-js` inserts 0 rows** when data.js is
   raw-CC shape (`CASES_RAW_CC`): extractor emits `caseId`, `upsert_operator` requires `id`.
 - [x] **Let operators delete their own handover notes.** ✅ Shipped 2026-07-15. Notes live as `kind: 'handover'` history

@@ -67,6 +67,9 @@ def _scalars_from(payload):
         "status": payload.get("status"),
         "created_at": _parse_created_at(payload),
         "updated_at": datetime.now(timezone.utc),
+        # RETAINED pick flag — true once picked, survives the case closing (analysis needs
+        # previously picked cases); mirrors the SPA's isQueued/isPicked distinction.
+        "picked": payload.get("agentStatus") == "queued",
     }
 
 
@@ -81,6 +84,7 @@ def _store(session, cid, payload, row=None):
         row.status = scalars["status"]
         row.created_at = scalars["created_at"]
         row.updated_at = scalars["updated_at"]
+        row.picked = scalars["picked"]
 
 
 def upsert_cc(session, cases):
@@ -129,12 +133,32 @@ def upsert_operator(session, cases, purge_ids=()):
     return added, updated, purged
 
 
-def all_cases(session):
-    """Return every stored case payload, newest first (NULL created_at last)."""
-    rows = session.execute(select(Case)).scalars().all()
+def all_cases(session, scope=None, since=None):
+    """Return stored case payloads, newest first (NULL created_at last), plus the max
+    updated_at cursor as (payloads, as_of_iso).
+
+    scope='picked' → only the working set (indexed WHERE on the lifted flag);
+    scope='rest'   → the complement (archive weeks etc.);
+    since=<ISO>    → only rows whose updated_at is strictly newer (delta refresh)."""
+    q = select(Case)
+    if scope == "picked":
+        q = q.where(Case.picked.is_(True))
+    elif scope == "rest":
+        q = q.where((Case.picked.is_(None)) | (Case.picked.is_(False)))
+    if since is not None:
+        try:
+            dt = datetime.fromisoformat(str(since).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            q = q.where(Case.updated_at > dt)
+        except ValueError:
+            pass   # bad cursor → behave like no cursor (full fetch, still correct)
+    rows = session.execute(q).scalars().all()
     dated = sorted((r for r in rows if r.created_at is not None), key=lambda r: r.created_at, reverse=True)
     undated = [r for r in rows if r.created_at is None]
-    return [r.payload for r in dated + undated]
+    stamps = [r.updated_at for r in rows if r.updated_at is not None]
+    as_of = max(stamps).isoformat() if stamps else None
+    return [r.payload for r in dated + undated], as_of
 
 
 def case_by_id(session, cid):

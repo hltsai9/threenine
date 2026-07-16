@@ -151,6 +151,9 @@ You don't normally create it by hand:
   applies it. After pulling a new version, re-run `alembic upgrade head` (see *Updating*, below).
   Revision `0003_add_events` adds the **`events`** usage-analytics table the same way (the board
   batches operator actions there; the hidden `#/analytics` page visualizes them).
+  Revision `0004_add_picked` adds the **`cases.picked`** column (+ indexes) and backfills it —
+  this one **requires** `alembic upgrade head` (AUTO_CREATE only creates missing tables, it never
+  adds columns to existing ones); it powers the staged board loading (`?scope=` / `?since=`).
 
 **PostgreSQL** (the schema this deployment currently uses) — if you prefer to create it manually,
 or to confirm it exists, the equivalent DDL is:
