@@ -310,7 +310,7 @@ test('operatorGanttData: groups the operator\'s segments per case, sums their ti
     ] };
   app.STATE.cases.push(fake);
   try {
-    const g = app.operatorGanttData(dayOp.id, ganttDay);
+    const g = app.operatorGanttData(dayOp.id, ganttDay, ganttDay);
     const row = g.rows.find(r => r.c.id === 'GANTT-1');
     ok(row, 'the case appears');
     eq(row.segs.length, 2, "only the matching processor's segments");
@@ -323,20 +323,37 @@ test('operatorGanttData: open segment (no endedAt) runs to the frozen NOW', () =
     processTimeline: [{ processor: dayOp.name, processType: 'IT Office', startedAt: iso(HOUR) }] };
   app.STATE.cases.push(fake);
   try {
-    const row = app.operatorGanttData(dayOp.id, ganttDay).rows.find(r => r.c.id === 'GANTT-2');
+    const row = app.operatorGanttData(dayOp.id, ganttDay, ganttDay).rows.find(r => r.c.id === 'GANTT-2');
     ok(row, 'processor matched by full name');
     eq(row.ms, HOUR);
   } finally { app.STATE.cases.pop(); }
 });
-test('operatorGanttSvg: renders labelled bars + the summary line', () => {
+test('operatorGanttData: from/to range includes earlier days; a single day excludes them', () => {
+  const prevDay = app.isoToLocalInput(new Date(FIXED - 24 * HOUR).toISOString()).slice(0, 10);
+  const fake = { id: 'GANTT-4', status: 'in_it', agentStatus: 'none', history: [],
+    processTimeline: [{ processor: dayOp.id, processType: 'Service Team', startedAt: iso(30 * HOUR), endedAt: iso(28 * HOUR) }] };
+  app.STATE.cases.push(fake);
+  try {
+    const ranged = app.operatorGanttData(dayOp.id, prevDay, ganttDay);
+    const row = ranged.rows.find(r => r.c.id === 'GANTT-4');
+    ok(row, 'yesterday\'s segment is inside the from/to range');
+    eq(row.ms, 2 * HOUR);
+    eq(ranged.rangeMs, 48 * HOUR, 'both days inclusive');
+    ok(!app.operatorGanttData(dayOp.id, ganttDay, ganttDay).rows.some(r => r.c.id === 'GANTT-4'),
+      'today-only range excludes it');
+  } finally { app.STATE.cases.pop(); }
+});
+test('operatorGanttSvg: renders labelled bars + the summary line; huge ranges are refused', () => {
   const fake = { id: 'GANTT-3', status: 'in_it', agentStatus: 'none', history: [],
     processTimeline: [{ processor: dayOp.id, processType: 'Service Team', startedAt: iso(2 * HOUR), endedAt: iso(HOUR) }] };
   app.STATE.cases.push(fake);
   try {
-    const html = app.operatorGanttSvg(dayOp.id, ganttDay);
+    const html = app.operatorGanttSvg(dayOp.id, ganttDay, ganttDay);
     ok(html.includes('an-gantt-bar'), 'segment bar rendered');
     ok(html.includes('GANTT-3'), 'case id row label');
     ok(html.includes('handled'), 'summary line present');
+    const wide = app.operatorGanttSvg(dayOp.id, '2026-01-01', ganttDay);
+    ok(wide.includes('31 days or fewer'), 'over-wide range refused with a hint');
   } finally { app.STATE.cases.pop(); }
 });
 

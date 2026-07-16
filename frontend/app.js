@@ -5932,8 +5932,11 @@ function bindHandlers() {
     ANALYTICS.ganttOp = e.target.value;
     render();
   });
-  document.getElementById('gantt-day')?.addEventListener('change', e => {
-    if (e.target.value) { ANALYTICS.ganttDay = e.target.value; render(); }
+  document.getElementById('gantt-from')?.addEventListener('change', e => {
+    if (e.target.value) { ANALYTICS.ganttFrom = e.target.value; render(); }
+  });
+  document.getElementById('gantt-to')?.addEventListener('change', e => {
+    if (e.target.value) { ANALYTICS.ganttTo = e.target.value; render(); }
   });
   document.getElementById('route-mine-only')?.addEventListener('change', e => {
     STATE.routeMineOnly = e.target.checked;
@@ -6498,7 +6501,7 @@ async function tryLoadLiveCases(allCases) {
 
 /* ---------- Usage-analytics dashboard (hidden admin page: #/analytics) ---------- */
 
-const ANALYTICS = { days: 30, data: null, loading: false, error: null, day: null, ganttOp: null, ganttDay: null };
+const ANALYTICS = { days: 30, data: null, loading: false, error: null, day: null, ganttOp: null, ganttFrom: null, ganttTo: null };
 
 async function loadAnalytics(days) {
   ANALYTICS.days = days;
@@ -6575,14 +6578,16 @@ function processorMatchesOperator(processor, op) {
       || p === shortOpName(op.name).toLowerCase();
 }
 
-// All the timeline slices `opId` worked during one display-zone day: rows grouped per case with
-// their segments clipped to the day, plus the summed working time.
-function operatorGanttData(opId, dayStr) {
+// All the timeline slices `opId` worked during a display-zone date range (both days inclusive):
+// rows grouped per case with their segments clipped to the range, plus the summed working time.
+function operatorGanttData(opId, fromStr, toStr) {
   const op = getOperator(opId);
-  const dayStartIso = localInputToIso(dayStr + 'T00:00');
-  if (!op || !dayStartIso) return { rows: [], totalMs: 0, dayStart: 0 };
-  const dayStart = Date.parse(dayStartIso);
-  const dayEnd = dayStart + 24 * HOUR;
+  const startIso = localInputToIso(fromStr + 'T00:00');
+  const endIso = localInputToIso(toStr + 'T00:00');
+  if (!op || !startIso || !endIso) return { rows: [], totalMs: 0, rangeStart: 0, rangeMs: 0 };
+  const rangeStart = Date.parse(startIso);
+  let rangeEnd = Date.parse(endIso) + 24 * HOUR;         // "to" day is inclusive
+  if (rangeEnd <= rangeStart) rangeEnd = rangeStart + 24 * HOUR;   // to before from → just from's day
   const nowMs = NOW.getTime();
   const byCase = new Map();
   for (const c of STATE.cases) {
@@ -6593,7 +6598,7 @@ function operatorGanttData(opId, dayStr) {
       let b = s.endedAt ? Date.parse(s.endedAt) : nowMs;   // open segment → still working
       if (isNaN(a)) continue;
       if (isNaN(b) || b < a) b = a;
-      const from = Math.max(a, dayStart), to = Math.min(b, dayEnd);
+      const from = Math.max(a, rangeStart), to = Math.min(b, rangeEnd);
       if (to <= from) continue;
       if (!byCase.has(c.id)) byCase.set(c.id, { c, segs: [] });
       byCase.get(c.id).segs.push({ from, to, type: s.processType || s.ccStatus || '' });
@@ -6606,28 +6611,50 @@ function operatorGanttData(opId, dayStr) {
     totalMs += r.ms;
     return r;
   }).sort((x, y) => x.segs[0].from - y.segs[0].from);
-  return { rows, totalMs, dayStart };
+  return { rows, totalMs, rangeStart, rangeMs: rangeEnd - rangeStart };
 }
 
-// Zero-dependency SVG Gantt: x = the day's 24h (display zone), y = one row per case; bars are
-// the operator's timeline segments (hover for stage + times); the operator's shift window is
-// shaded so "worked during their shift" reads at a glance.
-function operatorGanttSvg(opId, dayStr) {
+// Zero-dependency SVG Gantt: x = the chosen date range (display zone), y = one row per case;
+// bars are the operator's timeline segments (hover for stage + times); the operator's shift
+// window is shaded per day so "worked during their shift" reads at a glance.
+function operatorGanttSvg(opId, fromStr, toStr) {
   const op = getOperator(opId);
-  const { rows, totalMs, dayStart } = operatorGanttData(opId, dayStr);
+  const { rows, totalMs, rangeStart, rangeMs } = operatorGanttData(opId, fromStr, toStr);
+  const days = Math.max(1, Math.round(rangeMs / (24 * HOUR)));
+  if (days > 31) {
+    return `<div class="muted tiny">That range is ${days} days — pick 31 days or fewer so the timeline stays readable.</div>`;
+  }
   if (!rows.length) {
-    return `<div class="muted tiny">No Case Center timeline activity for ${escapeHtml(op ? op.name : opId)} on ${escapeHtml(dayStr)} (${escapeHtml(displayTzLabel())}).</div>`;
+    return `<div class="muted tiny">No Case Center timeline activity for ${escapeHtml(op ? op.name : opId)} between ${escapeHtml(fromStr)} and ${escapeHtml(toStr)} (${escapeHtml(displayTzLabel())}). The chart only sees cases currently loaded in the board.</div>`;
   }
   const W = 860, LAB = 76, PAD = 8, ROW = 20, TOP = 16;
   const H = TOP + rows.length * ROW + 24;
-  const x = ms => LAB + (ms - dayStart) / (24 * HOUR) * (W - LAB - PAD);
+  const x = ms => LAB + (ms - rangeStart) / rangeMs * (W - LAB - PAD);
+  const gridLine = (ms, strong) =>
+    `<line x1="${x(ms).toFixed(1)}" y1="${TOP - 4}" x2="${x(ms).toFixed(1)}" y2="${H - 18}" stroke="${strong ? '#c9d2c9' : '#e2e7e2'}"></line>`;
   let grid = '';
-  for (let h = 0; h <= 24; h += 3) {
-    const gx = x(dayStart + h * HOUR).toFixed(1);
-    grid += `<line x1="${gx}" y1="${TOP - 4}" x2="${gx}" y2="${H - 18}" stroke="#e2e7e2"></line>`
-      + `<text x="${gx}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#8a958f">${String(h).padStart(2, '0')}</text>`;
+  if (days === 1) {
+    for (let h = 0; h <= 24; h += 3) {
+      const t = rangeStart + h * HOUR;
+      grid += gridLine(t, false)
+        + `<text x="${x(t).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#8a958f">${String(h).padStart(2, '0')}</text>`;
+    }
+  } else {
+    // Multi-day: a line at each midnight, the date centered inside its day (thin out labels on
+    // long ranges), plus quiet 6-hour ticks while they still have room to breathe.
+    const labelEvery = Math.ceil(days / 12);
+    for (let d0 = 0; d0 <= days; d0++) {
+      const t = rangeStart + d0 * 24 * HOUR;
+      grid += gridLine(t, true);
+      if (d0 < days && d0 % labelEvery === 0) {
+        const p = _tzParts(new Date(t + 12 * HOUR).toISOString());
+        grid += `<text x="${x(t + 12 * HOUR).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#8a958f">${p.month}/${p.day}</text>`;
+      }
+      if (days <= 4 && d0 < days) for (let h = 6; h < 24; h += 6) grid += gridLine(t + h * HOUR, false);
+    }
   }
-  // Shade the operator's shift window (roster hoursUtc → display-zone hours; may wrap midnight).
+  // Shade the operator's shift window on every day of the range (roster hoursUtc → display-zone
+  // hours; may wrap midnight).
   let shade = '';
   const sh = (window.SHIFTS || []).find(s => s.name === (op && op.shift));
   const hours = sh ? shiftHoursUtc(sh) : null;
@@ -6635,21 +6662,28 @@ function operatorGanttSvg(opId, dayStr) {
     const off = DISPLAY_TZ_OPTIONS[DISPLAY_TZ].offsetHours ?? 0;
     const a = ((hours[0] + off) % 24 + 24) % 24, b = ((hours[1] + off) % 24 + 24) % 24;
     const spans = a < b ? [[a, b]] : [[a, 24], [0, b]];
-    shade = spans.map(([p, q]) =>
-      `<rect x="${x(dayStart + p * HOUR).toFixed(1)}" y="${TOP - 4}" width="${((q - p) / 24 * (W - LAB - PAD)).toFixed(1)}" height="${H - TOP - 14}" fill="rgba(63,110,94,0.08)"></rect>`).join('');
+    for (let d0 = 0; d0 < days; d0++) {
+      const base = rangeStart + d0 * 24 * HOUR;
+      shade += spans.map(([p, q]) =>
+        `<rect x="${x(base + p * HOUR).toFixed(1)}" y="${TOP - 4}" width="${((q - p) * HOUR / rangeMs * (W - LAB - PAD)).toFixed(1)}" height="${H - TOP - 14}" fill="rgba(63,110,94,0.08)"></rect>`).join('');
+    }
   }
+  const fmtT = ms => {
+    const p = _tzParts(new Date(ms).toISOString());
+    return days === 1 ? `${p.hour}:${p.minute}` : `${p.month}/${p.day} ${p.hour}:${p.minute}`;
+  };
   const bars = rows.map((r, i) => {
     const y = TOP + i * ROW;
     const label = `<text x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
     const segs = r.segs.map(s => `
       <rect class="an-gantt-bar" x="${x(s.from).toFixed(1)}" y="${y + 3}" width="${Math.max(2, x(s.to) - x(s.from)).toFixed(1)}" height="12" rx="3">
-        <title>${escapeHtml(r.c.id)} · ${escapeHtml(s.type)} · ${_displayHHMM(new Date(s.from).toISOString())}–${_displayHHMM(new Date(s.to).toISOString())} ${escapeHtml(displayTzLabel())} · ${fmtHours(s.to - s.from)}</title>
+        <title>${escapeHtml(r.c.id)} · ${escapeHtml(s.type)} · ${fmtT(s.from)}–${fmtT(s.to)} ${escapeHtml(displayTzLabel())} · ${fmtHours(s.to - s.from)}</title>
       </rect>`).join('');
     return label + segs;
   }).join('');
   return `
     <div class="muted tiny" style="margin-bottom:6px;"><strong>${rows.length}</strong> case${rows.length === 1 ? '' : 's'} handled · <strong>${fmtHours(totalMs)}</strong> of timeline work · shaded band = ${escapeHtml(op ? op.shift : '')} shift hours (${escapeHtml(displayTzLabel())})</div>
-    <svg class="an-gantt" viewBox="0 0 ${W} ${H}" role="img" aria-label="operator day gantt">${shade}${grid}${bars}</svg>`;
+    <svg class="an-gantt" viewBox="0 0 ${W} ${H}" role="img" aria-label="operator timeline gantt">${shade}${grid}${bars}</svg>`;
 }
 
 function renderAnalyticsPage() {
@@ -6761,24 +6795,28 @@ function renderAnalyticsPage() {
     })()}
 
     ${(() => {
-      // "Operator day timeline" — a Gantt built from Case Center's processTimeline (not the
-      // events table): which cases the operator touched during one display-zone day, how long
-      // on each, with their shift window shaded. ANALYTICS.ganttOp/ganttDay track the controls.
+      // "Operator timeline" — a Gantt built from Case Center's processTimeline (not the events
+      // table): which cases the operator touched during the chosen date range, how long on each,
+      // with their shift window shaded. ANALYTICS.ganttOp/ganttFrom/ganttTo track the controls.
       const ops = window.OPERATORS || [];
       if (!ops.length) return '';
       const opId = ops.some(o => o.id === ANALYTICS.ganttOp) ? ANALYTICS.ganttOp
         : (ops.some(o => o.id === STATE.operatorId) ? STATE.operatorId : ops[0].id);
-      const day = ANALYTICS.ganttDay || isoToLocalInput(NOW.toISOString()).slice(0, 10);
+      const today = isoToLocalInput(NOW.toISOString()).slice(0, 10);
+      const from = ANALYTICS.ganttFrom || today;
+      let to = ANALYTICS.ganttTo || today;
+      if (to < from) to = from;   // inverted range → collapse to the from-day
       const opts = ops.map(o =>
         `<option value="${escapeHtml(o.id)}"${o.id === opId ? ' selected' : ''}>${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`).join('');
       return `
         <div class="card"><div class="card-body">
-          <h3>Operator day timeline <span class="muted tiny">· from Case Center processTimeline</span></h3>
+          <h3>Operator timeline <span class="muted tiny">· from Case Center processTimeline</span></h3>
           <div class="an-gantt-controls">
             <label class="muted tiny">Operator <select id="gantt-op">${opts}</select></label>
-            <label class="muted tiny">Day <input type="date" id="gantt-day" value="${escapeHtml(day)}"></label>
+            <label class="muted tiny">From <input type="date" id="gantt-from" value="${escapeHtml(from)}"></label>
+            <label class="muted tiny">To <input type="date" id="gantt-to" value="${escapeHtml(to)}"></label>
           </div>
-          ${operatorGanttSvg(opId, day)}
+          ${operatorGanttSvg(opId, from, to)}
         </div></div>`;
     })()}
 

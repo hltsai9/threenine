@@ -2644,7 +2644,7 @@ table.case-table {
   top: 50%;
   transform: translateY(-50%);
   z-index: 4;
-  width: calc(20% - 12px);
+  width: calc(20% - 28px);   /* right edge stops well short of the User dot (station at 20%) */
   background: rgba(107, 122, 114, 0.12);
   border-radius: 8px;
   padding: 1px 6px;

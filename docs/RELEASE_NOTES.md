@@ -10,9 +10,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Changed (analytics Gantt takes a From/To date range; tracker pill clears the User dot)
+
+- The **Operator timeline** card's single day picker became **From / To date inputs** — the Gantt
+  now spans any range up to 31 days (both days inclusive): day-boundary grid lines with date
+  labels (thinned on long ranges, 6-hour ticks on short ones), the shift window shaded on
+  **every** day, and multi-day tooltips gain the date. Inverted ranges collapse to the From day.
+  1 new test (205 total).
+- The shared tracker pill's right edge now stops **well short of the User dot** (width
+  `20% − 28px`) — the current-shift name no longer crowds the station.
+
 ### Added (analytics: operator day Gantt from Case Center's processTimeline)
 
-- New **"Operator day timeline"** card on `#/analytics`: pick an operator and a day and get a
+- New **"Operator timeline"** card on `#/analytics`: pick an operator and a day and get a
   zero-dependency SVG **Gantt** — x-axis = the day's 24 h in the current display timezone,
   y-axis = one row per case the operator touched, bars = their `processTimeline` segments
   (hover a bar for stage + exact times + duration; open segments run to "now"). The operator's
