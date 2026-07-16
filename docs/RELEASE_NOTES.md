@@ -10,6 +10,12 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Changed (tracker route columns aligned)
+
+- The route tag is now **two aligned columns** in the left gutter: the previous-shift chip sits
+  flush **left**, the current-shift chip (arrow + name, plain picked-by, or the `→ ?` gap) flush
+  **right** — so names line up vertically across every row instead of ragged single chips.
+
 ### Added (Route Board tracker tag shows the handover route)
 
 - The left-edge name tag on every Route Board row now shows the **handover route**, keyed to the

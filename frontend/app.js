@@ -1815,14 +1815,21 @@ function tkmsIconHtml() {
 function routeTrackerTag(c) {
   const t = caseTracker(c);
   if (!t) return '';
-  const cls = t.kind === 'route' ? 'rb-tracker-to' : t.kind === 'gap' ? 'rb-tracker-by rb-tracker-gap' : 'rb-tracker-by';
   const title = t.kind === 'route' ? `Handover: ${t.from} → ${t.to}`
     : t.kind === 'gap' ? `Shift changed — no one on the current shift has this case yet (last: ${t.from})`
     : `Picked by ${t.from}`;
-  const toHtml = t.to
-    ? `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`
-    : '';
-  return `<div class="rb-tracker ${cls}" style="left:2px;" title="${escapeHtml(title)}">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>${toHtml}${c.addedToTkms ? tkmsIconHtml() : ''}</div>`;
+  const tkms = c.addedToTkms ? tkmsIconHtml() : '';
+  // Two aligned columns inside the left gutter: PREVIOUS shift flush LEFT, CURRENT shift flush
+  // RIGHT — so names line up vertically across rows. A plain "picked by a current-shift
+  // operator" tag has no previous side and sits in the right column alone.
+  const prev = (t.kind === 'route' || t.kind === 'gap')
+    ? `<span class="rb-tracker rb-tracker-by rb-tracker-prev">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span></span>`
+    : '<span></span>';
+  const currCls = t.kind === 'route' ? 'rb-tracker-to' : t.kind === 'gap' ? 'rb-tracker-by rb-tracker-gap' : 'rb-tracker-by';
+  const currBody = t.kind === 'by'
+    ? `${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>`
+    : `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`;
+  return `<div class="rb-tracker-wrap" style="left:2px;" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.

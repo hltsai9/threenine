@@ -2636,6 +2636,21 @@ table.case-table {
   max-width: calc(12% - 6px);
   overflow: hidden;
 }
+/* Two-column alignment for the route: previous-shift chip flush LEFT, current-shift chip flush
+ * RIGHT — names line up vertically across every row of the board. */
+.rb-tracker-wrap {
+  display: flex; align-items: center; justify-content: space-between; gap: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: calc(12% - 10px);
+}
+.rb-tracker-wrap .rb-tracker {
+  position: static;
+  top: auto;
+  transform: none;
+  max-width: 58%;
+}
 /* Inline tracker icons — sized and coloured (via currentColor) like the sidebar .nav-icon SVGs. */
 .rb-tracker-ic { width: 12px; height: 12px; display: block; flex: none; }
 .rb-tracker-name { overflow: hidden; text-overflow: ellipsis; }
