@@ -10,6 +10,25 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Added (analytics: operator day Gantt from Case Center's processTimeline)
+
+- New **"Operator day timeline"** card on `#/analytics`: pick an operator and a day and get a
+  zero-dependency SVG **Gantt** — x-axis = the day's 24 h in the current display timezone,
+  y-axis = one row per case the operator touched, bars = their `processTimeline` segments
+  (hover a bar for stage + exact times + duration; open segments run to "now"). The operator's
+  **shift window is shaded** so "worked during their shift" reads at a glance, and a summary line
+  gives **cases handled** and **total timeline hours**. Case Center processors are matched to
+  roster operators permissively (id / name / short name). 4 new tests (204 total).
+
+### Changed (Route Board stations rebalanced; tracker route is one pill)
+
+- The **User line moved right** (12 % → 20 %, with 1st Line/Core Team nudged to 36 %/56 %) so the
+  route tag in the left gutter has breathing room and no longer crowds the User dot. Station
+  positions now come from one `ROUTE_STATION_POS` constant (guides, dots, labels, sanity header).
+- The previous-shift and current-shift tracker chips now sit in **one shared pill** (single grey
+  background spanning the gutter) so the route reads as one unit instead of two floating tags;
+  a shift gap turns the whole pill amber.
+
 ### Changed (tracker route columns aligned)
 
 - The route tag is now **two aligned columns** in the left gutter: the previous-shift chip sits

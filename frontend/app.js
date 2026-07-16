@@ -1631,7 +1631,9 @@ function renderTzHint(owner) {
  * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
  */
 
-const ROUTE_STATION_POS = { 'User': 12, '1st Line': 31, 'Core Team': 50, 'HQ': 88 };
+// Station columns. User sits at 20% (not the left edge) so the tracker gutter has room for the
+// two-column "prev → curr" route names; Core Team/HQ rebalanced to keep the legs readable.
+const ROUTE_STATION_POS = { 'User': 20, '1st Line': 36, 'Core Team': 56, 'HQ': 88 };
 window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
 // Dot colour per station — matches the station squares in the band header.
 const STATION_DOT_COLOR = { 'User': '#3f6e5e', '1st Line': '#6b7a72', 'Core Team': '#8A3434', 'HQ': '#8C4A2F' };
@@ -1819,17 +1821,19 @@ function routeTrackerTag(c) {
     : t.kind === 'gap' ? `Shift changed — no one on the current shift has this case yet (last: ${t.from})`
     : `Picked by ${t.from}`;
   const tkms = c.addedToTkms ? tkmsIconHtml() : '';
-  // Two aligned columns inside the left gutter: PREVIOUS shift flush LEFT, CURRENT shift flush
-  // RIGHT — so names line up vertically across rows. A plain "picked by a current-shift
-  // operator" tag has no previous side and sits in the right column alone.
+  // ONE shared pill spanning the tracker gutter, with two aligned columns inside: PREVIOUS shift
+  // flush LEFT, CURRENT shift flush RIGHT — names line up vertically across rows and the pair
+  // reads as one unit. A "picked by a current-shift operator" tag has only the right column.
+  // A gap ("→ ?") colors the WHOLE pill amber.
+  const wrapCls = t.kind === 'gap' ? ' rb-tracker-gap' : '';
   const prev = (t.kind === 'route' || t.kind === 'gap')
     ? `<span class="rb-tracker rb-tracker-by rb-tracker-prev">${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span></span>`
     : '<span></span>';
-  const currCls = t.kind === 'route' ? 'rb-tracker-to' : t.kind === 'gap' ? 'rb-tracker-by rb-tracker-gap' : 'rb-tracker-by';
+  const currCls = t.kind === 'route' ? 'rb-tracker-to' : 'rb-tracker-by';
   const currBody = t.kind === 'by'
     ? `${TRACKER_PERSON_SVG}<span class="rb-tracker-name">${escapeHtml(t.from)}</span>`
     : `<span class="rb-tracker-arrow">→</span><span class="rb-tracker-name${t.kind === 'gap' ? ' rb-tracker-q' : ''}">${escapeHtml(t.to)}</span>`;
-  return `<div class="rb-tracker-wrap" style="left:2px;" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
+  return `<div class="rb-tracker-wrap${wrapCls}" style="left:2px;" title="${escapeHtml(title)}">${prev}<span class="rb-tracker ${currCls} rb-tracker-curr">${currBody}${tkms}</span></div>`;
 }
 
 // Route Board action-bar icons — inline SVG (stroke=currentColor) like the sidebar nav icons.
@@ -2201,7 +2205,7 @@ function _renderWatchRow(c, top) {
   const ts = caseTrackStatus(c);
   const station = caseStation(c);
   const expected = EXPECTED_STATION[ts] || station;
-  const pct = ROUTE_STATION_POS[station] ?? 88;
+  const pct = ROUTE_STATION_POS[station] ?? ROUTE_STATION_POS['HQ'];
   const dotColor = STATION_DOT_COLOR[station] || '#8C4A2F';
   const eye = `
       <div class="rb-watch-eye" style="left:calc(${pct}% + 22px);" aria-hidden="true">
@@ -2245,7 +2249,7 @@ function _renderWatchRow(c, top) {
 
 function _renderStayRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
-  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? ROUTE_STATION_POS['User'];
   return `
     <div class="rb-row rb-row-stay${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-stay-dot" style="left:${pct}%;"></div>
@@ -2276,16 +2280,16 @@ function _renderSanityHeader(count, expanded, top) {
   // The header dot marks the whole Sanity group (not one case), so it's fixed at the User edge.
   return `
     <div class="rb-row rb-row-sanity-header" style="top:${top}px;" data-action="toggle-sanity">
-      <div class="rb-sanity-dot" style="left:12%;"></div>
-      <button class="rb-sanity-toggle" style="left:calc(12% + 14px);" type="button" aria-expanded="${expanded}">${sym}</button>
-      <div class="rb-sanity-label" style="left:calc(12% + 42px);">Sanity Check · ${count} case${count === 1 ? '' : 's'}</div>
+      <div class="rb-sanity-dot" style="left:${ROUTE_STATION_POS['User']}%;"></div>
+      <button class="rb-sanity-toggle" style="left:calc(${ROUTE_STATION_POS['User']}% + 14px);" type="button" aria-expanded="${expanded}">${sym}</button>
+      <div class="rb-sanity-label" style="left:calc(${ROUTE_STATION_POS['User']}% + 42px);">Sanity Check · ${count} case${count === 1 ? '' : 's'}</div>
     </div>
   `;
 }
 
 function _renderSanitySubRow(c, top) {
   const sel = STATE.kanbanSelected === c.id ? ' rb-row-selected' : '';
-  const pct = ROUTE_STATION_POS[caseStation(c)] ?? 12;
+  const pct = ROUTE_STATION_POS[caseStation(c)] ?? ROUTE_STATION_POS['User'];
   return `
     <div class="rb-row rb-row-sanity-sub${sel}${itProcessOver(c) ? ' rb-row-over' : ''}" style="top:${top}px;" data-case-id="${c.id}" data-action="select-case" title="${escapeHtml(c.id)} · ${escapeHtml(c.subject)}">
       <div class="rb-sanity-sub-dot" style="left:${pct}%;"></div>
@@ -2381,18 +2385,18 @@ function renderRouteBoardStrip() {
         </div>
       </div>
       <div class="rb-card" style="height:${cardHeight}px;">
-        <div class="rb-guide" style="left:12%;"></div>
-        <div class="rb-guide" style="left:50%;"></div>
-        <div class="rb-guide" style="left:88%;"></div>
-        <div class="rb-station rb-station-user" style="left:12%; top:${HEADER_TOP}px;">
+        <div class="rb-guide" style="left:${ROUTE_STATION_POS['User']}%;"></div>
+        <div class="rb-guide" style="left:${ROUTE_STATION_POS['Core Team']}%;"></div>
+        <div class="rb-guide" style="left:${ROUTE_STATION_POS['HQ']}%;"></div>
+        <div class="rb-station rb-station-user" style="left:${ROUTE_STATION_POS['User']}%; top:${HEADER_TOP}px;">
           <span class="rb-station-square" style="background:#3f6e5e;"></span>
           <span class="rb-station-label"  style="color:#3f6e5e;">USER</span>
         </div>
-        <div class="rb-station rb-station-core" style="left:50%; top:${HEADER_TOP}px;">
+        <div class="rb-station rb-station-core" style="left:${ROUTE_STATION_POS['Core Team']}%; top:${HEADER_TOP}px;">
           <span class="rb-station-square" style="background:#8A3434;"></span>
           <span class="rb-station-label"  style="color:#8A3434;">CORE TEAM</span>
         </div>
-        <div class="rb-station rb-station-hq" style="left:88%; top:${HEADER_TOP}px;">
+        <div class="rb-station rb-station-hq" style="left:${ROUTE_STATION_POS['HQ']}%; top:${HEADER_TOP}px;">
           <span class="rb-station-square" style="background:#8C4A2F;"></span>
           <span class="rb-station-label"  style="color:#8C4A2F;">HQ</span>
         </div>
@@ -5924,6 +5928,13 @@ function bindHandlers() {
   document.querySelectorAll('[data-action="analytics-day"]').forEach(el => {
     el.addEventListener('click', () => { ANALYTICS.day = el.dataset.day; render(); });
   });
+  document.getElementById('gantt-op')?.addEventListener('change', e => {
+    ANALYTICS.ganttOp = e.target.value;
+    render();
+  });
+  document.getElementById('gantt-day')?.addEventListener('change', e => {
+    if (e.target.value) { ANALYTICS.ganttDay = e.target.value; render(); }
+  });
   document.getElementById('route-mine-only')?.addEventListener('change', e => {
     STATE.routeMineOnly = e.target.checked;
     render();
@@ -6487,7 +6498,7 @@ async function tryLoadLiveCases(allCases) {
 
 /* ---------- Usage-analytics dashboard (hidden admin page: #/analytics) ---------- */
 
-const ANALYTICS = { days: 30, data: null, loading: false, error: null, day: null };
+const ANALYTICS = { days: 30, data: null, loading: false, error: null, day: null, ganttOp: null, ganttDay: null };
 
 async function loadAnalytics(days) {
   ANALYTICS.days = days;
@@ -6550,6 +6561,95 @@ function lineChartSvg(series) {
       ${hover}
     </svg>
     <div class="an-line-axis"><span>${escapeHtml(first)}</span><span>hover a day for its count</span><span>${escapeHtml(last)}</span></div>`;
+}
+
+// ---- Operator day Gantt (from Case Center's processTimeline) --------------------------------
+// Does a timeline segment's `processor` (a CC account) refer to this roster operator? The two
+// systems aren't centrally mapped, so match permissively on id / name / short name (same
+// approach as isAssignedToMe).
+function processorMatchesOperator(processor, op) {
+  if (!processor || !op) return false;
+  const p = String(processor).toLowerCase();
+  return p === String(op.id).toLowerCase()
+      || p === String(op.name).toLowerCase()
+      || p === shortOpName(op.name).toLowerCase();
+}
+
+// All the timeline slices `opId` worked during one display-zone day: rows grouped per case with
+// their segments clipped to the day, plus the summed working time.
+function operatorGanttData(opId, dayStr) {
+  const op = getOperator(opId);
+  const dayStartIso = localInputToIso(dayStr + 'T00:00');
+  if (!op || !dayStartIso) return { rows: [], totalMs: 0, dayStart: 0 };
+  const dayStart = Date.parse(dayStartIso);
+  const dayEnd = dayStart + 24 * HOUR;
+  const nowMs = NOW.getTime();
+  const byCase = new Map();
+  for (const c of STATE.cases) {
+    if (c.deletedAt) continue;
+    for (const s of (c.processTimeline || [])) {
+      if (!processorMatchesOperator(s.processor, op)) continue;
+      const a = Date.parse(s.startedAt || '');
+      let b = s.endedAt ? Date.parse(s.endedAt) : nowMs;   // open segment → still working
+      if (isNaN(a)) continue;
+      if (isNaN(b) || b < a) b = a;
+      const from = Math.max(a, dayStart), to = Math.min(b, dayEnd);
+      if (to <= from) continue;
+      if (!byCase.has(c.id)) byCase.set(c.id, { c, segs: [] });
+      byCase.get(c.id).segs.push({ from, to, type: s.processType || s.ccStatus || '' });
+    }
+  }
+  let totalMs = 0;
+  const rows = [...byCase.values()].map(r => {
+    r.segs.sort((x, y) => x.from - y.from);
+    r.ms = r.segs.reduce((t, s) => t + (s.to - s.from), 0);
+    totalMs += r.ms;
+    return r;
+  }).sort((x, y) => x.segs[0].from - y.segs[0].from);
+  return { rows, totalMs, dayStart };
+}
+
+// Zero-dependency SVG Gantt: x = the day's 24h (display zone), y = one row per case; bars are
+// the operator's timeline segments (hover for stage + times); the operator's shift window is
+// shaded so "worked during their shift" reads at a glance.
+function operatorGanttSvg(opId, dayStr) {
+  const op = getOperator(opId);
+  const { rows, totalMs, dayStart } = operatorGanttData(opId, dayStr);
+  if (!rows.length) {
+    return `<div class="muted tiny">No Case Center timeline activity for ${escapeHtml(op ? op.name : opId)} on ${escapeHtml(dayStr)} (${escapeHtml(displayTzLabel())}).</div>`;
+  }
+  const W = 860, LAB = 76, PAD = 8, ROW = 20, TOP = 16;
+  const H = TOP + rows.length * ROW + 24;
+  const x = ms => LAB + (ms - dayStart) / (24 * HOUR) * (W - LAB - PAD);
+  let grid = '';
+  for (let h = 0; h <= 24; h += 3) {
+    const gx = x(dayStart + h * HOUR).toFixed(1);
+    grid += `<line x1="${gx}" y1="${TOP - 4}" x2="${gx}" y2="${H - 18}" stroke="#e2e7e2"></line>`
+      + `<text x="${gx}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#8a958f">${String(h).padStart(2, '0')}</text>`;
+  }
+  // Shade the operator's shift window (roster hoursUtc → display-zone hours; may wrap midnight).
+  let shade = '';
+  const sh = (window.SHIFTS || []).find(s => s.name === (op && op.shift));
+  const hours = sh ? shiftHoursUtc(sh) : null;
+  if (hours) {
+    const off = DISPLAY_TZ_OPTIONS[DISPLAY_TZ].offsetHours ?? 0;
+    const a = ((hours[0] + off) % 24 + 24) % 24, b = ((hours[1] + off) % 24 + 24) % 24;
+    const spans = a < b ? [[a, b]] : [[a, 24], [0, b]];
+    shade = spans.map(([p, q]) =>
+      `<rect x="${x(dayStart + p * HOUR).toFixed(1)}" y="${TOP - 4}" width="${((q - p) / 24 * (W - LAB - PAD)).toFixed(1)}" height="${H - TOP - 14}" fill="rgba(63,110,94,0.08)"></rect>`).join('');
+  }
+  const bars = rows.map((r, i) => {
+    const y = TOP + i * ROW;
+    const label = `<text x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    const segs = r.segs.map(s => `
+      <rect class="an-gantt-bar" x="${x(s.from).toFixed(1)}" y="${y + 3}" width="${Math.max(2, x(s.to) - x(s.from)).toFixed(1)}" height="12" rx="3">
+        <title>${escapeHtml(r.c.id)} · ${escapeHtml(s.type)} · ${_displayHHMM(new Date(s.from).toISOString())}–${_displayHHMM(new Date(s.to).toISOString())} ${escapeHtml(displayTzLabel())} · ${fmtHours(s.to - s.from)}</title>
+      </rect>`).join('');
+    return label + segs;
+  }).join('');
+  return `
+    <div class="muted tiny" style="margin-bottom:6px;"><strong>${rows.length}</strong> case${rows.length === 1 ? '' : 's'} handled · <strong>${fmtHours(totalMs)}</strong> of timeline work · shaded band = ${escapeHtml(op ? op.shift : '')} shift hours (${escapeHtml(displayTzLabel())})</div>
+    <svg class="an-gantt" viewBox="0 0 ${W} ${H}" role="img" aria-label="operator day gantt">${shade}${grid}${bars}</svg>`;
 }
 
 function renderAnalyticsPage() {
@@ -6657,6 +6757,28 @@ function renderAnalyticsPage() {
             <tbody>${dayRows}</tbody>
           </table>
           </div>
+        </div></div>`;
+    })()}
+
+    ${(() => {
+      // "Operator day timeline" — a Gantt built from Case Center's processTimeline (not the
+      // events table): which cases the operator touched during one display-zone day, how long
+      // on each, with their shift window shaded. ANALYTICS.ganttOp/ganttDay track the controls.
+      const ops = window.OPERATORS || [];
+      if (!ops.length) return '';
+      const opId = ops.some(o => o.id === ANALYTICS.ganttOp) ? ANALYTICS.ganttOp
+        : (ops.some(o => o.id === STATE.operatorId) ? STATE.operatorId : ops[0].id);
+      const day = ANALYTICS.ganttDay || isoToLocalInput(NOW.toISOString()).slice(0, 10);
+      const opts = ops.map(o =>
+        `<option value="${escapeHtml(o.id)}"${o.id === opId ? ' selected' : ''}>${escapeHtml(o.name)} (${escapeHtml(o.shift)})</option>`).join('');
+      return `
+        <div class="card"><div class="card-body">
+          <h3>Operator day timeline <span class="muted tiny">· from Case Center processTimeline</span></h3>
+          <div class="an-gantt-controls">
+            <label class="muted tiny">Operator <select id="gantt-op">${opts}</select></label>
+            <label class="muted tiny">Day <input type="date" id="gantt-day" value="${escapeHtml(day)}"></label>
+          </div>
+          ${operatorGanttSvg(opId, day)}
         </div></div>`;
     })()}
 

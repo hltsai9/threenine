@@ -292,6 +292,54 @@ test('computeCurrentShift: unparseable roster → null (caller keeps the old val
   app.SHIFTS = prev;
 });
 
+/* ---------- operator day Gantt (analytics, from processTimeline) ---------- */
+const ganttDay = app.isoToLocalInput(new Date(FIXED).toISOString()).slice(0, 10);
+test('processorMatchesOperator: matches id, name (any case), and short name', () => {
+  eq(app.processorMatchesOperator(dayOp.id, dayOp), true);
+  eq(app.processorMatchesOperator(dayOp.name.toUpperCase(), dayOp), true);
+  eq(app.processorMatchesOperator(app.shortOpName(dayOp.name), dayOp), true);
+  eq(app.processorMatchesOperator('someone-else', dayOp), false);
+  eq(app.processorMatchesOperator(null, dayOp), false);
+});
+test('operatorGanttData: groups the operator\'s segments per case, sums their time', () => {
+  const fake = { id: 'GANTT-1', status: 'in_it', agentStatus: 'none', history: [],
+    processTimeline: [
+      { processor: dayOp.id, processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(2 * HOUR) },
+      { processor: dayOp.id, processType: 'IT Office', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR) },
+      { processor: 'someone-else', processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },
+    ] };
+  app.STATE.cases.push(fake);
+  try {
+    const g = app.operatorGanttData(dayOp.id, ganttDay);
+    const row = g.rows.find(r => r.c.id === 'GANTT-1');
+    ok(row, 'the case appears');
+    eq(row.segs.length, 2, "only the matching processor's segments");
+    eq(row.ms, 2 * HOUR);
+    ok(g.totalMs >= 2 * HOUR, 'total includes this case');
+  } finally { app.STATE.cases.pop(); }
+});
+test('operatorGanttData: open segment (no endedAt) runs to the frozen NOW', () => {
+  const fake = { id: 'GANTT-2', status: 'in_it', agentStatus: 'none', history: [],
+    processTimeline: [{ processor: dayOp.name, processType: 'IT Office', startedAt: iso(HOUR) }] };
+  app.STATE.cases.push(fake);
+  try {
+    const row = app.operatorGanttData(dayOp.id, ganttDay).rows.find(r => r.c.id === 'GANTT-2');
+    ok(row, 'processor matched by full name');
+    eq(row.ms, HOUR);
+  } finally { app.STATE.cases.pop(); }
+});
+test('operatorGanttSvg: renders labelled bars + the summary line', () => {
+  const fake = { id: 'GANTT-3', status: 'in_it', agentStatus: 'none', history: [],
+    processTimeline: [{ processor: dayOp.id, processType: 'Service Team', startedAt: iso(2 * HOUR), endedAt: iso(HOUR) }] };
+  app.STATE.cases.push(fake);
+  try {
+    const html = app.operatorGanttSvg(dayOp.id, ganttDay);
+    ok(html.includes('an-gantt-bar'), 'segment bar rendered');
+    ok(html.includes('GANTT-3'), 'case id row label');
+    ok(html.includes('handled'), 'summary line present');
+  } finally { app.STATE.cases.pop(); }
+});
+
 /* ---------- operator pick survives a refresh (DB-roster race) ---------- */
 test('operator pick: unresolvable stored id goes pending and is never clobbered', () => {
   const prevOp = app.STATE.operatorId;
@@ -1148,7 +1196,7 @@ test('_renderFirstLineRow: static dot at 1st-Line pct + two dashed arrows', () =
     processTimeline: [{ processType: '1st  Line', processStartTime: iso(HOUR) }] };
   const html = app._renderFirstLineRow(c, 0);
   ok(html.includes('rb-row-firstline'), 'firstline row class');
-  ok(html.includes('left:31%'), 'dot at 1st-Line pct');
+  ok(html.includes(`left:${app.ROUTE_STATION_POS['1st Line']}%`), 'dot at 1st-Line pct');
   ok(html.includes('rb-fl-arrow-left') && html.includes('rb-fl-arrow-right'), 'both arrows');
 });
 

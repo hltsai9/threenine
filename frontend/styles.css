@@ -2633,23 +2633,31 @@ table.case-table {
   font-size: 11px; font-weight: 600;
   padding: 1px 5px; border-radius: 8px;
   white-space: nowrap;
-  max-width: calc(12% - 6px);
+  max-width: calc(20% - 6px);   /* tracker gutter = left of the User station (20%) */
   overflow: hidden;
 }
-/* Two-column alignment for the route: previous-shift chip flush LEFT, current-shift chip flush
- * RIGHT — names line up vertically across every row of the board. */
+/* ONE shared pill for the route pair: previous-shift name flush LEFT, current-shift name flush
+ * RIGHT — aligned vertically across every row, reading as a single unit. A gap ("→ ?") colors
+ * the whole pill amber via .rb-tracker-gap on the wrap. */
 .rb-tracker-wrap {
   display: flex; align-items: center; justify-content: space-between; gap: 3px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 4;
-  width: calc(12% - 10px);
+  width: calc(20% - 12px);
+  background: rgba(107, 122, 114, 0.12);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 11px; font-weight: 600;
 }
 .rb-tracker-wrap .rb-tracker {
   position: static;
   top: auto;
   transform: none;
   max-width: 58%;
+  background: transparent;   /* the wrap carries the shared background */
+  padding: 0;
 }
 /* Inline tracker icons — sized and coloured (via currentColor) like the sidebar .nav-icon SVGs. */
 .rb-tracker-ic { width: 12px; height: 12px; display: block; flex: none; }
@@ -3095,6 +3103,11 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
 .an-num { text-align: right; font-family: var(--font-mono); font-size: 12px; }
 .an-matrix th { font-size: 10.5px; }
 .an-day-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.an-gantt { width: 100%; height: auto; display: block; }
+.an-gantt-bar { fill: #3f6e5e; opacity: 0.85; }
+.an-gantt-bar:hover { fill: #8A3434; opacity: 1; }
+.an-gantt-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 10px; }
+.an-gantt-controls select, .an-gantt-controls input[type="date"] { margin-left: 4px; }
 
 /* "Added to TKMS page" checkbox in the case-detail / reading-panel toolbar. */
 .tkms-check {
