@@ -18,6 +18,8 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   **background-container deployment as the primary path** (`deploy/Dockerfile.mcp`,
   `MCP_TRANSPORT=streamable-http` on `:8081/mcp`, `host.docker.internal` DB-reachability and
   localhost-only security notes) with venv/stdio kept as the no-container alternative,
+  **per-tool-call logging** (stderr: args + duration + result summary, masked DB URL at
+  startup, `MCP_LOG_LEVEL` env, `docker logs` guidance),
   `DATABASE_URL`/port-forward setup (MariaDB-first), **opencode** registration (`opencode.json`,
   remote + local)
   plus Claude Code/Desktop equivalents, a tool reference table, worked examples with real

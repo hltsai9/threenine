@@ -43,7 +43,12 @@ stdio rule: never print to stdout — the MCP transport owns it; diagnostics go 
 """
 from __future__ import annotations
 
+import functools
+import logging
+import os
 import re
+import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -51,10 +56,52 @@ from sqlalchemy import select
 from mcp.server.fastmcp import FastMCP
 
 from .analytics import EXCLUDED_OPERATORS, events_summary as _events_summary
-from .db import Event, SessionLocal
+from .db import DATABASE_URL, Event, SessionLocal
 from .merge import all_cases, case_by_id, get_config as _get_config
 
+# Logs go to STDERR only (stdout belongs to the stdio transport). Tune with MCP_LOG_LEVEL
+# (DEBUG | INFO | WARNING, default INFO). In the container: `docker logs case-tracker-mcp`.
+logging.basicConfig(
+    stream=sys.stderr,
+    level=os.environ.get("MCP_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+log = logging.getLogger("case-tracker-mcp")
+
+
+def _safe_url(url):
+    """Mask the password so the DB URL is loggable."""
+    return re.sub(r"//([^:/@]+):[^@]+@", r"//\1:***@", str(url))
+
+
+def _logged(fn):
+    """One INFO line per tool call: name, arguments, duration, and a result summary
+    (count/total/casesHandled, or the error for error-dict returns)."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        shown = ", ".join(f"{k}={v!r}" for k, v in kwargs.items() if v is not None)
+        t0 = time.perf_counter()
+        try:
+            result = fn(*args, **kwargs)
+        except Exception:
+            log.exception("%s(%s) raised", fn.__name__, shown)
+            raise
+        ms = (time.perf_counter() - t0) * 1000
+        summary = ""
+        if isinstance(result, dict):
+            if "error" in result:
+                summary = f" -> error: {result['error']}"
+            else:
+                for k in ("count", "total", "casesHandled"):
+                    if k in result:
+                        summary = f" -> {k}={result[k]}"
+                        break
+        log.info("%s(%s) %.0fms%s", fn.__name__, shown, ms, summary)
+        return result
+    return wrapper
+
+
 mcp = FastMCP("case-tracker")
+log.info("case-tracker MCP server · db=%s", _safe_url(DATABASE_URL))
 
 # Case payloads are big (processTimeline / history / handover). List tools return these
 # summary fields only; ask for more via `fields` or fetch one case with get_case.
@@ -112,6 +159,7 @@ def _trim(payload, fields):
 
 
 @mcp.tool()
+@_logged
 def list_cases(scope: str | None = None, status: str | None = None, since: str | None = None,
                limit: int = 50, fields: list[str] | None = None) -> dict:
     """List cases (summaries — no processTimeline/history; use get_case for one full case).
@@ -133,6 +181,7 @@ def list_cases(scope: str | None = None, status: str | None = None, since: str |
 
 
 @mcp.tool()
+@_logged
 def get_case(case_id: str, fields: list[str] | None = None) -> dict:
     """One case. Full payload by default (large — includes processTimeline, history,
     handover); pass fields=["processTimeline"] etc. to fetch only specific keys."""
@@ -147,6 +196,7 @@ def get_case(case_id: str, fields: list[str] | None = None) -> dict:
 
 
 @mcp.tool()
+@_logged
 def get_board_config(key: str) -> dict:
     """Stored board config: key = 'shifts' (operators + shift windows + rota) or 'owners'
     (Core Team / HQ owner groups). Empty if the deployment still uses the bundled seed."""
@@ -161,6 +211,7 @@ def get_board_config(key: str) -> dict:
 
 
 @mcp.tool()
+@_logged
 def list_operators() -> dict:
     """The operator roster and shift windows from the stored 'shifts' config."""
     with SessionLocal() as session:
@@ -171,6 +222,7 @@ def list_operators() -> dict:
 
 
 @mcp.tool()
+@_logged
 def usage_summary(days: int = 30) -> dict:
     """Aggregated usage-analytics summary (same data as the #/analytics dashboard):
     totals, per-operator / per-kind counts, per-day series, hand-off times and stats.
@@ -180,6 +232,7 @@ def usage_summary(days: int = 30) -> dict:
 
 
 @mcp.tool()
+@_logged
 def list_events(operator_id: str | None = None, kind: str | None = None,
                 case_id: str | None = None, from_date: str | None = None,
                 to_date: str | None = None, limit: int = 100,
@@ -219,6 +272,7 @@ def list_events(operator_id: str | None = None, kind: str | None = None,
 
 
 @mcp.tool()
+@_logged
 def operator_timeline(operator_id: str, from_date: str, to_date: str,
                       utc_offset_minutes: int = 0) -> dict:
     """How an operator worked across a date range, from Case Center processTimeline —
@@ -300,15 +354,17 @@ def operator_timeline(operator_id: str, from_date: str, to_date: str,
 
 
 if __name__ == "__main__":
-    import os
     # MCP_TRANSPORT=streamable-http runs a long-lived HTTP server (for a background
     # container; endpoint path /mcp) instead of the default stdio (client-spawned process).
     if os.environ.get("MCP_TRANSPORT", "stdio") in ("streamable-http", "http"):
         mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
         mcp.settings.port = int(os.environ.get("MCP_PORT", "8081"))
+        log.info("transport=streamable-http endpoint=http://%s:%s/mcp",
+                 mcp.settings.host, mcp.settings.port)
         mcp.run(transport="streamable-http")
     else:
-        mcp.run()   # stdio
+        log.info("transport=stdio")
+        mcp.run()
 ```
 
 ## 2 · Run it in a background container
@@ -360,6 +416,27 @@ container itself, so:
 
 > **Security:** the HTTP endpoint has no authentication. Keep the port binding
 > `127.0.0.1:8081:8081` (localhost only, as above) — don't expose it to the network.
+
+### Logs
+
+The server logs every tool call to **stderr** — one line with the tool name, arguments,
+duration, and a result summary (or the error) — plus a startup line with the transport and the
+DB URL (password masked):
+
+```
+2026-07-17 17:23:44 INFO [case-tracker-mcp] case-tracker MCP server · db=mysql+pymysql://user:***@host.docker.internal:3307/cases
+2026-07-17 17:23:44 INFO [case-tracker-mcp] transport=streamable-http endpoint=http://0.0.0.0:8081/mcp
+2026-07-17 17:23:52 INFO [case-tracker-mcp] list_cases(scope='picked') 2ms -> count=12
+2026-07-17 17:23:59 INFO [case-tracker-mcp] operator_timeline(operator_id='op-da', from_date='2026-07-16', to_date='2026-07-17', utc_offset_minutes=0) 6ms -> casesHandled=2
+2026-07-17 17:24:03 INFO [case-tracker-mcp] get_case(case_id='NOPE') 1ms -> error: case not found
+```
+
+- **Container:** `docker logs -f case-tracker-mcp` (add `-t` for Docker's own timestamps).
+- **stdio:** stderr is captured by the client — opencode shows it in the session's MCP/server
+  output; Claude Code in the output of `claude mcp list` / its log files.
+- **Verbosity:** set `MCP_LOG_LEVEL` (`DEBUG` | `INFO` | `WARNING`, default `INFO`) — e.g.
+  add `-e MCP_LOG_LEVEL=WARNING` to `docker run` to log errors only. Unhandled exceptions are
+  always logged with a full traceback.
 
 ## 3 · Connect to the container
 
