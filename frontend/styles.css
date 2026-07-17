@@ -2633,7 +2633,7 @@ table.case-table {
   font-size: 11px; font-weight: 600;
   padding: 1px 5px; border-radius: 8px;
   white-space: nowrap;
-  max-width: calc(20% - 6px);   /* tracker gutter = left of the User station (20%) */
+  max-width: calc(17% - 6px);   /* tracker gutter = left of the User station (17%) */
   overflow: hidden;
 }
 /* ONE shared pill for the route pair that HUGS its content ("prev → curr" adjacent, no dead
@@ -2647,7 +2647,7 @@ table.case-table {
   transform: translate(-100%, -50%);
   z-index: 4;
   width: max-content;
-  max-width: calc(20% - 24px);   /* never grows past the row's left edge / into the dot */
+  max-width: calc(17% - 24px);   /* never grows past the row's left edge / into the dot */
   background: rgba(107, 122, 114, 0.12);
   border-radius: 8px;
   padding: 1px 7px;

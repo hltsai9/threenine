@@ -1631,9 +1631,10 @@ function renderTzHint(owner) {
  * The fonts (Lora / IBM Plex Sans / IBM Plex Mono) are loaded in index.html.
  */
 
-// Station columns. User sits at 20% (not the left edge) so the tracker gutter has room for the
-// two-column "prev → curr" route names; Core Team/HQ rebalanced to keep the legs readable.
-const ROUTE_STATION_POS = { 'User': 20, '1st Line': 36, 'Core Team': 56, 'HQ': 88 };
+// Station columns. User sits at 17% (not the left edge) so the tracker gutter has room for the
+// "prev → curr" route pill; HQ pulled in to 84% so the right-side chips (case id · hours) have
+// breathing room before the board edge.
+const ROUTE_STATION_POS = { 'User': 17, '1st Line': 34, 'Core Team': 55, 'HQ': 84 };
 window.ROUTE_STATION_POS = ROUTE_STATION_POS;   // exposed for tests
 // Dot colour per station — matches the station squares in the band header.
 const STATION_DOT_COLOR = { 'User': '#3f6e5e', '1st Line': '#6b7a72', 'Core Team': '#8A3434', 'HQ': '#8C4A2F' };
@@ -6629,7 +6630,8 @@ function operatorGanttSvg(opId, fromStr, toStr) {
   if (!rows.length) {
     return `<div class="muted tiny">No Case Center timeline activity for ${escapeHtml(op ? op.name : opId)} between ${escapeHtml(fromStr)} and ${escapeHtml(toStr)} (${escapeHtml(displayTzLabel())}). The chart only sees cases currently loaded in the board.</div>`;
   }
-  const W = 860, LAB = 76, PAD = 8, ROW = 20, TOP = 16;
+  // Label column sized for real Case Center ids (up to ~21 mono chars at 8.5px ≈ 108px).
+  const W = 860, LAB = 118, PAD = 8, ROW = 20, TOP = 16;
   const H = TOP + rows.length * ROW + 24;
   const x = ms => LAB + (ms - rangeStart) / rangeMs * (W - LAB - PAD);
   const gridLine = (ms, strong) =>
@@ -6677,7 +6679,7 @@ function operatorGanttSvg(opId, fromStr, toStr) {
   const bars = rows.map((r, i) => {
     const y = TOP + i * ROW;
     const href = caseHref(r.c);
-    const idText = `<text class="an-gantt-id" x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
+    const idText = `<text class="an-gantt-id" x="${LAB - 6}" y="${y + 12}" text-anchor="end" font-size="8.5" font-family="IBM Plex Mono, monospace" fill="#4a544e">${escapeHtml(r.c.id)}</text>`;
     // Row label opens the case in Case Center when a link can be built (SVG <a> = native anchor).
     const label = href
       ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer"><title>Open ${escapeHtml(r.c.id)} in Case Center</title>${idText}</a>`

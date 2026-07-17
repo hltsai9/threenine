@@ -1160,13 +1160,13 @@ test('stay row dot is placed at the case station (HQ), not hard-coded User', () 
   const c = { id: 'C-STAY', subject: 's', assigneeDept: 'HQ Identity',
     processTimeline: [{ processType: 'Service Team', processStartTime: iso(HOUR) }] };
   const html = app._renderStayRow(c, 0);
-  ok(html.includes('left:88%'), 'stay dot at HQ (88%)');
+  ok(html.includes(`left:${app.ROUTE_STATION_POS['HQ']}%`), 'stay dot at the HQ station');
 });
 test('watch row dot is placed at the case station (HQ)', () => {
   const c = { id: 'C-WATCH', subject: 's', assigneeDept: 'HQ Identity', trackStatus: 'escalated_to_hq',
     processTimeline: [{ processType: 'Service Team', startedAt: iso(HOUR) }] };
   const html = app._renderWatchRow(c, 0);
-  ok(html.includes('left:88%'), 'watch dot at HQ (88%)');
+  ok(html.includes(`left:${app.ROUTE_STATION_POS['HQ']}%`), 'watch dot at the HQ station');
 });
 
 /* ---------- watch row: settled ring (at expected) vs intent arrow (not at expected) ---------- */

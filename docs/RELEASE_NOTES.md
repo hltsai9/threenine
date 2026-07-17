@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Changed (Gantt fits 21-char case ids; User/HQ stations re-tuned)
+
+- The Operator-timeline **label column widened (76 → 118 units) and its id font shrank to
+  8.5px**, so real Case Center ids (up to ~21 characters) fit without clipping.
+- Route Board stations: **User back left to 17 %** (the content-hugging pill needs less gutter
+  than the old full-width one) and **HQ in to 84 %**, giving the right-side chips
+  (case id · hours, overdue pills) more room before the board edge. 1st Line/Core Team follow
+  at 34 %/55 %; two tests now read the position constant instead of hardcoding 88 %.
+
 ### Fixed (Gantt: Case Center processors match roster ids with the "op-" prefix)
 
 - Roster operator ids are **`op-` + the Case Center operator id**, but the Operator-timeline
