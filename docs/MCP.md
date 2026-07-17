@@ -304,10 +304,19 @@ if __name__ == "__main__":
 
 ## 2 · Install
 
+Use a virtual environment (from the repo root):
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r backend/requirements.txt   # SQLAlchemy + DB drivers (skip if already installed)
 pip install "mcp>=1.2,<2"                 # official MCP Python SDK
 ```
+
+> The venv matters for the client configs below: the MCP client spawns the server itself, so
+> either launch the client from a shell where `.venv` is activated, or point the command at
+> the venv's interpreter directly — `.venv/bin/python` instead of `python` (used in the
+> examples below; on Windows: `.venv\Scripts\python.exe`).
 
 ## 3 · Point it at your database
 
@@ -324,7 +333,7 @@ alembic -c backend/alembic.ini upgrade head
 Quick manual smoke test (it should sit silently waiting on stdin — Ctrl-C to exit):
 
 ```bash
-cd /path/to/threenine && python -m backend.mcp_server
+cd /path/to/threenine && .venv/bin/python -m backend.mcp_server
 ```
 
 ## 4 · Connect from opencode
@@ -338,7 +347,7 @@ Add to **`opencode.json` in the repo root** (start `opencode` inside the repo so
   "mcp": {
     "case-tracker": {
       "type": "local",
-      "command": ["python", "-m", "backend.mcp_server"],
+      "command": [".venv/bin/python", "-m", "backend.mcp_server"],
       "enabled": true,
       "environment": {
         "DATABASE_URL": "{env:DATABASE_URL}"
@@ -352,7 +361,8 @@ Notes:
 
 - `{env:NAME}` substitutes from your shell environment at load time — or hardcode the
   port-forward URL (`"DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5433/cases"`).
-- To use it from **outside** the repo (e.g. global `~/.config/opencode/opencode.json`), add
+- To use it from **outside** the repo (e.g. global `~/.config/opencode/opencode.json`), use the
+  absolute interpreter path (`"/path/to/threenine/.venv/bin/python"`) and add
   `"PYTHONPATH": "/path/to/threenine"` to `environment` so `-m backend.mcp_server` still resolves.
 - `"enabled": false` parks the server without deleting the config.
 - Optional: pass `ANALYTICS_EXCLUDE_OPERATORS` through `environment` to hide other operators
@@ -363,7 +373,7 @@ Notes:
 ```bash
 claude mcp add case-tracker \
   --env DATABASE_URL="postgresql+psycopg://user:pass@localhost:5433/cases" \
-  -- python -m backend.mcp_server
+  -- .venv/bin/python -m backend.mcp_server
 ```
 
 or the equivalent `.mcp.json` / Desktop-config entry:
@@ -372,7 +382,7 @@ or the equivalent `.mcp.json` / Desktop-config entry:
 {
   "mcpServers": {
     "case-tracker": {
-      "command": "python",
+      "command": "/path/to/threenine/.venv/bin/python",
       "args": ["-m", "backend.mcp_server"],
       "cwd": "/path/to/threenine",
       "env": { "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5433/cases" }
