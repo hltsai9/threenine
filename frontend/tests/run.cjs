@@ -342,6 +342,8 @@ test('operatorGanttData: from/to range includes earlier days; a single day exclu
     ok(row, 'yesterday\'s segment is inside the from/to range');
     eq(row.ms, 2 * HOUR);
     eq(ranged.rangeMs, 48 * HOUR, 'both days inclusive');
+    eq(ranged.activeDays, 1, 'only yesterday had activity — today does not dilute the average');
+    eq(ranged.avgCasesPerDay, 1);
     ok(!app.operatorGanttData(dayOp.id, ganttDay, ganttDay).rows.some(r => r.c.id === 'GANTT-4'),
       'today-only range excludes it');
   } finally { app.STATE.cases.pop(); }

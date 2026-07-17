@@ -6608,13 +6608,27 @@ function operatorGanttData(opId, fromStr, toStr) {
     }
   }
   let totalMs = 0;
+  // Distinct cases touched per display-zone day → the "cases handled per day" average. A day
+  // only counts once it has activity, so off days don't dilute the number.
+  const dayCases = new Map();   // day index in the range → Set(case id)
   const rows = [...byCase.values()].map(r => {
     r.segs.sort((x, y) => x.from - y.from);
     r.ms = r.segs.reduce((t, s) => t + (s.to - s.from), 0);
     totalMs += r.ms;
+    for (const s of r.segs) {
+      const d0 = Math.floor((s.from - rangeStart) / (24 * HOUR));
+      const d1 = Math.floor((s.to - 1 - rangeStart) / (24 * HOUR));
+      for (let d = d0; d <= d1; d++) {
+        if (!dayCases.has(d)) dayCases.set(d, new Set());
+        dayCases.get(d).add(r.c.id);
+      }
+    }
     return r;
   }).sort((x, y) => x.segs[0].from - y.segs[0].from);
-  return { rows, totalMs, rangeStart, rangeMs: rangeEnd - rangeStart };
+  const activeDays = dayCases.size;
+  const caseDays = [...dayCases.values()].reduce((t, s) => t + s.size, 0);
+  const avgCasesPerDay = activeDays ? Math.round(caseDays / activeDays * 10) / 10 : 0;
+  return { rows, totalMs, rangeStart, rangeMs: rangeEnd - rangeStart, activeDays, avgCasesPerDay };
 }
 
 // Zero-dependency SVG Gantt: x = the chosen date range (display zone), y = one row per case;
@@ -6622,7 +6636,7 @@ function operatorGanttData(opId, fromStr, toStr) {
 // window is shaded per day so "worked during their shift" reads at a glance.
 function operatorGanttSvg(opId, fromStr, toStr) {
   const op = getOperator(opId);
-  const { rows, totalMs, rangeStart, rangeMs } = operatorGanttData(opId, fromStr, toStr);
+  const { rows, totalMs, rangeStart, rangeMs, activeDays, avgCasesPerDay } = operatorGanttData(opId, fromStr, toStr);
   const days = Math.max(1, Math.round(rangeMs / (24 * HOUR)));
   if (days > 31) {
     return `<div class="muted tiny">That range is ${days} days — pick 31 days or fewer so the timeline stays readable.</div>`;
@@ -6691,7 +6705,7 @@ function operatorGanttSvg(opId, fromStr, toStr) {
     return label + segs;
   }).join('');
   return `
-    <div class="muted tiny" style="margin-bottom:6px;"><strong>${rows.length}</strong> case${rows.length === 1 ? '' : 's'} handled · <strong>${fmtHours(totalMs)}</strong> of timeline work · shaded band = ${escapeHtml(op ? op.shift : '')} shift hours (${escapeHtml(displayTzLabel())})</div>
+    <div class="muted tiny" style="margin-bottom:6px;"><strong>${rows.length}</strong> case${rows.length === 1 ? '' : 's'} handled · <strong>${avgCasesPerDay}</strong>/day on average over ${activeDays} active day${activeDays === 1 ? '' : 's'} · <strong>${fmtHours(totalMs)}</strong> of timeline work · shaded band = ${escapeHtml(op ? op.shift : '')} shift hours (${escapeHtml(displayTzLabel())})</div>
     <svg class="an-gantt" viewBox="0 0 ${W} ${H}" role="img" aria-label="operator timeline gantt">${shade}${grid}${bars}</svg>`;
 }
 

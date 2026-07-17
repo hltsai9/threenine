@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Added (Gantt summary shows average cases handled per day)
+
+- The line above the Operator timeline now includes **"N/day on average over M active days"** —
+  distinct cases touched per display-zone day, averaged over the days that actually had
+  activity (off days inside the range don't dilute it). A case worked on two days counts on
+  both. 2 new assertions.
+
 ### Changed (Gantt fits 21-char case ids; User/HQ stations re-tuned)
 
 - The Operator-timeline **label column widened (76 → 118 units) and its id font shrank to
