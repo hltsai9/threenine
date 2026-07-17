@@ -10,6 +10,16 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Docs (MCP guide: query the DB from an AI agent)
+
+- New [`docs/MCP.md`](MCP.md) — a **read-only MCP server** for the Case Tracker DB as a
+  copy-paste guide: the full verified `backend/mcp_server.py` code (7 tools — cases, config,
+  roster, usage events/summary, and an `operator_timeline` twin of the analytics Gantt),
+  install steps, `DATABASE_URL`/port-forward setup, **opencode** registration (`opencode.json`)
+  plus Claude Code/Desktop equivalents, a tool reference table, worked examples with real
+  captured output, and troubleshooting. Code verified end-to-end over stdio against a seeded
+  DB (26 assertions incl. Gantt parity). Follow-ups tracked in improvement-plan §7.
+
 ### Added (Gantt summary shows average cases handled per day)
 
 - The line above the Operator timeline now includes **"N/day on average over M active days"** —

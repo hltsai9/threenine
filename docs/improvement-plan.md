@@ -649,3 +649,17 @@ right columns. (Public Pages site stays on seed data; live mode is local only.)
   exports follow automatically since they read from history.
 - [x] **Separate the time chip and the Core Team member chip on the Route Board.** ✅ Shipped
   2026-07-15 — deadline chip stays; member chip stacks beneath it, still clickable to re-assign.
+
+## 7. MCP server follow-ups — noted 2026-07-17
+
+The read-only DB MCP server ships as a doc-with-code ([`MCP.md`](MCP.md)); once the code lands
+as `backend/mcp_server.py`, possible next steps:
+
+- [ ] **Streamable-HTTP transport** so the server can run in-cluster (next to the API) and
+  agents connect over the network with a bearer token — no local port-forward needed.
+- [ ] **MCP resources** for case payloads (URI-addressable `case://<id>`), cheaper than tools
+  for bulk context.
+- [ ] **Read-only DB role recipe** (Postgres `GRANT SELECT`) so the server's DATABASE_URL is
+  physically incapable of writes.
+- [ ] **`requirements-mcp.txt`** (`-r requirements.txt` + `mcp>=1.2,<2`) once the code moves
+  into `backend/`.
