@@ -6,7 +6,7 @@ the shift/operator roster, usage-analytics events, and the same per-operator tim
 the `#/analytics` Gantt shows.
 
 ```
-opencode / Claude ── stdio (JSON-RPC) ── python -m backend.mcp_server ── DATABASE_URL ── MariaDB/Postgres/SQLite
+opencode / Claude ── HTTP :8081/mcp (or stdio) ── backend.mcp_server (container) ── DATABASE_URL ── MariaDB/Postgres/SQLite
 ```
 
 Design guarantees:
@@ -23,15 +23,16 @@ Design guarantees:
 
 ## 1 · The server code
 
-Save as **`backend/mcp_server.py`** (verified working — all tools exercised over stdio against
-a seeded database):
+Save as **`backend/mcp_server.py`** (verified working — all tools exercised against a seeded
+database over both transports, stdio and streamable-HTTP):
 
 ```python
-"""Read-only MCP server for the Case Tracker database (stdio transport).
+"""Read-only MCP server for the Case Tracker database.
 
 Run from the repo root:
 
-    python -m backend.mcp_server
+    python -m backend.mcp_server                          # stdio (client-spawned)
+    MCP_TRANSPORT=streamable-http python -m backend.mcp_server   # HTTP :8081/mcp (container)
 
 The database is selected by DATABASE_URL exactly like the API (see backend/db.py —
 defaults to the repo-root SQLite; postgres:// URLs are normalized automatically).
@@ -299,51 +300,110 @@ def operator_timeline(operator_id: str, from_date: str, to_date: str,
 
 
 if __name__ == "__main__":
-    mcp.run()   # stdio transport
+    import os
+    # MCP_TRANSPORT=streamable-http runs a long-lived HTTP server (for a background
+    # container; endpoint path /mcp) instead of the default stdio (client-spawned process).
+    if os.environ.get("MCP_TRANSPORT", "stdio") in ("streamable-http", "http"):
+        mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
+        mcp.settings.port = int(os.environ.get("MCP_PORT", "8081"))
+        mcp.run(transport="streamable-http")
+    else:
+        mcp.run()   # stdio
 ```
 
-## 2 · Install
+## 2 · Run it in a background container
 
-Use a virtual environment (from the repo root):
+The server supports two transports: **stdio** (the client spawns the process — see §4) and
+**streamable HTTP** (`MCP_TRANSPORT=streamable-http` — a long-running server clients connect
+to over the network). A background container uses HTTP.
+
+Save as **`deploy/Dockerfile.mcp`**:
+
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY backend/requirements.txt backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt "mcp>=1.2,<2"
+COPY backend/ backend/
+ENV MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8081
+EXPOSE 8081
+USER 1000
+CMD ["python", "-m", "backend.mcp_server"]
+```
+
+Build and run in the background (from the repo root):
+
+```bash
+docker build -f deploy/Dockerfile.mcp -t case-tracker-mcp .
+
+docker run -d --name case-tracker-mcp --restart unless-stopped \
+  -p 127.0.0.1:8081:8081 \
+  --add-host=host.docker.internal:host-gateway \
+  -e DATABASE_URL="mysql+pymysql://USER:PASS@host.docker.internal:3307/DBNAME" \
+  case-tracker-mcp
+
+docker logs -f case-tracker-mcp   # should show "Uvicorn running on http://0.0.0.0:8081"
+```
+
+The MCP endpoint is **`http://127.0.0.1:8081/mcp`**.
+
+**Reaching the database from inside the container** — `localhost` inside the container is the
+container itself, so:
+
+- DB behind `kubectl port-forward` on your machine (`kubectl port-forward
+  svc/<your-mariadb-service> 3307:3306`) → use `host.docker.internal:3307` as above (the
+  `--add-host` flag makes that name work on Linux; Docker Desktop has it built in).
+- DB reachable directly (VPN / same network / running this container **in** the cluster) →
+  put the real host or K8s service DNS in `DATABASE_URL` and drop the `--add-host` flag.
+- Schema must already be current — the server never creates/alters tables:
+  `alembic -c backend/alembic.ini upgrade head` (from a checkout that reaches the DB).
+
+> **Security:** the HTTP endpoint has no authentication. Keep the port binding
+> `127.0.0.1:8081:8081` (localhost only, as above) — don't expose it to the network.
+
+## 3 · Connect to the container
+
+**opencode** — `opencode.json` (repo root, or global `~/.config/opencode/opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "case-tracker": {
+      "type": "remote",
+      "url": "http://127.0.0.1:8081/mcp",
+      "enabled": true
+    }
+  }
+}
+```
+
+**Claude Code**:
+
+```bash
+claude mcp add --transport http case-tracker http://127.0.0.1:8081/mcp
+```
+
+## 4 · Alternative: run locally over stdio (no container)
+
+The client spawns the server itself — nothing runs in the background. Install into a venv
+(from the repo root):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt   # SQLAlchemy + DB drivers (skip if already installed)
 pip install "mcp>=1.2,<2"                 # official MCP Python SDK
-```
 
-> The venv matters for the client configs below: the MCP client spawns the server itself, so
-> either launch the client from a shell where `.venv` is activated, or point the command at
-> the venv's interpreter directly — `.venv/bin/python` instead of `python` (used in the
-> examples below; on Windows: `.venv\Scripts\python.exe`).
-
-## 3 · Point it at your database
-
-The server reads **`DATABASE_URL`** exactly like the API (unset → the repo-root demo SQLite).
-For the Kubernetes MariaDB/MySQL, port-forward first and make sure migrations have run
-(local port 3307 so a MySQL already running on your machine at 3306 doesn't clash):
-
-```bash
 kubectl port-forward svc/<your-mariadb-service> 3307:3306
 export DATABASE_URL="mysql+pymysql://USER:PASS@localhost:3307/DBNAME"
-# schema must be current (the server never creates/alters tables):
-alembic -c backend/alembic.ini upgrade head
 ```
 
-(Postgres equivalent: `kubectl port-forward svc/<pg> 5433:5432` +
-`postgresql+psycopg://USER:PASS@localhost:5433/DBNAME`.)
+> The client configs must point at the venv's interpreter (`.venv/bin/python`, Windows:
+> `.venv\Scripts\python.exe`) — the client spawns the process outside your activated shell.
 
-Quick manual smoke test (it should sit silently waiting on stdin — Ctrl-C to exit):
-
-```bash
-cd /path/to/threenine && .venv/bin/python -m backend.mcp_server
-```
-
-## 4 · Connect from opencode
-
-Add to **`opencode.json` in the repo root** (start `opencode` inside the repo so
-`python -m backend.mcp_server` resolves):
+opencode (`opencode.json` in the repo root; from elsewhere use the absolute interpreter path
+and add `"PYTHONPATH": "/path/to/threenine"` to `environment`):
 
 ```json
 {
@@ -353,34 +413,19 @@ Add to **`opencode.json` in the repo root** (start `opencode` inside the repo so
       "type": "local",
       "command": [".venv/bin/python", "-m", "backend.mcp_server"],
       "enabled": true,
-      "environment": {
-        "DATABASE_URL": "{env:DATABASE_URL}"
-      }
+      "environment": { "DATABASE_URL": "{env:DATABASE_URL}" }
     }
   }
 }
 ```
 
-Notes:
-
-- `{env:NAME}` substitutes from your shell environment at load time — or hardcode the
-  port-forward URL (`"DATABASE_URL": "mysql+pymysql://user:pass@localhost:3307/cases"`).
-- To use it from **outside** the repo (e.g. global `~/.config/opencode/opencode.json`), use the
-  absolute interpreter path (`"/path/to/threenine/.venv/bin/python"`) and add
-  `"PYTHONPATH": "/path/to/threenine"` to `environment` so `-m backend.mcp_server` still resolves.
-- `"enabled": false` parks the server without deleting the config.
-- Optional: pass `ANALYTICS_EXCLUDE_OPERATORS` through `environment` to hide other operators
-  from the events tools (default hides `op-admin`).
-
-## 5 · Connect from Claude Code / Claude Desktop
+Claude Code / Desktop:
 
 ```bash
 claude mcp add case-tracker \
   --env DATABASE_URL="mysql+pymysql://user:pass@localhost:3307/cases" \
   -- .venv/bin/python -m backend.mcp_server
 ```
-
-or the equivalent `.mcp.json` / Desktop-config entry:
 
 ```json
 {
@@ -395,7 +440,10 @@ or the equivalent `.mcp.json` / Desktop-config entry:
 }
 ```
 
-## 6 · Tool reference
+Optional for either transport: pass `ANALYTICS_EXCLUDE_OPERATORS` through the environment to
+hide operators from the events tools (default hides `op-admin`).
+
+## 5 · Tool reference
 
 | Tool | Parameters (defaults) | Returns |
 | ---- | --------------------- | ------- |
@@ -411,7 +459,7 @@ or the equivalent `.mcp.json` / Desktop-config entry:
 `op-` prefix** first (`cc123` ↔ `op-cc123`), then full id / name / short name — the same rule
 as the board's Gantt.
 
-## 7 · Worked examples
+## 6 · Worked examples
 
 Real captured output (seeded demo DB, trimmed). In opencode just ask in plain language —
 the model picks the tool; the calls below are what it runs.
@@ -464,7 +512,9 @@ from_date="2026-07-17")`
 | ------- | ----------- |
 | `no such column: cases.picked` (or similar) on every tool | Schema behind the code — run `alembic -c backend/alembic.ini upgrade head`. |
 | `no 'shifts' config stored` | The deployment still uses the bundled `frontend/shifts.js` seed — seed the config (see the seed-config job in `deploy/`) or edit via the Shifts page. |
-| Client says the server disconnected immediately | Run `python -m backend.mcp_server` manually and read stderr — usually a bad `DATABASE_URL` or a dead port-forward. |
+| Container starts then exits / client can't connect to `:8081` | `docker logs case-tracker-mcp` — usually a bad `DATABASE_URL`. Confirm the log shows `Uvicorn running`, and that the client URL ends in **`/mcp`**. |
+| Container runs but every tool errors with a connection failure | The container can't reach the DB: `localhost` inside the container is the container itself — use `host.docker.internal` (+ `--add-host=host.docker.internal:host-gateway`) for a host port-forward, or the real DB host/service DNS. |
+| stdio client says the server disconnected immediately | Run `.venv/bin/python -m backend.mcp_server` manually and read stderr — usually a bad `DATABASE_URL` or a dead port-forward. |
 | Tools work but return nothing | Empty DB / wrong database — check `DATABASE_URL`; unset means the repo-root demo SQLite. |
 | `operator_timeline` finds 0 cases for a real operator | The roster id must be `op-` + the Case Center account id (check `list_operators()` against a real segment's `processor`). |
 

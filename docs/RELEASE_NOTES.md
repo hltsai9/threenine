@@ -15,8 +15,11 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - New [`docs/MCP.md`](MCP.md) — a **read-only MCP server** for the Case Tracker DB as a
   copy-paste guide: the full verified `backend/mcp_server.py` code (7 tools — cases, config,
   roster, usage events/summary, and an `operator_timeline` twin of the analytics Gantt),
-  venv-based install steps (`python3 -m venv .venv` — client configs point at
-  `.venv/bin/python`), `DATABASE_URL`/port-forward setup, **opencode** registration (`opencode.json`)
+  **background-container deployment as the primary path** (`deploy/Dockerfile.mcp`,
+  `MCP_TRANSPORT=streamable-http` on `:8081/mcp`, `host.docker.internal` DB-reachability and
+  localhost-only security notes) with venv/stdio kept as the no-container alternative,
+  `DATABASE_URL`/port-forward setup (MariaDB-first), **opencode** registration (`opencode.json`,
+  remote + local)
   plus Claude Code/Desktop equivalents, a tool reference table, worked examples with real
   captured output, and troubleshooting. Code verified end-to-end over stdio against a seeded
   DB (26 assertions incl. Gantt parity). Follow-ups tracked in improvement-plan §7.
