@@ -6,7 +6,7 @@ the shift/operator roster, usage-analytics events, and the same per-operator tim
 the `#/analytics` Gantt shows.
 
 ```
-opencode / Claude ── port-forward → HTTP :8081/mcp (or stdio) ── backend.mcp_server (K8s pod) ── DATABASE_URL ── MariaDB/Postgres/SQLite
+opencode (/sse) / Claude Code (/mcp) ── port-forward or Ingress ── backend.mcp_server (K8s pod) ── DATABASE_URL ── MariaDB/Postgres/SQLite
 ```
 
 Design guarantees:
@@ -374,19 +374,27 @@ class _BearerAuth:
 
 
 def _run_http():
-    """Serve streamable-HTTP, gated by MCP_AUTH_TOKEN (empty = OPEN, matches API_AUTH_TOKEN)."""
+    """Serve BOTH HTTP transports from one server, gated by MCP_AUTH_TOKEN (empty = OPEN,
+    matches API_AUTH_TOKEN):
+      • /mcp            — Streamable HTTP (current spec; Claude Code --transport http)
+      • /sse, /messages — legacy HTTP+SSE (opencode's `type: remote` still uses this)
+    Serving both means any client connects regardless of which transport it speaks."""
     import uvicorn
+    from starlette.applications import Starlette
 
     mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
     mcp.settings.port = int(os.environ.get("MCP_PORT", "8081"))
-    app = mcp.streamable_http_app()
+    sh_app = mcp.streamable_http_app()            # /mcp  (also inits the session manager)
+    routes = list(mcp.sse_app().routes) + list(sh_app.routes)   # /sse, /messages, /mcp
+    app = Starlette(routes=routes, lifespan=lambda _: mcp.session_manager.run())
+
     token = os.environ.get("MCP_AUTH_TOKEN", "") or ""
     if token:
         app = _BearerAuth(app, token)
-        log.info("transport=streamable-http endpoint=http://%s:%s/mcp auth=bearer-token",
+        log.info("transport=http endpoints=/mcp,/sse host=%s port=%s auth=bearer-token",
                  mcp.settings.host, mcp.settings.port)
     else:
-        log.warning("transport=streamable-http endpoint=http://%s:%s/mcp auth=NONE — "
+        log.warning("transport=http endpoints=/mcp,/sse host=%s port=%s auth=NONE — "
                     "set MCP_AUTH_TOKEN to require a bearer token",
                     mcp.settings.host, mcp.settings.port)
     uvicorn.run(app, host=mcp.settings.host, port=mcp.settings.port, log_level="warning")
@@ -404,9 +412,10 @@ if __name__ == "__main__":
 
 ## 2 · Deploy on Kubernetes
 
-The server supports two transports: **stdio** (the client spawns the process — see §4) and
-**streamable HTTP** (`MCP_TRANSPORT=streamable-http` — a long-running server clients connect to
-over the network). An in-cluster Deployment uses HTTP, and reaches the database through the same
+The server runs either as **stdio** (the client spawns the process — see §4) or as a long-running
+**HTTP** server (`MCP_TRANSPORT=streamable-http`) that serves **both** HTTP transports at once —
+Streamable HTTP at `/mcp` and legacy HTTP+SSE at `/sse` — so any client connects whichever it
+speaks. An in-cluster Deployment uses HTTP, and reaches the database through the same
 `case-tracker-db` Secret the API already uses — so `DATABASE_URL` is the in-cluster Service DNS
 (e.g. `mysql+pymysql://user:pass@mariadb:3306/cases`), no port-forward needed for the server↔DB
 hop.
@@ -567,7 +576,7 @@ DB URL (password masked):
 
 ```
 2026-07-17 17:23:44 INFO [case-tracker-mcp] case-tracker MCP server · db=mysql+pymysql://user:***@mariadb:3306/cases
-2026-07-17 17:23:44 INFO [case-tracker-mcp] transport=streamable-http endpoint=http://0.0.0.0:8081/mcp auth=bearer-token
+2026-07-17 17:23:44 INFO [case-tracker-mcp] transport=http endpoints=/mcp,/sse host=0.0.0.0 port=8081 auth=bearer-token
 2026-07-17 17:23:52 INFO [case-tracker-mcp] list_cases(scope='picked') 2ms -> count=12
 2026-07-17 17:23:59 INFO [case-tracker-mcp] operator_timeline(operator_id='op-da', from_date='2026-07-16', to_date='2026-07-17', utc_offset_minutes=0) 6ms -> casesHandled=2
 2026-07-17 17:24:03 INFO [case-tracker-mcp] get_case(case_id='NOPE') 1ms -> error: case not found
@@ -583,7 +592,12 @@ DB URL (password masked):
 ## 3 · Connect to the in-cluster server
 
 Forward the Service to your machine (authenticated by your kubeconfig), then point the client at
-the local port with the bearer token from the Secret. The endpoint path is **`/mcp`**.
+the local port with the bearer token from the Secret.
+
+> **Endpoint path depends on the client's transport** — the server serves both:
+> **opencode** (`type: remote`) still speaks the legacy **HTTP+SSE** transport → use **`/sse`**.
+> **Claude Code** (`--transport http`) speaks **Streamable HTTP** → use **`/mcp`**. Pointing
+> opencode at `/mcp` fails with `SSE error: Non-200 status code (404)`.
 
 ```bash
 kubectl port-forward svc/case-tracker-mcp 8081:80
@@ -591,7 +605,8 @@ TOKEN=$(kubectl get secret case-tracker-mcp -o jsonpath='{.data.MCP_AUTH_TOKEN}'
 ```
 
 **opencode** — `opencode.json` (repo root, or global `~/.config/opencode/opencode.json`);
-`{env:MCP_AUTH_TOKEN}` pulls the token from your shell so it isn't committed:
+`{env:MCP_AUTH_TOKEN}` pulls the token from your shell so it isn't committed. Note the
+**`/sse`** path:
 
 ```json
 {
@@ -599,7 +614,7 @@ TOKEN=$(kubectl get secret case-tracker-mcp -o jsonpath='{.data.MCP_AUTH_TOKEN}'
   "mcp": {
     "case-tracker": {
       "type": "remote",
-      "url": "http://127.0.0.1:8081/mcp",
+      "url": "http://127.0.0.1:8081/sse",
       "enabled": true,
       "headers": { "Authorization": "Bearer {env:MCP_AUTH_TOKEN}" }
     }
@@ -607,7 +622,7 @@ TOKEN=$(kubectl get secret case-tracker-mcp -o jsonpath='{.data.MCP_AUTH_TOKEN}'
 }
 ```
 
-**Claude Code**:
+**Claude Code** (Streamable HTTP → **`/mcp`**):
 
 ```bash
 claude mcp add --transport http case-tracker http://127.0.0.1:8081/mcp \
@@ -743,6 +758,8 @@ from_date="2026-07-17")`
 | `no such column: cases.picked` (or similar) on every tool | Schema behind the code — run `alembic -c backend/alembic.ini upgrade head`. |
 | `no 'shifts' config stored` | The deployment still uses the bundled `frontend/shifts.js` seed — seed the config (see the seed-config job in `deploy/`) or edit via the Shifts page. |
 | Pod `CrashLoopBackOff` / client can't connect to `:8081` | `kubectl logs deploy/case-tracker-mcp --previous` — usually a bad `DATABASE_URL`. Confirm the log shows `Uvicorn running`, that `kubectl port-forward` is running, and that the client URL ends in **`/mcp`**. |
+| opencode: `SSE error: Non-200 status code (404)` | opencode's `type: remote` speaks the legacy **HTTP+SSE** transport — its `url` must end in **`/sse`**, not `/mcp` (that's Claude Code's Streamable-HTTP path). The server serves both; point each client at its own path. |
+| `ERR_TLS_CERT_ALTNAME_INVALID` on the HTTPS URL | The TLS cert served by the Ingress doesn't list your hostname in its SAN. Add the exact host to **both** `spec.rules[].host` **and** `spec.tls[].hosts` so cert-manager reissues a cert covering it; if the `secretName` already holds a cert for another host, delete that Secret so it's regenerated. Verify: `kubectl get certificate` / `openssl s_client -connect HOST:443 -servername HOST </dev/null 2>/dev/null \| openssl x509 -noout -ext subjectAltName`. |
 | Client gets `401 unauthorized` on every call | Missing/wrong bearer token — the client's `Authorization: Bearer <token>` must match `MCP_AUTH_TOKEN` in the `case-tracker-mcp` Secret. Re-read it with the `kubectl get secret … base64 -d` command in §2. Startup log `auth=NONE` means the Secret didn't reach the pod. |
 | Pod runs but every tool errors with a connection failure | The pod can't reach the DB — check `DATABASE_URL` uses the in-cluster **Service DNS** (`mariadb:3306`, not `localhost`), the `case-tracker-db` Secret, and any NetworkPolicy. Confirm with the `kubectl exec` check in §2. |
 | stdio client says the server disconnected immediately | Run `.venv/bin/python -m backend.mcp_server` manually and read stderr — usually a bad `DATABASE_URL` or a dead port-forward. |
