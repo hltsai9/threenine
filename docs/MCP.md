@@ -6,7 +6,7 @@ the shift/operator roster, usage-analytics events, and the same per-operator tim
 the `#/analytics` Gantt shows.
 
 ```
-opencode / Claude ── HTTP :8081/mcp (or stdio) ── backend.mcp_server (container) ── DATABASE_URL ── MariaDB/Postgres/SQLite
+opencode / Claude ── port-forward → HTTP :8081/mcp (or stdio) ── backend.mcp_server (K8s pod) ── DATABASE_URL ── MariaDB/Postgres/SQLite
 ```
 
 Design guarantees:
@@ -367,13 +367,16 @@ if __name__ == "__main__":
         mcp.run()
 ```
 
-## 2 · Run it in a background container
+## 2 · Deploy on Kubernetes
 
 The server supports two transports: **stdio** (the client spawns the process — see §4) and
-**streamable HTTP** (`MCP_TRANSPORT=streamable-http` — a long-running server clients connect
-to over the network). A background container uses HTTP.
+**streamable HTTP** (`MCP_TRANSPORT=streamable-http` — a long-running server clients connect to
+over the network). An in-cluster Deployment uses HTTP, and reaches the database through the same
+`case-tracker-db` Secret the API already uses — so `DATABASE_URL` is the in-cluster Service DNS
+(e.g. `mysql+pymysql://user:pass@mariadb:3306/cases`), no port-forward needed for the server↔DB
+hop.
 
-Save as **`deploy/Dockerfile.mcp`**:
+**Image** — save as `deploy/Dockerfile.mcp` (mirrors `Dockerfile.api`; adds the `mcp` package):
 
 ```dockerfile
 FROM python:3.11-slim
@@ -381,41 +384,129 @@ WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt "mcp>=1.2,<2"
 COPY backend/ backend/
-ENV MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8081
-EXPOSE 8081
+RUN useradd -u 1000 -m app
 USER 1000
+ENV MCP_TRANSPORT=streamable-http MCP_HOST=0.0.0.0 MCP_PORT=8081 PYTHONUNBUFFERED=1
+EXPOSE 8081
 CMD ["python", "-m", "backend.mcp_server"]
 ```
 
-Build and run in the background (from the repo root):
+Build and push to the registry your cluster pulls from:
 
 ```bash
-docker build -f deploy/Dockerfile.mcp -t case-tracker-mcp .
-
-docker run -d --name case-tracker-mcp --restart unless-stopped \
-  -p 127.0.0.1:8081:8081 \
-  --add-host=host.docker.internal:host-gateway \
-  -e DATABASE_URL="mysql+pymysql://USER:PASS@host.docker.internal:3307/DBNAME" \
-  case-tracker-mcp
-
-docker logs -f case-tracker-mcp   # should show "Uvicorn running on http://0.0.0.0:8081"
+docker build -f deploy/Dockerfile.mcp -t <your-registry>/case-tracker-mcp:latest .
+docker push <your-registry>/case-tracker-mcp:latest
 ```
 
-The MCP endpoint is **`http://127.0.0.1:8081/mcp`**.
+**Manifest** — save as `deploy/k8s/mcp-deployment.yaml` (same conventions as
+`api-deployment.yaml`: non-root, read-only rootfs, the `case-tracker-db` Secret for
+`DATABASE_URL`; a `tcpSocket` probe since the server has no `/healthz`):
 
-**Reaching the database from inside the container** — `localhost` inside the container is the
-container itself, so:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-tracker-mcp
+  labels: { app: case-tracker-mcp }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: case-tracker-mcp }
+  template:
+    metadata:
+      labels: { app: case-tracker-mcp }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: mcp
+          image: <your-registry>/case-tracker-mcp:latest   # pin to a digest/tag in prod
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8081 }
+          envFrom:
+            - secretRef: { name: case-tracker-db }   # DATABASE_URL (same Secret as the API)
+          # env:
+          #   - { name: MCP_LOG_LEVEL, value: "INFO" }
+          #   - { name: ANALYTICS_EXCLUDE_OPERATORS, value: "op-admin" }
+          startupProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+            failureThreshold: 20
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-tracker-mcp
+spec:
+  selector: { app: case-tracker-mcp }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+```
 
-- DB behind `kubectl port-forward` on your machine (`kubectl port-forward
-  svc/<your-mariadb-service> 3307:3306`) → use `host.docker.internal:3307` as above (the
-  `--add-host` flag makes that name work on Linux; Docker Desktop has it built in).
-- DB reachable directly (VPN / same network / running this container **in** the cluster) →
-  put the real host or K8s service DNS in `DATABASE_URL` and drop the `--add-host` flag.
-- Schema must already be current — the server never creates/alters tables:
-  `alembic -c backend/alembic.ini upgrade head` (from a checkout that reaches the DB).
+```bash
+kubectl apply -f deploy/k8s/mcp-deployment.yaml
+kubectl rollout status deploy/case-tracker-mcp
+```
 
-> **Security:** the HTTP endpoint has no authentication. Keep the port binding
-> `127.0.0.1:8081:8081` (localhost only, as above) — don't expose it to the network.
+Notes:
+
+- **Schema** must already be at head — the server never creates/alters tables. The API's
+  `migrate` initContainer (or your migration Job) handles `alembic upgrade head`; the MCP
+  Deployment just reads.
+- **Security:** the endpoint has **no authentication**. Keep the Service `ClusterIP` (the
+  default above) — do **not** add it to the Ingress. Clients reach it via `kubectl port-forward`
+  (§3), which is authenticated by your kubeconfig.
+
+### Verify it connects to the database
+
+The server connects **lazily** — a healthy pod does not prove the DB works; the first query
+does. Three checks, weakest to strongest:
+
+1. **Which DB did it resolve?** The startup log prints the URL (password masked):
+   ```bash
+   kubectl logs deploy/case-tracker-mcp | head -2
+   # ... case-tracker MCP server · db=mysql+pymysql://user:***@mariadb:3306/cases
+   ```
+   If this says `db=sqlite:////app/casetracker.db`, the Secret didn't reach the pod — it's
+   running against an empty demo SQLite, not your database.
+2. **Force a real query, watch the log.** After a client calls any tool (or run the exec below):
+   ```
+   INFO [case-tracker-mcp] list_cases(limit=1) 3ms -> count=1        ← connected, data flowing
+   INFO [case-tracker-mcp] list_cases(limit=1) raised                ← DB unreachable; traceback follows
+   ```
+3. **Decisive — query from inside the pod** (isolates pod↔DB from any client):
+   ```bash
+   kubectl exec deploy/case-tracker-mcp -- python -c "
+   import sqlalchemy
+   from backend.db import engine, SessionLocal, Case
+   print('url:', engine.url)
+   print('tables:', sqlalchemy.inspect(engine).get_table_names())
+   with SessionLocal() as s: print('cases in db:', s.query(Case).count())"
+   ```
+   - Connected → `['alembic_version', 'cases', 'config', 'events']` and a real case count.
+   - `Can't connect to MySQL server` → DNS / NetworkPolicy / credentials — check the Service
+     name, namespace, and the `case-tracker-db` Secret.
+   - Empty table list → connected, but to the wrong database/schema.
+
+   Finally confirm it's **your** data: `list_operators()` should return your real roster (demo
+   SQLite would return seed names).
 
 ### Logs
 
@@ -424,21 +515,28 @@ duration, and a result summary (or the error) — plus a startup line with the t
 DB URL (password masked):
 
 ```
-2026-07-17 17:23:44 INFO [case-tracker-mcp] case-tracker MCP server · db=mysql+pymysql://user:***@host.docker.internal:3307/cases
+2026-07-17 17:23:44 INFO [case-tracker-mcp] case-tracker MCP server · db=mysql+pymysql://user:***@mariadb:3306/cases
 2026-07-17 17:23:44 INFO [case-tracker-mcp] transport=streamable-http endpoint=http://0.0.0.0:8081/mcp
 2026-07-17 17:23:52 INFO [case-tracker-mcp] list_cases(scope='picked') 2ms -> count=12
 2026-07-17 17:23:59 INFO [case-tracker-mcp] operator_timeline(operator_id='op-da', from_date='2026-07-16', to_date='2026-07-17', utc_offset_minutes=0) 6ms -> casesHandled=2
 2026-07-17 17:24:03 INFO [case-tracker-mcp] get_case(case_id='NOPE') 1ms -> error: case not found
 ```
 
-- **Container:** `docker logs -f case-tracker-mcp` (add `-t` for Docker's own timestamps).
+- **Kubernetes:** `kubectl logs -f deploy/case-tracker-mcp` (`--previous` for a crashed pod).
 - **stdio:** stderr is captured by the client — opencode shows it in the session's MCP/server
   output; Claude Code in the output of `claude mcp list` / its log files.
-- **Verbosity:** set `MCP_LOG_LEVEL` (`DEBUG` | `INFO` | `WARNING`, default `INFO`) — e.g.
-  add `-e MCP_LOG_LEVEL=WARNING` to `docker run` to log errors only. Unhandled exceptions are
-  always logged with a full traceback.
+- **Verbosity:** set `MCP_LOG_LEVEL` (`DEBUG` | `INFO` | `WARNING`, default `INFO`) via the
+  Deployment `env` (commented above) to log errors only. Unhandled exceptions always log a full
+  traceback.
 
-## 3 · Connect to the container
+## 3 · Connect to the in-cluster server
+
+Forward the Service to your machine (authenticated by your kubeconfig), then point the client at
+the local port. The endpoint path is **`/mcp`**.
+
+```bash
+kubectl port-forward svc/case-tracker-mcp 8081:80
+```
 
 **opencode** — `opencode.json` (repo root, or global `~/.config/opencode/opencode.json`):
 
@@ -461,7 +559,7 @@ DB URL (password masked):
 claude mcp add --transport http case-tracker http://127.0.0.1:8081/mcp
 ```
 
-## 4 · Alternative: run locally over stdio (no container)
+## 4 · Alternative: run locally over stdio (no cluster)
 
 The client spawns the server itself — nothing runs in the background. Install into a venv
 (from the repo root):
@@ -589,11 +687,12 @@ from_date="2026-07-17")`
 | ------- | ----------- |
 | `no such column: cases.picked` (or similar) on every tool | Schema behind the code — run `alembic -c backend/alembic.ini upgrade head`. |
 | `no 'shifts' config stored` | The deployment still uses the bundled `frontend/shifts.js` seed — seed the config (see the seed-config job in `deploy/`) or edit via the Shifts page. |
-| Container starts then exits / client can't connect to `:8081` | `docker logs case-tracker-mcp` — usually a bad `DATABASE_URL`. Confirm the log shows `Uvicorn running`, and that the client URL ends in **`/mcp`**. |
-| Container runs but every tool errors with a connection failure | The container can't reach the DB: `localhost` inside the container is the container itself — use `host.docker.internal` (+ `--add-host=host.docker.internal:host-gateway`) for a host port-forward, or the real DB host/service DNS. |
+| Pod `CrashLoopBackOff` / client can't connect to `:8081` | `kubectl logs deploy/case-tracker-mcp --previous` — usually a bad `DATABASE_URL`. Confirm the log shows `Uvicorn running`, that `kubectl port-forward` is running, and that the client URL ends in **`/mcp`**. |
+| Pod runs but every tool errors with a connection failure | The pod can't reach the DB — check `DATABASE_URL` uses the in-cluster **Service DNS** (`mariadb:3306`, not `localhost`), the `case-tracker-db` Secret, and any NetworkPolicy. Confirm with the `kubectl exec` check in §2. |
 | stdio client says the server disconnected immediately | Run `.venv/bin/python -m backend.mcp_server` manually and read stderr — usually a bad `DATABASE_URL` or a dead port-forward. |
 | Tools work but return nothing | Empty DB / wrong database — check `DATABASE_URL`; unset means the repo-root demo SQLite. |
 | `operator_timeline` finds 0 cases for a real operator | The roster id must be `op-` + the Case Center account id (check `list_operators()` against a real segment's `processor`). |
 
-Deferred ideas (tracked in [`improvement-plan.md`](improvement-plan.md)): streamable-HTTP
-transport for in-cluster use, MCP resources for case payloads, a read-only DB role recipe.
+Deferred ideas (tracked in [`improvement-plan.md`](improvement-plan.md)): bearer-token auth so
+the Service can go on the Ingress (drop the port-forward), MCP resources for case payloads, a
+read-only DB role recipe.

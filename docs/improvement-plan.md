@@ -655,8 +655,11 @@ right columns. (Public Pages site stays on seed data; live mode is local only.)
 The read-only DB MCP server ships as a doc-with-code ([`MCP.md`](MCP.md)); once the code lands
 as `backend/mcp_server.py`, possible next steps:
 
-- [ ] **Streamable-HTTP transport** so the server can run in-cluster (next to the API) and
-  agents connect over the network with a bearer token — no local port-forward needed.
+- [x] **Streamable-HTTP transport** so the server can run in-cluster (next to the API). ✅
+  Documented 2026-07-17 (`MCP_TRANSPORT=streamable-http`, `deploy/k8s/mcp-deployment.yaml` in
+  [`MCP.md`](MCP.md)). Still port-forwarded — see the auth item below.
+- [ ] **Bearer-token auth** on the HTTP endpoint so the Service can go on the Ingress and drop
+  the `kubectl port-forward` (today the endpoint is unauthenticated, ClusterIP + port-forward).
 - [ ] **MCP resources** for case payloads (URI-addressable `case://<id>`), cheaper than tools
   for bulk context.
 - [ ] **Read-only DB role recipe** (Postgres `GRANT SELECT`) so the server's DATABASE_URL is
