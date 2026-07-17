@@ -6,7 +6,7 @@ the shift/operator roster, usage-analytics events, and the same per-operator tim
 the `#/analytics` Gantt shows.
 
 ```
-opencode / Claude ── stdio (JSON-RPC) ── python -m backend.mcp_server ── DATABASE_URL ── Postgres/SQLite
+opencode / Claude ── stdio (JSON-RPC) ── python -m backend.mcp_server ── DATABASE_URL ── MariaDB/Postgres/SQLite
 ```
 
 Design guarantees:
@@ -321,14 +321,18 @@ pip install "mcp>=1.2,<2"                 # official MCP Python SDK
 ## 3 · Point it at your database
 
 The server reads **`DATABASE_URL`** exactly like the API (unset → the repo-root demo SQLite).
-For the Kubernetes Postgres, port-forward first and make sure migrations have run:
+For the Kubernetes MariaDB/MySQL, port-forward first and make sure migrations have run
+(local port 3307 so a MySQL already running on your machine at 3306 doesn't clash):
 
 ```bash
-kubectl port-forward svc/<your-postgres-service> 5433:5432
-export DATABASE_URL="postgresql+psycopg://USER:PASS@localhost:5433/DBNAME"
+kubectl port-forward svc/<your-mariadb-service> 3307:3306
+export DATABASE_URL="mysql+pymysql://USER:PASS@localhost:3307/DBNAME"
 # schema must be current (the server never creates/alters tables):
 alembic -c backend/alembic.ini upgrade head
 ```
+
+(Postgres equivalent: `kubectl port-forward svc/<pg> 5433:5432` +
+`postgresql+psycopg://USER:PASS@localhost:5433/DBNAME`.)
 
 Quick manual smoke test (it should sit silently waiting on stdin — Ctrl-C to exit):
 
@@ -360,7 +364,7 @@ Add to **`opencode.json` in the repo root** (start `opencode` inside the repo so
 Notes:
 
 - `{env:NAME}` substitutes from your shell environment at load time — or hardcode the
-  port-forward URL (`"DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5433/cases"`).
+  port-forward URL (`"DATABASE_URL": "mysql+pymysql://user:pass@localhost:3307/cases"`).
 - To use it from **outside** the repo (e.g. global `~/.config/opencode/opencode.json`), use the
   absolute interpreter path (`"/path/to/threenine/.venv/bin/python"`) and add
   `"PYTHONPATH": "/path/to/threenine"` to `environment` so `-m backend.mcp_server` still resolves.
@@ -372,7 +376,7 @@ Notes:
 
 ```bash
 claude mcp add case-tracker \
-  --env DATABASE_URL="postgresql+psycopg://user:pass@localhost:5433/cases" \
+  --env DATABASE_URL="mysql+pymysql://user:pass@localhost:3307/cases" \
   -- .venv/bin/python -m backend.mcp_server
 ```
 
@@ -385,7 +389,7 @@ or the equivalent `.mcp.json` / Desktop-config entry:
       "command": "/path/to/threenine/.venv/bin/python",
       "args": ["-m", "backend.mcp_server"],
       "cwd": "/path/to/threenine",
-      "env": { "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5433/cases" }
+      "env": { "DATABASE_URL": "mysql+pymysql://user:pass@localhost:3307/cases" }
     }
   }
 }
