@@ -19,7 +19,9 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   `deploy/k8s/mcp-deployment.yaml` mirroring the API manifests, `MCP_TRANSPORT=streamable-http`
   on `:8081/mcp`, in-cluster Service-DNS `DATABASE_URL` via the shared `case-tracker-db` Secret,
   `tcpSocket` probes, `kubectl port-forward` to connect, a "verify it connects to the database"
-  runbook, ClusterIP/no-auth security notes) with venv/stdio kept as the no-cluster alternative,
+  runbook, **bearer-token auth** on the HTTP endpoint (`MCP_AUTH_TOKEN` from a
+  `case-tracker-mcp` Secret; pure-ASGI 401 gate; clients send `Authorization: Bearer …`; empty =
+  open, matching `API_AUTH_TOKEN`)) with venv/stdio kept as the no-cluster alternative,
   **per-tool-call logging** (stderr: args + duration + result summary, masked DB URL at
   startup, `MCP_LOG_LEVEL` env, `docker logs` guidance),
   `DATABASE_URL`/port-forward setup (MariaDB-first), **opencode** registration (`opencode.json`,

@@ -658,8 +658,10 @@ as `backend/mcp_server.py`, possible next steps:
 - [x] **Streamable-HTTP transport** so the server can run in-cluster (next to the API). ✅
   Documented 2026-07-17 (`MCP_TRANSPORT=streamable-http`, `deploy/k8s/mcp-deployment.yaml` in
   [`MCP.md`](MCP.md)). Still port-forwarded — see the auth item below.
-- [ ] **Bearer-token auth** on the HTTP endpoint so the Service can go on the Ingress and drop
-  the `kubectl port-forward` (today the endpoint is unauthenticated, ClusterIP + port-forward).
+- [x] **Bearer-token auth** on the HTTP endpoint. ✅ Documented 2026-07-17 (`MCP_AUTH_TOKEN`
+  from a `case-tracker-mcp` Secret; pure-ASGI 401 gate). Verified: 401 without/with a wrong
+  token, 200 with the right one. Still ClusterIP + port-forward by default; with the token set
+  the Service *can* go on the Ingress (require HTTPS).
 - [ ] **MCP resources** for case payloads (URI-addressable `case://<id>`), cheaper than tools
   for bulk context.
 - [ ] **Read-only DB role recipe** (Postgres `GRANT SELECT`) so the server's DATABASE_URL is
