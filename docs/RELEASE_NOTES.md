@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-17
 
+### Fixed (Gantt: Case Center processors match roster ids with the "op-" prefix)
+
+- Roster operator ids are **`op-` + the Case Center operator id**, but the Operator-timeline
+  matcher compared the raw `processTimeline.processor` against the full roster id — so real
+  ingested timelines never matched anyone. The prefix-stripped id is now the primary match
+  (`cc123` ↔ `op-cc123`, case-insensitive); full id / name / short name stay as fallbacks.
+
 ### Changed (tracker pill hugs its content; Gantt pickers themed + case ids link out)
 
 - The route pill no longer stretches across the whole gutter (short names left the two chips

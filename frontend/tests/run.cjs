@@ -294,8 +294,11 @@ test('computeCurrentShift: unparseable roster → null (caller keeps the old val
 
 /* ---------- operator day Gantt (analytics, from processTimeline) ---------- */
 const ganttDay = app.isoToLocalInput(new Date(FIXED).toISOString()).slice(0, 10);
-test('processorMatchesOperator: matches id, name (any case), and short name', () => {
-  eq(app.processorMatchesOperator(dayOp.id, dayOp), true);
+test('processorMatchesOperator: CC id = roster id without "op-"; also name / short name', () => {
+  const op = { id: 'op-cc123', name: 'Mia Chen (MC)', shift: 'Day' };
+  eq(app.processorMatchesOperator('cc123', op), true, 'bare Case Center id matches op-<ccId>');
+  eq(app.processorMatchesOperator('CC123', op), true, 'case-insensitively');
+  eq(app.processorMatchesOperator(op.id, op), true);
   eq(app.processorMatchesOperator(dayOp.name.toUpperCase(), dayOp), true);
   eq(app.processorMatchesOperator(app.shortOpName(dayOp.name), dayOp), true);
   eq(app.processorMatchesOperator('someone-else', dayOp), false);
@@ -303,9 +306,9 @@ test('processorMatchesOperator: matches id, name (any case), and short name', ()
 });
 test('operatorGanttData: groups the operator\'s segments per case, sums their time', () => {
   const fake = { id: 'GANTT-1', status: 'in_it', agentStatus: 'none', history: [],
-    processTimeline: [
-      { processor: dayOp.id, processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(2 * HOUR) },
-      { processor: dayOp.id, processType: 'IT Office', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR) },
+    processTimeline: [   // processor = the bare Case Center id (roster id minus "op-")
+      { processor: dayOp.id.replace(/^op-/, ''), processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(2 * HOUR) },
+      { processor: dayOp.id.replace(/^op-/, ''), processType: 'IT Office', startedAt: iso(2 * HOUR), endedAt: iso(1 * HOUR) },
       { processor: 'someone-else', processType: 'Service Team', startedAt: iso(3 * HOUR), endedAt: iso(1 * HOUR) },
     ] };
   app.STATE.cases.push(fake);
