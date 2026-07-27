@@ -5928,7 +5928,7 @@ function caseHandoverNotes(c) {
   const items = [];
   let latestShown = false;
   for (const h of (c.history || [])) {
-    if (h.kind !== 'handover') continue;
+    if (h.kind !== 'handover' || h.deleted) continue;   // soft-deleted notes are hidden here
     const op = getOperator(h.who);
     const who = op ? op.name : (h.who || '?');
     const isLatest = !!(c.handover && c.handover.at === h.at);
@@ -5948,26 +5948,33 @@ function caseHandoverNotes(c) {
   return items;
 }
 
-// Delete ONE handover note (identified by its history timestamp) from a case. Pure mutation —
-// the UI handler adds the confirm dialog / audit entry around it. When the deleted note was the
-// CURRENT c.handover, the newest remaining note is promoted back into c.handover (from → to
-// parsed back out of its history detail; marked stale so the shift-handover discipline still
-// asks for a fresh note); with no notes left, c.handover clears. Returns true when it deleted.
-function deleteHandoverNote(c, at) {
-  const idx = (c.history || []).findIndex(h => h.kind === 'handover' && h.at === at);
+// Delete ONE handover note (identified by its history timestamp) from a case. SOFT delete —
+// the history entry (and its text) is kept as an audit record, just flagged `deleted` so every
+// read path (panel, export, shift activity, history list) hides it; the text stays queryable in
+// the stored payload / DB. The UI handler adds the confirm dialog / audit marker around it.
+// When the deleted note was the CURRENT c.handover, the newest remaining (non-deleted) note is
+// promoted back into c.handover (from → to parsed back out of its history detail; marked stale
+// so the shift-handover discipline still asks for a fresh note); with no notes left, c.handover
+// clears. `byId` (optional) records who deleted it. Returns true when it deleted.
+function deleteHandoverNote(c, at, byId) {
+  const entry = (c.history || []).find(h => h.kind === 'handover' && h.at === at && !h.deleted);
   const wasCurrent = !!(c.handover && c.handover.at === at);
-  if (idx === -1 && !wasCurrent) return false;
-  if (idx !== -1) c.history.splice(idx, 1);
+  if (!entry && !wasCurrent) return false;
+  if (entry) {
+    entry.deleted = true;
+    entry.deletedAt = new Date(NOW).toISOString();
+    if (byId) entry.deletedBy = byId;
+  }
   if (wasCurrent) {
     // Clear FIRST — caseHandoverNotes has a fallback that re-adds c.handover when no matching
-    // history entry exists, which would resurrect the note we just deleted.
+    // (non-deleted) history entry exists, which would resurrect the note we just hid.
     c.handover = null;
     const rest = caseHandoverNotes(c);
     const last = rest[rest.length - 1] || null;
     if (!last) {
       c.handover = null;
     } else {
-      const h = (c.history || []).find(x => x.kind === 'handover' && x.at === last.at);
+      const h = (c.history || []).find(x => x.kind === 'handover' && x.at === last.at && !x.deleted);
       const route = h && /\((\w+) → (\w+)\)/.exec(h.detail || '');
       const toName = h && /^Handover to (.+?) \(/.exec(h.detail || '');
       const toOp = toName ? (window.OPERATORS || []).find(o => o.name === toName[1]) : null;
@@ -7019,7 +7026,7 @@ function renderCaseDetailBody(c) {
       </div>`).join('');
   const allHandoversHtml = handoverHtml + olderNotes;
 
-  const history = (c.history || []).slice().reverse().map(h => {
+  const history = (c.history || []).filter(h => !h.deleted).slice().reverse().map(h => {
     const op = getOperator(h.who);
     const who = op ? op.name : h.who;
     return `
@@ -8585,7 +8592,7 @@ function renderShiftDetail(shiftName) {
   const activity = [];
   for (const c of allOpen) {
     for (const h of (c.history || [])) {
-      if (h.kind === 'handover' && sh.operatorIds.includes(h.who)) {
+      if (h.kind === 'handover' && !h.deleted && sh.operatorIds.includes(h.who)) {
         activity.push({ at: h.at, who: h.who, caseId: c.id, detail: h.detail });
       }
     }
@@ -9958,7 +9965,7 @@ function bindHandlers() {
         </div>
       `, () => {
         const op = getOperator(STATE.operatorId);
-        if (!deleteHandoverNote(c, at)) return true;
+        if (!deleteHandoverNote(c, at, op ? op.id : STATE.operatorId)) return true;
         if (op) logHistory(c, op, 'handover-deleted', `Deleted own handover note from ${fmtAbsolute(at)}`);
         track('handover_delete', null, c.id);
         showToast('Handover note deleted.', 'info');

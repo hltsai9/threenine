@@ -8,7 +8,19 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
-## 2026-07-17
+## 2026-07-27
+
+### Changed (handover-note deletion is now a soft delete)
+
+- Deleting your own handover note no longer destroys it. `deleteHandoverNote` (`frontend/app.js`)
+  flags the history entry `deleted` (with `deletedAt` + `deletedBy`) and keeps its text instead
+  of splicing it out, so the note survives in the case payload / DB for audit and recovery — and
+  is queryable (e.g. via the MCP `get_case` tool: `payload.history[]` where `deleted` is true).
+  Every read path hides soft-deleted notes exactly as a hard delete did: the "Handover notes"
+  panel and export (`caseHandoverNotes`/`caseNotesText`), the shift-view recent-handover activity,
+  and the case-detail history list all skip `deleted` entries. Visible behavior is unchanged —
+  the note disappears from the UI and the current-handover pointer still promotes the previous
+  note — so all existing tests pass; a new test asserts the retained-but-hidden audit record.
 
 ### Docs (MCP guide: query the DB from an AI agent)
 

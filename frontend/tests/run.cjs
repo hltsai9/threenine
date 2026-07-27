@@ -465,6 +465,24 @@ test('deleteHandoverNote: deleting an older note keeps the current one', () => {
   eq(c.handover.note, 'second', 'current untouched');
   eq(app.caseHandoverNotes(c).length, 1);
 });
+test('deleteHandoverNote: soft delete retains the note + text for audit/recovery', () => {
+  const c = {
+    history: [
+      { at: iso(3 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): first' },
+      { at: iso(1 * HOUR), who: opId, kind: 'handover', detail: 'Handover note (Day → Night): second' },
+    ],
+    handover: { at: iso(1 * HOUR), author: opId, note: 'second', from: 'Day', to: 'Night' },
+  };
+  ok(app.deleteHandoverNote(c, iso(1 * HOUR), opId));
+  eq(c.history.length, 2, 'entry retained in history, not spliced out');
+  const gone = c.history.find(h => h.at === iso(1 * HOUR));
+  ok(gone.deleted, 'entry flagged deleted');
+  ok(gone.deletedAt, 'deletion time recorded');
+  eq(gone.deletedBy, opId, 'deleter recorded');
+  ok(/second/.test(gone.detail), 'original text kept for recovery');
+  eq(app.caseHandoverNotes(c).length, 1, 'but hidden from the visible notes');
+  ok(!app.caseNotesText(c).includes('second'), 'and hidden from the export');
+});
 
 test('moving row: assigned core-bound case shows BOTH deadline and member chips', () => {
   // Find a core-bound moving case in the seed and assign a member with a known name.
