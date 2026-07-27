@@ -22,6 +22,8 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
   the note disappears from the UI and the current-handover pointer still promotes the previous
   note — so all existing tests pass; a new test asserts the retained-but-hidden audit record.
 
+## 2026-07-17
+
 ### Docs (MCP guide: query the DB from an AI agent)
 
 - New [`docs/MCP.md`](MCP.md) — a **read-only MCP server** for the Case Tracker DB as a
