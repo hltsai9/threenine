@@ -10,6 +10,22 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-27
 
+### Fixed (writing a handover note no longer resets the chosen next operator)
+
+- When a case was already handed to a specific teammate (`c.handover.toOperator`), clicking
+  **Write handover note** overwrote the recipient with a bare shift name (e.g. "Night"). The new
+  `nextShiftHandover()` helper (`frontend/app.js`) preserves an existing addressed recipient —
+  keeping `toOperator` and their shift — and only falls back to the opposite shift when no next
+  operator is set. The note modal now shows the kept recipient's name too.
+
+### Added (handover reminder banner on the picked workspace)
+
+- A banner at the top of the Picked workspace reminds the signed-in operator how many cases
+  **under their name** still need a handover note for the next shift, with quick links to each
+  case. Driven by `myHandoverPendingCases()` (`frontend/app.js`) — picked cases where
+  `caseTrackerOperatorId` is the operator and `needsHandoverNote` is still true; shown whenever
+  the count is > 0 (a running nudge, not gated on shift-end).
+
 ### Changed (handover-note deletion is now a soft delete)
 
 - Deleting your own handover note no longer destroys it. `deleteHandoverNote` (`frontend/app.js`)

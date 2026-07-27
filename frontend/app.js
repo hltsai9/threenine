@@ -1555,6 +1555,16 @@ function handoverPendingCases() {
   return pickedCases().filter(needsHandoverNote);
 }
 
+// Picked cases UNDER THE SIGNED-IN OPERATOR'S NAME that still need a fresh handover note for the
+// next shift — drives the reminder banner on the picked workspace. "Under their name" =
+// caseTrackerOperatorId points at them (a case they picked, or one handed to them) and
+// needsHandoverNote is still true (no fresh note authored this shift). Not gated on shift-ending
+// time: it's a running reminder of what's left to hand over.
+function myHandoverPendingCases() {
+  const me = STATE.operatorId;
+  return pickedCases().filter(c => caseTrackerOperatorId(c) === me && needsHandoverNote(c));
+}
+
 function renderWatchlists(sla, escalated) {
   if (sla.length === 0 && escalated.length === 0) return '';
   const row = c => {
@@ -2077,6 +2087,25 @@ function caseTrackerOperatorId(c) {
   return STATE.operatorId;
 }
 
+// Build the c.handover object when an operator writes an end-of-shift note (the generic "Write
+// handover note" button). If the case was already addressed to a specific teammate
+// (c.handover.toOperator), KEEP that recipient — writing a fresh note must not silently reset the
+// next operator back to a bare shift name. Otherwise target the opposite shift. Returns the new
+// handover object, the history detail string, and the resolved recipient (or null).
+function nextShiftHandover(c, op, note) {
+  const recipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+  const to = recipient ? recipient.shift : (op.shift === 'Day' ? 'Night' : 'Day');
+  const handover = {
+    note, author: op.id, from: op.shift, to,
+    ...(recipient ? { toOperator: recipient.id } : {}),
+    at: new Date(NOW).toISOString(), staleForCurrentShift: false,
+  };
+  const detail = recipient
+    ? `Handover to ${recipient.name} (${op.shift} → ${to}): ${note}`
+    : `Handover note (${op.shift} → ${to}): ${note}`;
+  return { handover, detail, recipient };
+}
+
 function _classifyRouteRow(c) {
   const ts = caseTrackStatus(c);
   if (ts === 'sanity_check') return 'sanity';
@@ -2545,6 +2574,19 @@ function renderCaseList() {
     </div>
   ` : '';
 
+  // Reminder: cases under the signed-in operator's name that still need a handover note for the
+  // next shift. Persistent nudge so nothing rolls over unhanded.
+  const myPending = myHandoverPendingCases();
+  const meOp = getOperator(STATE.operatorId);
+  const nextShiftName = meOp ? (meOp.shift === 'Day' ? 'Night' : 'Day') : 'next';
+  const handoverBanner = myPending.length > 0 ? `
+    <div class="handover-reminder">
+      <span class="handover-reminder-icon">⇄</span>
+      <span class="handover-reminder-text"><strong>${myPending.length}</strong> case${myPending.length === 1 ? '' : 's'} under your name still ${myPending.length === 1 ? 'needs' : 'need'} a handover note for the ${escapeHtml(nextShiftName)} shift:</span>
+      <span class="handover-reminder-cases">${myPending.map(c => `<a class="mono" href="#/cases/${c.id}" title="${escapeHtml(c.subject)}">${c.id}</a>`).join(' ')}</span>
+    </div>
+  ` : '';
+
   // Live "N cases from Case Center · M picked" banner intentionally hidden (per request).
   // To restore: render the strip below where ${liveBanner} used to sit.
   const liveBanner = '';
@@ -2571,6 +2613,7 @@ function renderCaseList() {
         </div>
       </div>
       ${liveBanner}
+      ${handoverBanner}
       ${remindersBanner}
       <div class="picked-workspace">
         <div class="picked-workspace-top">
@@ -5214,10 +5257,14 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'end_of_shift_handover') {
+    // If the case was already handed to a specific teammate, keep addressing them (name);
+    // otherwise it's a generic hand-off to the opposite shift.
+    const existingRecipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+    const targetLabel = existingRecipient ? existingRecipient.name : (op.shift === 'Day' ? 'Night' : 'Day');
     showModal(`
       <h3>Handover note</h3>
-      <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(op.shift === 'Day' ? 'Night' : 'Day')} · case ${escapeHtml(c.id)}</div>
-      <label>Note for the next shift</label>
+      <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(targetLabel)} · case ${escapeHtml(c.id)}</div>
+      <label>Note for ${existingRecipient ? escapeHtml(existingRecipient.name) : 'the next shift'}</label>
       <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
@@ -5226,13 +5273,14 @@ function handlePrompt(caseId, kind) {
     `, (modal) => {
       const note = fieldVal(modal, 'note').trim();
       if (!note) return modalError('Handover note is required.');
-      const target = op.shift === 'Day' ? 'Night' : 'Day';
-      c.handover = { note, author: op.id, from: op.shift, to: target, at: new Date(NOW).toISOString(), staleForCurrentShift: false };
-      // Include the note text so it survives in history after the next handover overwrites
-      // c.handover — the History panel and the export's Note column read it from here.
-      logHistory(c, op, 'handover', `Handover note (${op.shift} → ${target}): ${note}`);
-      track('handover_note', { to: target }, c.id);
-      showToast(`Handover note saved for ${c.id} (${op.shift} → ${target}).`, 'success');
+      // Keep an already-chosen next operator instead of resetting it to a bare shift name.
+      const { handover, detail, recipient } = nextShiftHandover(c, op, note);
+      c.handover = handover;
+      // The detail carries the note text so it survives in history after the next handover
+      // overwrites c.handover — the History panel and the export's Note column read it from here.
+      logHistory(c, op, 'handover', detail);
+      track('handover_note', recipient ? { to: handover.to, toOperator: recipient.id } : { to: handover.to }, c.id);
+      showToast(`Handover note saved for ${c.id} (${op.shift} → ${recipient ? recipient.name : handover.to}).`, 'success');
       render();
       return true;
     });

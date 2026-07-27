@@ -1976,6 +1976,26 @@ table.case-table {
   50%      { box-shadow: 0 0 0 6px rgba(207, 106, 124, 0); }
 }
 
+/* ---------- Handover reminder banner ---------- */
+.handover-reminder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 11px 16px;
+  margin-bottom: 14px;
+  background: var(--warn-bg);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.handover-reminder-icon { font-size: 15px; font-weight: 700; color: var(--warn); }
+.handover-reminder-text strong { color: var(--warn); }
+.handover-reminder-cases { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; }
+.handover-reminder-cases a { font-size: 12px; }
+
 .reminders-due {
   background: var(--panel);
   border: 1px solid #f1c0c8;

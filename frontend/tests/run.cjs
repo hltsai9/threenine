@@ -465,6 +465,27 @@ test('deleteHandoverNote: deleting an older note keeps the current one', () => {
   eq(c.handover.note, 'second', 'current untouched');
   eq(app.caseHandoverNotes(c).length, 1);
 });
+/* ---------- nextShiftHandover: writing a note keeps an already-chosen next operator ---------- */
+test('nextShiftHandover: preserves the addressed next operator instead of resetting to a shift', () => {
+  const dayOp = app.getOperator('op-da');       // Day (current)
+  const nightOp = app.getOperator('op-na');     // Night — case already handed to them
+  const c = { handover: { note: 'old', author: dayOp.id, from: 'Day', to: nightOp.shift, toOperator: nightOp.id, at: iso(2 * HOUR) } };
+  const { handover, detail, recipient } = app.nextShiftHandover(c, dayOp, 'fresh state');
+  eq(handover.toOperator, nightOp.id, 'next operator kept');
+  eq(handover.to, nightOp.shift, 'the "to" shift tracks the kept recipient');
+  eq(recipient.id, nightOp.id, 'recipient reported back');
+  ok(detail.includes(nightOp.name), 'history detail names the recipient');
+  ok(handover.note === 'fresh state' && !handover.staleForCurrentShift, 'note refreshed');
+});
+test('nextShiftHandover: no prior recipient → targets the opposite shift', () => {
+  const dayOp = app.getOperator('op-da');
+  const c = {};   // never handed to anyone
+  const { handover, recipient } = app.nextShiftHandover(c, dayOp, 'note');
+  eq(handover.to, 'Night', 'Day → Night default');
+  ok(!('toOperator' in handover), 'no operator addressed');
+  eq(recipient, null);
+});
+
 test('deleteHandoverNote: soft delete retains the note + text for audit/recovery', () => {
   const c = {
     history: [
