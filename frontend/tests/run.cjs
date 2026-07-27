@@ -485,6 +485,22 @@ test('nextShiftHandover: no prior recipient → targets the opposite shift', () 
   ok(!('toOperator' in handover), 'no operator addressed');
   eq(recipient, null);
 });
+test('buildHandover: explicit recipient addresses them and uses their shift', () => {
+  const dayOp = app.getOperator('op-da');
+  const nightOp = app.getOperator('op-na');
+  const { handover, detail, recipient } = app.buildHandover(dayOp, 'the note', nightOp);
+  eq(handover.toOperator, nightOp.id, 'addressed to the picked operator');
+  eq(handover.to, nightOp.shift, 'to = their shift');
+  eq(recipient.id, nightOp.id);
+  ok(detail.includes(nightOp.name), 'history detail names them');
+});
+test('buildHandover: null recipient → opposite shift, no toOperator', () => {
+  const dayOp = app.getOperator('op-da');
+  const { handover, recipient } = app.buildHandover(dayOp, 'note', null);
+  eq(handover.to, 'Night');
+  ok(!('toOperator' in handover), 'no operator addressed');
+  eq(recipient, null);
+});
 
 test('deleteHandoverNote: soft delete retains the note + text for audit/recovery', () => {
   const c = {

@@ -2087,13 +2087,10 @@ function caseTrackerOperatorId(c) {
   return STATE.operatorId;
 }
 
-// Build the c.handover object when an operator writes an end-of-shift note (the generic "Write
-// handover note" button). If the case was already addressed to a specific teammate
-// (c.handover.toOperator), KEEP that recipient — writing a fresh note must not silently reset the
-// next operator back to a bare shift name. Otherwise target the opposite shift. Returns the new
-// handover object, the history detail string, and the resolved recipient (or null).
-function nextShiftHandover(c, op, note) {
-  const recipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+// Build a c.handover object + its history detail for a note. `recipient` is the addressed
+// teammate (an operator object) or null for a generic hand-off to the opposite shift. Returns
+// { handover, detail, recipient }.
+function buildHandover(op, note, recipient) {
   const to = recipient ? recipient.shift : (op.shift === 'Day' ? 'Night' : 'Day');
   const handover = {
     note, author: op.id, from: op.shift, to,
@@ -2104,6 +2101,15 @@ function nextShiftHandover(c, op, note) {
     ? `Handover to ${recipient.name} (${op.shift} → ${to}): ${note}`
     : `Handover note (${op.shift} → ${to}): ${note}`;
   return { handover, detail, recipient };
+}
+
+// The default recipient when the "Write handover note" modal opens: whoever the case is already
+// addressed to (c.handover.toOperator), else null — so writing a fresh note keeps an already
+// chosen next operator instead of resetting it to a bare shift name. The modal lets the operator
+// override this (see the end_of_shift_handover handler); this wrapper is the no-override path.
+function nextShiftHandover(c, op, note) {
+  const recipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
+  return buildHandover(op, note, recipient);
 }
 
 function _classifyRouteRow(c) {
@@ -3162,23 +3168,9 @@ function renderDetailActions(c) {
     items.push(`<a class="btn" href="${escapeHtml(c.caseLink)}" target="_blank" rel="noreferrer" title="Open this case in Case Center">↗ Case Center</a>`);
   }
 
+  // Write handover note — its modal now also carries the "Hand over to…" recipient picker
+  // (type-to-search; defaults to the case's existing recipient), so it's the single entry point.
   items.push(`<button class="btn" data-action="prompt" data-case-id="${c.id}" data-kind="end_of_shift_handover">Write handover note</button>`);
-
-  // "Hand over to" — pick a specific operator to address the handover note at.
-  // Open the same note modal pre-filled with the chosen recipient.
-  const meId = STATE.operatorId;
-  const recipientOpts = (window.OPERATORS || [])
-    .filter(o => o.id !== meId)
-    .map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)} · ${escapeHtml(o.shift)}</option>`)
-    .join('');
-  if (recipientOpts) {
-    items.push(`
-      <select class="ts-picker handover-to-picker" data-action="handover-to-select" data-case-id="${c.id}" title="Pick an operator and address a handover note to them">
-        <option value="">Hand over to…</option>
-        ${recipientOpts}
-      </select>
-    `);
-  }
 
   items.push(renderBellButton(c, 'detail'));
   items.push(renderQueueToggleButton(c, 'normal'));
@@ -5258,14 +5250,25 @@ function handlePrompt(caseId, kind) {
   }
 
   if (kind === 'end_of_shift_handover') {
-    // If the case was already handed to a specific teammate, keep addressing them (name);
-    // otherwise it's a generic hand-off to the opposite shift.
+    // Merged flow: one modal carries the recipient picker ("Hand over to…", type-to-search via
+    // a datalist) AND the note. The picker defaults to the case's existing recipient if any;
+    // clearing it hands to the opposite shift generically.
+    const recipients = (window.OPERATORS || []).filter(o => o.id !== STATE.operatorId);
+    const rLabel = o => `${o.name} · ${o.shift}`;
     const existingRecipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
-    const targetLabel = existingRecipient ? existingRecipient.name : (op.shift === 'Day' ? 'Night' : 'Day');
+    const nextShift = op.shift === 'Day' ? 'Night' : 'Day';
+    const recipientField = recipients.length ? `
+      <label>Hand over to <span class="muted tiny">— type to search; leave blank for the ${escapeHtml(nextShift)} shift</span></label>
+      <input type="text" data-field="recipient" list="handover-recipient-list" autocomplete="off"
+             value="${escapeHtml(existingRecipient ? rLabel(existingRecipient) : '')}"
+             placeholder="${escapeHtml(nextShift)} shift (no specific person)">
+      <datalist id="handover-recipient-list">${recipients.map(o => `<option value="${escapeHtml(rLabel(o))}"></option>`).join('')}</datalist>
+    ` : '';
     showModal(`
       <h3>Handover note</h3>
-      <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(targetLabel)} · case ${escapeHtml(c.id)}</div>
-      <label>Note for ${existingRecipient ? escapeHtml(existingRecipient.name) : 'the next shift'}</label>
+      <div class="modal-sub">case ${escapeHtml(c.id)}</div>
+      ${recipientField}
+      <label>Note</label>
       <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
       <div class="modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
@@ -5274,8 +5277,17 @@ function handlePrompt(caseId, kind) {
     `, (modal) => {
       const note = fieldVal(modal, 'note').trim();
       if (!note) return modalError('Handover note is required.');
-      // Keep an already-chosen next operator instead of resetting it to a bare shift name.
-      const { handover, detail, recipient } = nextShiftHandover(c, op, note);
+      // Resolve the typed recipient (exact "Name · Shift" label, or just the name). Empty = no
+      // specific person → hand to the opposite shift.
+      const typed = fieldVal(modal, 'recipient').trim();
+      let recipient = null;
+      if (typed) {
+        const t = typed.toLowerCase();
+        recipient = recipients.find(o => rLabel(o).toLowerCase() === t)
+          || recipients.find(o => o.name.toLowerCase() === t);
+        if (!recipient) return modalError('Pick a teammate from the list, or clear the field to hand to the next shift.');
+      }
+      const { handover, detail } = buildHandover(op, note, recipient);
       c.handover = handover;
       // The detail carries the note text so it survives in history after the next handover
       // overwrites c.handover — the History panel and the export's Note column read it from here.
@@ -5565,42 +5577,6 @@ function handlePrompt(caseId, kind) {
     }
     return;
   }
-}
-
-function handleHandoverTo(caseId, recipientOpId) {
-  const c = caseById(caseId);
-  const op = getOperator(STATE.operatorId);
-  const recipient = getOperator(recipientOpId);
-  if (!c || !op || !recipient) return;
-  showModal(`
-    <h3>Hand over to ${escapeHtml(recipient.name)}</h3>
-    <div class="modal-sub">${escapeHtml(op.shift)} → ${escapeHtml(recipient.shift)} · case ${escapeHtml(c.id)}</div>
-    <label>Note for ${escapeHtml(recipient.name)}</label>
-    <textarea data-field="note" placeholder="What's the state, what to do next, what to watch for…"></textarea>
-    <div class="modal-actions">
-      <button class="btn" data-modal-cancel>Cancel</button>
-      <button class="btn btn-primary" data-modal-submit>Send handover</button>
-    </div>
-  `, (modal) => {
-    const note = fieldVal(modal, 'note').trim();
-    if (!note) return modalError('Handover note is required.');
-    c.handover = {
-      note,
-      author: op.id,
-      from: op.shift,
-      to: recipient.shift,
-      toOperator: recipient.id,
-      at: new Date(NOW).toISOString(),
-      staleForCurrentShift: false,
-    };
-    // Include the note text so it survives in history after the next handover overwrites
-    // c.handover — the History panel and the export's Note column read it from here.
-    logHistory(c, op, 'handover', `Handover to ${recipient.name} (${op.shift} → ${recipient.shift}): ${note}`);
-    track('handover_note', { to: recipient.shift, toOperator: recipient.id }, c.id);
-    showToast(`Handover note for ${c.id} addressed to ${recipient.name}.`, 'success');
-    render();
-    return true;
-  });
 }
 
 function handleNewCase(op) {
@@ -5898,15 +5874,6 @@ function bindHandlers() {
       const def = value ? TRACK_STATUS_BY_ID[value] : null;
       if (def && def.scheduled) { openHandoffTimeModal(c, value, prev, el); return; }
       commitTrackStatus(c, value, prev);
-    });
-  });
-  document.querySelectorAll('[data-action="handover-to-select"]').forEach(el => {
-    el.addEventListener('change', () => {
-      const recipientOpId = el.value;
-      const caseId = el.dataset.caseId;
-      el.value = '';
-      if (!recipientOpId) return;
-      handleHandoverTo(caseId, recipientOpId);
     });
   });
   document.querySelectorAll('[data-action="reassign"]').forEach(el => {
