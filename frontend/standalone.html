@@ -6661,7 +6661,7 @@ function renderCaseList() {
     <div class="handover-reminder">
       <span class="handover-reminder-icon">⇄</span>
       <span class="handover-reminder-text"><strong>${myPending.length}</strong> case${myPending.length === 1 ? '' : 's'} under your name still ${myPending.length === 1 ? 'needs' : 'need'} a handover note for the ${escapeHtml(nextShiftName)} shift:</span>
-      <span class="handover-reminder-cases">${myPending.map(c => `<a class="mono" href="#/cases/${c.id}" title="${escapeHtml(c.subject)}">${c.id}</a>`).join(' ')}</span>
+      <span class="handover-reminder-cases">${myPending.map(c => `<a class="mono handover-reminder-case" data-action="reminder-goto-case" data-case-id="${c.id}" href="#/cases/${c.id}" title="${escapeHtml(c.subject)}">${c.id}</a>`).join(' ')}</span>
     </div>
   ` : '';
 
@@ -7078,7 +7078,8 @@ function renderCaseDetailBody(c) {
 
   // Every earlier handover note (newest first), under the styled latest one — the full note
   // history lives here now; the History list below still shows the raw event log.
-  const olderNotes = caseHandoverNotes(c)
+  const allNotes = caseHandoverNotes(c);
+  const olderNotes = allNotes
     .filter(n => !(c.handover && c.handover.at === n.at))
     .reverse()
     .map(n => `
@@ -7139,7 +7140,7 @@ function renderCaseDetailBody(c) {
             ${renderWaitUser(c)}
           </div>` : ''}
           <div class="detail-section">
-            <h3>Handover notes</h3>
+            <h3>Handover notes${allNotes.length ? ` <span class="muted tiny" style="font-weight:400">· ${allNotes.length}</span>` : ''}</h3>
             ${allHandoversHtml}
           </div>
           <div class="detail-section">
@@ -10016,6 +10017,25 @@ function bindHandlers() {
       STATE.pickedListTab = el.dataset.tab === 'sanity' ? 'sanity' : 'cases';
       track('list_tab', { tab: STATE.pickedListTab });
       render();
+    });
+  });
+  // Reminder-banner case links: select the case in the Route Board / reading panel in place
+  // (no navigation away) so the operator can read it and write the note without leaving. Falls
+  // back to the full detail route if the case somehow isn't in the picked workspace.
+  document.querySelectorAll('[data-action="reminder-goto-case"]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.preventDefault();
+      const id = el.dataset.caseId;
+      const c = caseById(id);
+      if (c && isPicked(c)) {
+        STATE.kanbanSelected = id;
+        STATE.pickedListTab = isSanityCase(c) ? 'sanity' : 'cases';
+        render();
+        const row = document.querySelector(`.rb-row[data-case-id="${id}"], .picked-row[data-case-id="${id}"]`);
+        if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+      } else {
+        navigate(`#/cases/${id}`);
+      }
     });
   });
   document.querySelectorAll('[data-action="delete-handover-note"]').forEach(el => {

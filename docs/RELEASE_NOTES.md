@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-07-27
 
+### Changed (reminder-banner case links select in place; handover-notes count)
+
+- The handover reminder banner's case links now **select the case in the Route Board / reading
+  panel in place** (`data-action="reminder-goto-case"`) instead of navigating to the standalone
+  `#/cases/<id>` page — the operator reads the case and writes the note without leaving the
+  workspace. Falls back to the detail route if the case isn't in the picked workspace.
+- The reading panel's / case detail's **"Handover notes"** heading now shows a count
+  (e.g. "Handover notes · 3") for discoverability. The section already listed the current note
+  plus every earlier note (reconstructed from history via `caseHandoverNotes`); the count makes
+  it obvious how many exist without scrolling.
+
 ### Fixed (writing a handover note no longer resets the chosen next operator)
 
 - When a case was already handed to a specific teammate (`c.handover.toOperator`), clicking
