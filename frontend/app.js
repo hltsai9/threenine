@@ -5258,10 +5258,10 @@ function handlePrompt(caseId, kind) {
     const existingRecipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
     const nextShift = op.shift === 'Day' ? 'Night' : 'Day';
     const recipientField = recipients.length ? `
-      <label>Hand over to <span class="muted tiny">— type to search; leave blank for the ${escapeHtml(nextShift)} shift</span></label>
+      <label>Hand over to * <span class="muted tiny">— type to search</span></label>
       <input type="text" data-field="recipient" list="handover-recipient-list" autocomplete="off"
              value="${escapeHtml(existingRecipient ? rLabel(existingRecipient) : '')}"
-             placeholder="${escapeHtml(nextShift)} shift (no specific person)">
+             placeholder="Type a teammate's name">
       <datalist id="handover-recipient-list">${recipients.map(o => `<option value="${escapeHtml(rLabel(o))}"></option>`).join('')}</datalist>
     ` : '';
     showModal(`
@@ -5277,15 +5277,17 @@ function handlePrompt(caseId, kind) {
     `, (modal) => {
       const note = fieldVal(modal, 'note').trim();
       if (!note) return modalError('Handover note is required.');
-      // Resolve the typed recipient (exact "Name · Shift" label, or just the name). Empty = no
-      // specific person → hand to the opposite shift.
+      // A recipient is REQUIRED whenever there are teammates to pick (only a single-operator
+      // roster falls back to the opposite shift). Resolve the typed value to an operator by its
+      // "Name · Shift" label, or just the name.
       const typed = fieldVal(modal, 'recipient').trim();
       let recipient = null;
-      if (typed) {
+      if (recipients.length) {
+        if (!typed) return modalError('Choose who to hand this over to.');
         const t = typed.toLowerCase();
         recipient = recipients.find(o => rLabel(o).toLowerCase() === t)
           || recipients.find(o => o.name.toLowerCase() === t);
-        if (!recipient) return modalError('Pick a teammate from the list, or clear the field to hand to the next shift.');
+        if (!recipient) return modalError('Pick a teammate from the list.');
       }
       const { handover, detail } = buildHandover(op, note, recipient);
       c.handover = handover;

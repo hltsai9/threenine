@@ -13,10 +13,11 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 ### Changed (merged "Hand over to…" into the "Write handover note" modal)
 
 - The separate **Hand over to…** dropdown is gone; the **Write handover note** modal now carries
-  a recipient picker at the top — a type-to-search field (native `<datalist>` of `Name · Shift`)
-  where you can filter teammates by typing. It **defaults to the case's existing recipient** when
-  one is set, so re-writing a note keeps the next operator; clearing the field hands to the
-  opposite shift generically. Unresolvable text is rejected with a hint. Refactor: extracted
+  a recipient picker at the top — a **required** type-to-search field (native `<datalist>` of
+  `Name · Shift`) where you filter teammates by typing. Saving without a resolvable teammate is
+  blocked ("Choose who to hand this over to."). It **defaults to the case's existing recipient**
+  when one is set, so re-writing a note keeps the next operator. (A single-operator roster, with
+  no one to pick, still falls back to the opposite shift.) Refactor: extracted
   `buildHandover(op, note, recipient)` (`frontend/app.js`) shared by the modal and the
   default-preserving `nextShiftHandover`; removed the now-dead `handleHandoverTo` +
   `handover-to-select` picker/handler. Tests: +2 for `buildHandover`.
