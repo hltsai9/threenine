@@ -6653,11 +6653,20 @@ async function tryLoadLiveCases(allCases) {
 
 /* ---------- Release notes (curated from docs/RELEASE_NOTES.md; published via DB config) ---------- */
 
+const RELEASE_NOTES_KEY = 'case-tracker-release-notes';
 function publishedReleaseNoteIds() {
   return Array.isArray(window.__RELEASE_NOTES_PUBLISHED__) ? window.__RELEASE_NOTES_PUBLISHED__ : [];
 }
 function applyReleaseNotesConfig(payload) {
   window.__RELEASE_NOTES_PUBLISHED__ = Array.isArray(payload && payload.published) ? payload.published : [];
+}
+// Per-device published set (demo / no-backend mode). In DB mode loadConfigFromServer overrides
+// this with the shared config when one has been published.
+function loadReleaseNotesLocal() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(RELEASE_NOTES_KEY) || 'null');
+    if (Array.isArray(ids)) window.__RELEASE_NOTES_PUBLISHED__ = ids;
+  } catch (e) { /* ignore */ }
 }
 
 // Minimal, safe inline markdown for release-note bodies: escape FIRST, then render **bold**,
@@ -6694,12 +6703,9 @@ function renderReleaseNotesPage() {
         <h1>Release notes</h1>
         <div class="subtitle">What's new on the board.</div>
       </div>
-      <div class="toolbar">
-        <button class="btn" data-action="edit-release-notes">✎ Edit</button>
-      </div>
     </div>`;
   if (!chosen.length) {
-    return header + `<div class="card"><div class="card-body muted">No release notes published yet.${isDbBackend() ? ' Click <strong>Edit</strong> to pick entries to show.' : ''}</div></div>`;
+    return header + `<div class="card"><div class="card-body muted">No release notes published yet.</div></div>`;
   }
   // Group by date. `chosen` preserves source order (newest date first).
   const groups = [];
@@ -6720,9 +6726,8 @@ function renderReleaseNotesPage() {
   return header + `<div class="rn-page">${body}</div>`;
 }
 
-// The pick-entries editor (shared by the Release notes page and the Analytics page Edit buttons).
+// The pick-entries editor (opened from the Analytics page Edit button).
 function openReleaseNotesEditor() {
-  if (!isDbBackend()) { showToast('Publishing release notes needs the DB backend.', 'warn'); return; }
   const source = window.RELEASE_NOTES_SOURCE || [];
   if (!source.length) { showToast('No changelog entries to pick from.', 'warn'); return; }
   const pub = new Set(publishedReleaseNoteIds());
@@ -6731,9 +6736,10 @@ function openReleaseNotesEditor() {
     if (e.date !== lastDate) { rows += `<div class="rn-pick-date">${escapeHtml(e.date)}</div>`; lastDate = e.date; }
     rows += `<label class="rn-pick"><input type="checkbox" data-rn-id="${escapeHtml(e.id)}"${pub.has(e.id) ? ' checked' : ''}><span>${escapeHtml(e.heading)}</span></label>`;
   }
+  const shared = isDbBackend();
   showModal(`
     <h3>Publish release notes</h3>
-    <div class="modal-sub">Tick the entries to show on the Release notes page. Saved for everyone.</div>
+    <div class="modal-sub">Tick the entries to show on the Release notes page. ${shared ? 'Saved for everyone.' : 'Demo mode — saved on this device only.'}</div>
     <div class="rn-picklist">${rows}</div>
     <div class="modal-actions">
       <button class="btn" data-modal-cancel>Cancel</button>
@@ -6742,7 +6748,15 @@ function openReleaseNotesEditor() {
   `, (modal) => {
     const ids = Array.prototype.slice.call(modal.querySelectorAll('[data-rn-id]:checked')).map(el => el.dataset.rnId);
     window.__RELEASE_NOTES_PUBLISHED__ = ids;
-    saveConfigToServer('releaseNotes', { published: ids }, 'Release notes').then(ok => { if (ok) render(); });
+    if (shared) {
+      // DB backend → shared config, every operator sees it.
+      saveConfigToServer('releaseNotes', { published: ids }, 'Release notes').then(ok => { if (ok) render(); });
+    } else {
+      // Demo / no backend → persist per-device so the pick still survives a refresh.
+      try { localStorage.setItem(RELEASE_NOTES_KEY, JSON.stringify(ids)); } catch (e) { /* ignore */ }
+      showToast('Release notes updated (saved on this device).', 'success');
+      render();
+    }
     return true;
   });
 }
@@ -7243,6 +7257,7 @@ async function isServerMode() {
 
 async function boot() {
   if (!location.hash) location.hash = '#/cases';
+  loadReleaseNotesLocal();   // per-device published set; server config overrides it in DB mode
   if (await isServerMode()) {
     await bootServerLoad();
     return;

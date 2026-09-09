@@ -10,6 +10,15 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-09-09
 
+### Changed (release-notes editing lives on Analytics only; works in demo)
+
+- Removed the **Edit** button from the Release notes page — the changelog picker now opens only
+  from the **Analytics** page's "✎ Edit release notes" button (single admin entry point).
+- The picker now works **in demo / no-backend mode**: instead of blocking (it required the DB
+  backend), it saves the chosen entries to `localStorage` per-device (`case-tracker-release-notes`,
+  loaded at boot via `loadReleaseNotesLocal`). In DB mode it still saves to the shared config for
+  everyone; the server config overrides the local set when present.
+
 ### Added (Release notes page + changelog picker)
 
 - New **Release notes** page (`#/release-notes`, in the sidebar) — blank by default. It shows a
