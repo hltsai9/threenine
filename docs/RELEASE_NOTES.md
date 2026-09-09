@@ -20,7 +20,10 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 - **Handover "Hand over to" picker** is now a custom filter dropdown (replacing the native
   `<datalist>`): typing narrows the list to matching names, and an **×** button clears the
   keyword filter. Clicking a name selects it (id stored in a hidden field); the recipient stays
-  required. Wired by `wireHandoverCombo()` after the modal opens.
+  required. Wired by `wireHandoverCombo()` after the modal opens. The options list is a
+  **focus-triggered popover** that floats over the note field (capped height + scroll), so the
+  modal stays compact no matter how large the roster is (e.g. 17 operators); focusing a
+  pre-filled field shows the whole roster so it's easy to switch.
 
 ### Internal
 

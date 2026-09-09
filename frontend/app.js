@@ -5079,9 +5079,11 @@ function logHistory(c, op, kind, detail) {
   c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind, detail });
 }
 
-// Wire the handover recipient combo box in the just-opened modal: typing filters the list to
-// matching names, clicking an item selects it (stores the id in the hidden field), and the "×"
-// clears the keyword filter. No-op outside a browser (tests) or when the combo isn't present.
+// Wire the handover recipient combo box in the just-opened modal. The options list is a popover
+// that only appears while the field is focused (so the modal stays compact even with a long
+// roster) and floats over the note field rather than growing the window. Typing filters the list
+// to matching names; clicking an item selects it (id stored in the hidden field); "×" clears the
+// keyword filter. No-op outside a browser (tests) or when the combo isn't present.
 function wireHandoverCombo() {
   if (typeof document === 'undefined') return;
   const modal = document.getElementById('modal-root')?.querySelector('.modal');
@@ -5090,9 +5092,17 @@ function wireHandoverCombo() {
   const input = combo.querySelector('[data-field="recipient"]');
   const hidden = combo.querySelector('[data-field="recipientId"]');
   const clearBtn = combo.querySelector('[data-combo-clear]');
+  const list = combo.querySelector('[data-combo-list]');
   const items = Array.prototype.slice.call(combo.querySelectorAll('.combo-item'));
+  const labelOf = id => (items.find(li => li.dataset.id === id) || {}).dataset?.label || '';
+  const show = () => { list.hidden = false; };
+  const hide = () => { list.hidden = true; };
   const applyFilter = () => {
-    const q = input.value.trim().toLowerCase();
+    // When the field still holds the currently-selected label (just focused, nothing typed),
+    // show the whole roster so it's easy to switch; once the operator types, filter by substring.
+    const raw = input.value.trim();
+    const holdingSelection = hidden.value && raw.toLowerCase() === labelOf(hidden.value).toLowerCase();
+    const q = holdingSelection ? '' : raw.toLowerCase();
     let shown = 0;
     items.forEach(li => {
       const match = !q || li.dataset.label.toLowerCase().includes(q);
@@ -5106,20 +5116,28 @@ function wireHandoverCombo() {
       empty.className = 'combo-empty';
       empty.setAttribute('data-combo-empty', '');
       empty.textContent = 'No matching teammate';
-      combo.querySelector('[data-combo-list]').appendChild(empty);
+      list.appendChild(empty);
     }
     if (clearBtn) clearBtn.hidden = !input.value;
   };
-  input.addEventListener('input', () => { hidden.value = ''; applyFilter(); });
-  items.forEach(li => li.addEventListener('click', () => {
+  input.addEventListener('focus', () => { show(); applyFilter(); });
+  input.addEventListener('input', () => { hidden.value = ''; show(); applyFilter(); });
+  // Blur closes the popover. Item/clear use mousedown+preventDefault so the click lands before
+  // the input loses focus, so blur only fires when focus truly leaves the combo.
+  input.addEventListener('blur', () => setTimeout(hide, 0));
+  items.forEach(li => li.addEventListener('mousedown', e => {
+    e.preventDefault();
     input.value = li.dataset.label;
     hidden.value = li.dataset.id;
     applyFilter();
+    hide();
   }));
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    input.value = ''; hidden.value = ''; applyFilter(); input.focus();
+  if (clearBtn) clearBtn.addEventListener('mousedown', e => {
+    e.preventDefault();
+    input.value = ''; hidden.value = ''; show(); applyFilter(); input.focus();
   });
-  applyFilter();
+  applyFilter();   // set the × visibility; the list starts hidden
+  hide();
 }
 
 function handlePrompt(caseId, kind) {

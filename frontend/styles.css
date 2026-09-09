@@ -1503,7 +1503,10 @@ table.case-table {
 }
 .modal textarea { min-height: 80px; resize: vertical; }
 .modal input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent-soft); }
-/* Handover recipient combo box — filter dropdown with a clear (×) button */
+/* Handover recipient combo box — filter dropdown with a clear (×) button. The options list is a
+   popover (absolute) that appears on focus and floats over the note field, so the modal stays
+   compact regardless of how many operators there are. */
+.modal .combo { position: relative; }
 .modal .combo-input-wrap { position: relative; }
 .modal .combo-input { padding-right: 34px; }
 .modal .combo-clear {
@@ -1513,9 +1516,11 @@ table.case-table {
 }
 .modal .combo-clear:hover { background: var(--chip-soft-2); color: var(--text); }
 .modal .combo-list {
-  list-style: none; margin: 6px 0 0; padding: 4px;
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  list-style: none; margin: 0; padding: 4px;
   max-height: 168px; overflow-y: auto;
   border: 1px solid var(--border); border-radius: 11px; background: var(--panel);
+  box-shadow: var(--shadow-modal);
 }
 .modal .combo-item {
   padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text); cursor: pointer;
