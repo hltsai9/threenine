@@ -10,6 +10,13 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-09-09
 
+### Fixed (handover recipient dropdown now opens on modal load)
+
+- The recipient popover stayed closed when the modal opened even though the field was
+  autofocused (the modal's autofocus fires before `wireHandoverCombo` attaches its focus
+  handler, and wiring then hid the list) — you had to click away and back to see it. Wiring now
+  reflects the real focus state on load: if the field is already focused, the popover opens.
+
 ### Changed (handover reminder skips Sanity Check; import accepts a link; filter dropdown + clear)
 
 - **Handover reminder** no longer counts **Sanity Check** cases — they park in their own group

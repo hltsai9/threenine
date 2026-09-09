@@ -5136,8 +5136,11 @@ function wireHandoverCombo() {
     e.preventDefault();
     input.value = ''; hidden.value = ''; show(); applyFilter(); input.focus();
   });
-  applyFilter();   // set the × visibility; the list starts hidden
-  hide();
+  applyFilter();   // set the × visibility
+  // showModal autofocuses the first field (this input) BEFORE these listeners exist, so the
+  // opening focus never fired our handler. Reflect the real focus state now: open the popover if
+  // the field is already focused on load, otherwise keep it closed until the operator focuses it.
+  if (document.activeElement === input) show(); else hide();
 }
 
 function handlePrompt(caseId, kind) {
