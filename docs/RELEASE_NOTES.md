@@ -8,6 +8,25 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ---
 
+## 2026-09-09
+
+### Changed (handover reminder skips Sanity Check; import accepts a link; filter dropdown + clear)
+
+- **Handover reminder** no longer counts **Sanity Check** cases — they park in their own group
+  and aren't part of the shift hand-off (`myHandoverPendingCases` now also excludes `isSanityCase`).
+- **+ Import case by ID** accepts either a case ID **or a pasted case link**. New pure helper
+  `extractCaseId` pulls the ID from a link — the last `/`-separated segment (query/fragment
+  stripped), preferring a `Case-…` segment — and a plain ID passes through unchanged.
+- **Handover "Hand over to" picker** is now a custom filter dropdown (replacing the native
+  `<datalist>`): typing narrows the list to matching names, and an **×** button clears the
+  keyword filter. Clicking a name selects it (id stored in a hidden field); the recipient stays
+  required. Wired by `wireHandoverCombo()` after the modal opens.
+
+### Internal
+
+- Tests: +4 for `extractCaseId` (plain id, link with query/fragment, trailing slash, `Case-`
+  segment preference, empty). `node frontend/tests/run.cjs` → 214 passing.
+
 ## 2026-07-27
 
 ### Changed (merged "Hand over to…" into the "Write handover note" modal)

@@ -1503,6 +1503,26 @@ table.case-table {
 }
 .modal textarea { min-height: 80px; resize: vertical; }
 .modal input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent-soft); }
+/* Handover recipient combo box — filter dropdown with a clear (×) button */
+.modal .combo-input-wrap { position: relative; }
+.modal .combo-input { padding-right: 34px; }
+.modal .combo-clear {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  border: none; background: transparent; cursor: pointer;
+  font-size: 18px; line-height: 1; color: var(--text-faint-2); padding: 2px 7px; border-radius: 6px;
+}
+.modal .combo-clear:hover { background: var(--chip-soft-2); color: var(--text); }
+.modal .combo-list {
+  list-style: none; margin: 6px 0 0; padding: 4px;
+  max-height: 168px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 11px; background: var(--panel);
+}
+.modal .combo-item {
+  padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text); cursor: pointer;
+}
+.modal .combo-item:hover { background: var(--accent-bg); }
+.modal .combo-item-sel { background: var(--accent-bg); font-weight: 600; }
+.modal .combo-empty { padding: 8px 10px; font-size: 13px; color: var(--text-faint-2); }
 .modal label.inline-check {
   display: inline-flex;
   align-items: center;

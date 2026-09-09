@@ -502,6 +502,24 @@ test('buildHandover: null recipient → opposite shift, no toOperator', () => {
   eq(recipient, null);
 });
 
+/* ---------- extractCaseId: accept a raw id or a pasted case link ---------- */
+test('extractCaseId: plain id is returned as-is', () => {
+  eq(app.extractCaseId('Case-581234'), 'Case-581234');
+  eq(app.extractCaseId('  581234 '), '581234');
+});
+test('extractCaseId: pulls the id from a full case link', () => {
+  eq(app.extractCaseId('https://case-center.internal/case/Case-581234'), 'Case-581234');
+  eq(app.extractCaseId('https://cc.example/x/Case-581234/'), 'Case-581234', 'trailing slash');
+  eq(app.extractCaseId('https://cc.example/case/Case-581234?tab=history#top'), 'Case-581234', 'query + fragment stripped');
+});
+test('extractCaseId: prefers a Case- segment over a trailing non-id segment', () => {
+  eq(app.extractCaseId('https://cc.example/Case-581234/details'), 'Case-581234');
+});
+test('extractCaseId: empty input → empty', () => {
+  eq(app.extractCaseId(''), '');
+  eq(app.extractCaseId('   '), '');
+});
+
 test('deleteHandoverNote: soft delete retains the note + text for audit/recovery', () => {
   const c = {
     history: [

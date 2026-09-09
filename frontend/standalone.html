@@ -1511,6 +1511,26 @@ table.case-table {
 }
 .modal textarea { min-height: 80px; resize: vertical; }
 .modal input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent-soft); }
+/* Handover recipient combo box — filter dropdown with a clear (×) button */
+.modal .combo-input-wrap { position: relative; }
+.modal .combo-input { padding-right: 34px; }
+.modal .combo-clear {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  border: none; background: transparent; cursor: pointer;
+  font-size: 18px; line-height: 1; color: var(--text-faint-2); padding: 2px 7px; border-radius: 6px;
+}
+.modal .combo-clear:hover { background: var(--chip-soft-2); color: var(--text); }
+.modal .combo-list {
+  list-style: none; margin: 6px 0 0; padding: 4px;
+  max-height: 168px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 11px; background: var(--panel);
+}
+.modal .combo-item {
+  padding: 8px 10px; border-radius: 8px; font-size: 13.5px; color: var(--text); cursor: pointer;
+}
+.modal .combo-item:hover { background: var(--accent-bg); }
+.modal .combo-item-sel { background: var(--accent-bg); font-weight: 600; }
+.modal .combo-empty { padding: 8px 10px; font-size: 13px; color: var(--text-faint-2); }
 .modal label.inline-check {
   display: inline-flex;
   align-items: center;
@@ -5636,11 +5656,13 @@ function handoverPendingCases() {
 // Picked cases UNDER THE SIGNED-IN OPERATOR'S NAME that still need a fresh handover note for the
 // next shift — drives the reminder banner on the picked workspace. "Under their name" =
 // caseTrackerOperatorId points at them (a case they picked, or one handed to them) and
-// needsHandoverNote is still true (no fresh note authored this shift). Not gated on shift-ending
-// time: it's a running reminder of what's left to hand over.
+// needsHandoverNote is still true (no fresh note authored this shift). Sanity Check cases are
+// excluded (they park in their own group and aren't part of the shift hand-off). Not gated on
+// shift-ending time: it's a running reminder of what's left to hand over.
 function myHandoverPendingCases() {
   const me = STATE.operatorId;
-  return pickedCases().filter(c => caseTrackerOperatorId(c) === me && needsHandoverNote(c));
+  return pickedCases().filter(c =>
+    caseTrackerOperatorId(c) === me && needsHandoverNote(c) && !isSanityCase(c));
 }
 
 function renderWatchlists(sla, escalated) {
@@ -9155,6 +9177,49 @@ function logHistory(c, op, kind, detail) {
   c.history.push({ at: new Date(NOW).toISOString(), who: op.id, kind, detail });
 }
 
+// Wire the handover recipient combo box in the just-opened modal: typing filters the list to
+// matching names, clicking an item selects it (stores the id in the hidden field), and the "×"
+// clears the keyword filter. No-op outside a browser (tests) or when the combo isn't present.
+function wireHandoverCombo() {
+  if (typeof document === 'undefined') return;
+  const modal = document.getElementById('modal-root')?.querySelector('.modal');
+  const combo = modal && modal.querySelector('[data-combo]');
+  if (!combo) return;
+  const input = combo.querySelector('[data-field="recipient"]');
+  const hidden = combo.querySelector('[data-field="recipientId"]');
+  const clearBtn = combo.querySelector('[data-combo-clear]');
+  const items = Array.prototype.slice.call(combo.querySelectorAll('.combo-item'));
+  const applyFilter = () => {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    items.forEach(li => {
+      const match = !q || li.dataset.label.toLowerCase().includes(q);
+      li.hidden = !match;
+      if (match) shown++;
+      li.classList.toggle('combo-item-sel', !!hidden.value && li.dataset.id === hidden.value);
+    });
+    combo.querySelector('[data-combo-empty]')?.remove();
+    if (!shown) {
+      const empty = document.createElement('li');
+      empty.className = 'combo-empty';
+      empty.setAttribute('data-combo-empty', '');
+      empty.textContent = 'No matching teammate';
+      combo.querySelector('[data-combo-list]').appendChild(empty);
+    }
+    if (clearBtn) clearBtn.hidden = !input.value;
+  };
+  input.addEventListener('input', () => { hidden.value = ''; applyFilter(); });
+  items.forEach(li => li.addEventListener('click', () => {
+    input.value = li.dataset.label;
+    hidden.value = li.dataset.id;
+    applyFilter();
+  }));
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    input.value = ''; hidden.value = ''; applyFilter(); input.focus();
+  });
+  applyFilter();
+}
+
 function handlePrompt(caseId, kind) {
   const op = getOperator(STATE.operatorId);
 
@@ -9335,12 +9400,22 @@ function handlePrompt(caseId, kind) {
     const rLabel = o => `${o.name} · ${o.shift}`;
     const existingRecipient = c.handover && c.handover.toOperator ? getOperator(c.handover.toOperator) : null;
     const nextShift = op.shift === 'Day' ? 'Night' : 'Day';
+    // Custom filter dropdown (not a native <datalist>): typing narrows the list to matching
+    // names, and an "×" clears the keyword filter. A hidden field holds the chosen operator id.
     const recipientField = recipients.length ? `
-      <label>Hand over to * <span class="muted tiny">— type to search</span></label>
-      <input type="text" data-field="recipient" list="handover-recipient-list" autocomplete="off"
-             value="${escapeHtml(existingRecipient ? rLabel(existingRecipient) : '')}"
-             placeholder="Type a teammate's name">
-      <datalist id="handover-recipient-list">${recipients.map(o => `<option value="${escapeHtml(rLabel(o))}"></option>`).join('')}</datalist>
+      <label>Hand over to * <span class="muted tiny">— type to filter</span></label>
+      <div class="combo" data-combo>
+        <div class="combo-input-wrap">
+          <input type="text" class="combo-input" data-field="recipient" autocomplete="off"
+                 value="${escapeHtml(existingRecipient ? rLabel(existingRecipient) : '')}"
+                 placeholder="Type a teammate's name">
+          <button type="button" class="combo-clear" data-combo-clear aria-label="Clear filter" title="Clear">×</button>
+        </div>
+        <input type="hidden" data-field="recipientId" value="${escapeHtml(existingRecipient ? existingRecipient.id : '')}">
+        <ul class="combo-list" data-combo-list>
+          ${recipients.map(o => `<li class="combo-item" data-id="${escapeHtml(o.id)}" data-label="${escapeHtml(rLabel(o))}">${escapeHtml(rLabel(o))}</li>`).join('')}
+        </ul>
+      </div>
     ` : '';
     showModal(`
       <h3>Handover note</h3>
@@ -9356,16 +9431,19 @@ function handlePrompt(caseId, kind) {
       const note = fieldVal(modal, 'note').trim();
       if (!note) return modalError('Handover note is required.');
       // A recipient is REQUIRED whenever there are teammates to pick (only a single-operator
-      // roster falls back to the opposite shift). Resolve the typed value to an operator by its
-      // "Name · Shift" label, or just the name.
-      const typed = fieldVal(modal, 'recipient').trim();
+      // roster falls back to the opposite shift). Prefer the clicked id; else resolve the typed
+      // text to an operator by its "Name · Shift" label, or just the name.
       let recipient = null;
       if (recipients.length) {
-        if (!typed) return modalError('Choose who to hand this over to.');
-        const t = typed.toLowerCase();
-        recipient = recipients.find(o => rLabel(o).toLowerCase() === t)
-          || recipients.find(o => o.name.toLowerCase() === t);
-        if (!recipient) return modalError('Pick a teammate from the list.');
+        const chosenId = fieldVal(modal, 'recipientId').trim();
+        const typed = fieldVal(modal, 'recipient').trim();
+        if (chosenId) recipient = recipients.find(o => o.id === chosenId) || null;
+        if (!recipient && typed) {
+          const t = typed.toLowerCase();
+          recipient = recipients.find(o => rLabel(o).toLowerCase() === t)
+            || recipients.find(o => o.name.toLowerCase() === t);
+        }
+        if (!recipient) return modalError('Choose who to hand this over to.');
       }
       const { handover, detail } = buildHandover(op, note, recipient);
       c.handover = handover;
@@ -9377,6 +9455,7 @@ function handlePrompt(caseId, kind) {
       render();
       return true;
     });
+    wireHandoverCombo();
     return;
   }
 
@@ -9659,6 +9738,22 @@ function handlePrompt(caseId, kind) {
   }
 }
 
+// Accept either a raw case ID or a full case link and return the case ID. From a link the id is
+// the last "/"-separated path segment (query string / fragment stripped first); Case Center ids
+// start with "Case-", so a segment matching that is preferred over a trailing segment when both
+// are present. A plain id (no slash) is returned as-is.
+function extractCaseId(input) {
+  let s = String(input || '').trim();
+  if (!s) return '';
+  s = s.split(/[?#]/)[0].trim();          // drop ?query and #fragment
+  if (s.includes('/')) {
+    const segs = s.split('/').filter(Boolean);
+    const caseSeg = segs.filter(x => /^case-/i.test(x)).pop();   // prefer a "Case-…" segment
+    s = caseSeg || (segs.length ? segs[segs.length - 1] : s);
+  }
+  return s.trim();
+}
+
 function handleNewCase(op) {
   if (!/^https?:$/.test(location.protocol)) {
     showToast('Adding a case by ID requires running the board via serve.py.', 'warn');
@@ -9666,16 +9761,18 @@ function handleNewCase(op) {
   }
   showModal(`
     <h3>Add a case by ID</h3>
-    <div class="modal-sub">Pulls this case from Case Center by its ID and adds it to the board.</div>
-    <label>Case ID *</label>
-    <input type="text" data-field="caseId" placeholder="e.g. 581234">
+    <div class="modal-sub">Pulls this case from Case Center and adds it to the board. Paste the case ID or the full case link.</div>
+    <label>Case ID or link *</label>
+    <input type="text" data-field="caseId" placeholder="e.g. Case-581234 or https://…/Case-581234">
     <div class="modal-actions">
       <button class="btn" data-modal-cancel>Cancel</button>
       <button class="btn btn-primary" data-modal-submit>Fetch &amp; add</button>
     </div>
   `, (modal) => {
-    const id = fieldVal(modal, 'caseId').trim();
-    if (!id) return modalError('Enter a case ID.');
+    const raw = fieldVal(modal, 'caseId').trim();
+    if (!raw) return modalError('Enter a case ID or paste the case link.');
+    const id = extractCaseId(raw);
+    if (!id) return modalError('Could not read a case ID from that — check the link or ID.');
     addCaseById(id);   // async; modal closes now
     return true;
   });
