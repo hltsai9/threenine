@@ -1144,6 +1144,7 @@ function currentRoute() {
   if (h.startsWith('#/owners')) return { name: 'owners' };
   if (h.startsWith('#/flow')) return { name: 'flow' };
   if (h.startsWith('#/clocks')) return { name: 'clocks' };
+  if (h.startsWith('#/release-notes')) return { name: 'releaseNotes' };
   // Hidden admin page — no sidebar link; reachable only by typing the hash.
   if (h.startsWith('#/analytics')) return { name: 'analytics' };
   return { name: 'cases' };
@@ -1168,6 +1169,7 @@ function labelForRoute(route) {
     }
     case 'flow': return 'Status Flow';
     case 'clocks': return 'Clock model';
+    case 'releaseNotes': return 'Release notes';
     default: return 'Back';
   }
 }
@@ -1194,6 +1196,7 @@ function render() {
     owners: 'owners',
     flow: 'flow',
     clocks: 'clocks',
+    releaseNotes: 'releaseNotes',
   })[route.name];
   document.querySelector(`.nav a[data-route="${active}"]`)?.classList.add('active');
 
@@ -1210,6 +1213,7 @@ function render() {
   else if (route.name === 'shiftDetail') main.innerHTML = renderShiftDetail(route.shift);
   else if (route.name === 'flow') main.innerHTML = renderStatusFlow();
   else if (route.name === 'clocks') main.innerHTML = renderClockModel();
+  else if (route.name === 'releaseNotes') main.innerHTML = renderReleaseNotesPage();
   else if (route.name === 'analytics') main.innerHTML = renderAnalyticsPage();
   bindHandlers();
   saveState();
@@ -5976,6 +5980,9 @@ function bindHandlers() {
       commitTrackStatus(c, value, prev);
     });
   });
+  document.querySelectorAll('[data-action="edit-release-notes"]').forEach(el => {
+    el.addEventListener('click', e => { e.preventDefault(); openReleaseNotesEditor(); });
+  });
   document.querySelectorAll('[data-action="reassign"]').forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();
@@ -6442,14 +6449,16 @@ function saveConfigToServer(key, payload, label) {
 // configured / unreachable just leaves the bundled shifts.js / owners.js seed in place.
 async function loadConfigFromServer() {
   if (!/^https?:$/.test(location.protocol)) return;
-  for (const key of ['shifts', 'owners']) {
+  for (const key of ['shifts', 'owners', 'releaseNotes']) {
     try {
       const res = await fetch(apiUrl('api/config/' + key), withAuth({ headers: { Accept: 'application/json' } }));
       if (!res.ok) continue;
       const data = await res.json();
       const payload = data && data.payload;
       if (!payload || typeof payload !== 'object') continue;   // never saved → keep the seed
-      if (key === 'shifts') applyShiftsConfig(payload); else applyOwnersConfig(payload);
+      if (key === 'shifts') applyShiftsConfig(payload);
+      else if (key === 'owners') applyOwnersConfig(payload);
+      else if (key === 'releaseNotes') applyReleaseNotesConfig(payload);
     } catch (e) { /* keep the bundled seed */ }
   }
   // Lets bootServerLoad skip a duplicate pull when the login gate already loaded the config.
@@ -6640,6 +6649,102 @@ async function tryLoadLiveCases(allCases) {
   syncWeeksToNow();   // re-anchor the weekly buckets onto today for the freshly loaded cases
   snapshotSavedCases();
   return true;
+}
+
+/* ---------- Release notes (curated from docs/RELEASE_NOTES.md; published via DB config) ---------- */
+
+function publishedReleaseNoteIds() {
+  return Array.isArray(window.__RELEASE_NOTES_PUBLISHED__) ? window.__RELEASE_NOTES_PUBLISHED__ : [];
+}
+function applyReleaseNotesConfig(payload) {
+  window.__RELEASE_NOTES_PUBLISHED__ = Array.isArray(payload && payload.published) ? payload.published : [];
+}
+
+// Minimal, safe inline markdown for release-note bodies: escape FIRST, then render **bold**,
+// `code`, and [text](url) (http/https/#/relative/mailto only). "- " lines become a bullet list.
+function renderReleaseNoteBody(md) {
+  const inline = (s) => escapeHtml(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, txt, url) =>
+      /^(https?:|mailto:|#|\/)/i.test(url) ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${txt}</a>` : txt);
+  const html = [];
+  let inList = false;
+  for (const raw of String(md || '').split('\n')) {
+    const bullet = /^\s*-\s+(.*)$/.exec(raw);
+    if (bullet) {
+      if (!inList) { html.push('<ul class="rn-body-list">'); inList = true; }
+      html.push(`<li>${inline(bullet[1].trim())}</li>`);
+    } else if (raw.trim()) {
+      if (inList) { html.push('</ul>'); inList = false; }
+      html.push(`<p>${inline(raw.trim())}</p>`);
+    }
+  }
+  if (inList) html.push('</ul>');
+  return html.join('');
+}
+
+function renderReleaseNotesPage() {
+  const source = window.RELEASE_NOTES_SOURCE || [];
+  const pub = new Set(publishedReleaseNoteIds());
+  const chosen = source.filter(e => pub.has(e.id));
+  const header = `
+    <div class="page-header">
+      <div>
+        <h1>Release notes</h1>
+        <div class="subtitle">What's new on the board.</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" data-action="edit-release-notes">✎ Edit</button>
+      </div>
+    </div>`;
+  if (!chosen.length) {
+    return header + `<div class="card"><div class="card-body muted">No release notes published yet.${isDbBackend() ? ' Click <strong>Edit</strong> to pick entries to show.' : ''}</div></div>`;
+  }
+  // Group by date. `chosen` preserves source order (newest date first).
+  const groups = [];
+  for (const e of chosen) {
+    let g = groups[groups.length - 1];
+    if (!g || g.date !== e.date) { g = { date: e.date, items: [] }; groups.push(g); }
+    g.items.push(e);
+  }
+  const body = groups.map(g => `
+    <div class="rn-group">
+      <div class="rn-date">${escapeHtml(g.date)}</div>
+      ${g.items.map(e => `
+        <div class="rn-entry">
+          <div class="rn-entry-head">${escapeHtml(e.heading)}</div>
+          <div class="rn-entry-body">${renderReleaseNoteBody(e.body)}</div>
+        </div>`).join('')}
+    </div>`).join('');
+  return header + `<div class="rn-page">${body}</div>`;
+}
+
+// The pick-entries editor (shared by the Release notes page and the Analytics page Edit buttons).
+function openReleaseNotesEditor() {
+  if (!isDbBackend()) { showToast('Publishing release notes needs the DB backend.', 'warn'); return; }
+  const source = window.RELEASE_NOTES_SOURCE || [];
+  if (!source.length) { showToast('No changelog entries to pick from.', 'warn'); return; }
+  const pub = new Set(publishedReleaseNoteIds());
+  let rows = '', lastDate = null;
+  for (const e of source) {
+    if (e.date !== lastDate) { rows += `<div class="rn-pick-date">${escapeHtml(e.date)}</div>`; lastDate = e.date; }
+    rows += `<label class="rn-pick"><input type="checkbox" data-rn-id="${escapeHtml(e.id)}"${pub.has(e.id) ? ' checked' : ''}><span>${escapeHtml(e.heading)}</span></label>`;
+  }
+  showModal(`
+    <h3>Publish release notes</h3>
+    <div class="modal-sub">Tick the entries to show on the Release notes page. Saved for everyone.</div>
+    <div class="rn-picklist">${rows}</div>
+    <div class="modal-actions">
+      <button class="btn" data-modal-cancel>Cancel</button>
+      <button class="btn btn-primary" data-modal-submit>Publish</button>
+    </div>
+  `, (modal) => {
+    const ids = Array.prototype.slice.call(modal.querySelectorAll('[data-rn-id]:checked')).map(el => el.dataset.rnId);
+    window.__RELEASE_NOTES_PUBLISHED__ = ids;
+    saveConfigToServer('releaseNotes', { published: ids }, 'Release notes').then(ok => { if (ok) render(); });
+    return true;
+  });
 }
 
 /* ---------- Usage-analytics dashboard (hidden admin page: #/analytics) ---------- */
@@ -6865,6 +6970,7 @@ function renderAnalyticsPage() {
           </select>
         </label>
         <button class="btn" id="analytics-refresh">↻ Refresh</button>
+        <button class="btn" data-action="edit-release-notes" title="Pick which changelog entries appear on the Release notes page">✎ Edit release notes</button>
       </div>
     </div>`;
 

@@ -10,6 +10,18 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-09-09
 
+### Added (Release notes page + changelog picker)
+
+- New **Release notes** page (`#/release-notes`, in the sidebar) — blank by default. It shows a
+  curated subset of the changelog, grouped by date. An **Edit** button (also added to the
+  Analytics page toolbar) opens a picker listing every entry parsed from `docs/RELEASE_NOTES.md`
+  with checkboxes; the chosen set is published to the page. The selection is stored in the shared
+  DB config (`releaseNotes` key, like Shifts/Owners — `_CONFIG_KEYS` in `backend/api.py`), so
+  every operator sees the same published notes. Build: `bundle.mjs` parses `RELEASE_NOTES.md`
+  into `window.RELEASE_NOTES_SOURCE` (generated `frontend/release-notes.js`); note bodies render
+  through a small escape-first markdown formatter (bold/code/links/bullets, `javascript:` links
+  rejected). Tests: +4 (renderer safety + page publish/blank).
+
 ### Fixed (handover recipient dropdown now opens on modal load)
 
 - The recipient popover stayed closed when the modal opened even though the field was

@@ -15,8 +15,8 @@ Endpoints (same contract the SPA already expects):
     GET  /api/cases?id=C-1041  -> {"cases": [ that one case ], "operatorLayer": "server"}
     POST /api/ingest?id=C-1041 -> re-ingest ONE case from Case Center (spawns the ingest CLI)
     POST /api/save             -> body {"cases":[...]} and/or {"purgeIds":[...]}
-    GET  /api/config/{key}     -> {"key": "shifts"|"owners", "payload": {...}|null}
-    POST /api/config/{key}     -> body {"payload": {...}}  (shifts roster/rota or owner directory)
+    GET  /api/config/{key}     -> {"key": "shifts"|"owners"|"releaseNotes", "payload": {...}|null}
+    POST /api/config/{key}     -> body {"payload": {...}}  (shifts roster/rota, owner directory, or published release notes)
     POST /api/events           -> body {"events":[{at, operatorId, kind, caseId, detail}...]}
                                   usage-analytics batch from the SPA's track() helper
     GET  /api/events/summary?days=30 -> aggregated indices for the hidden #/analytics dashboard
@@ -202,7 +202,7 @@ def ingest_case_route(request: Request, id: str = ""):
 # Shared board config (shifts roster/rota and the owner directory). Saved from the Shifts / Owners
 # pages and read at boot so every operator/device sees the same config; the SPA falls back to its
 # bundled shifts.js / owners.js when a key has never been saved.
-_CONFIG_KEYS = {"shifts", "owners"}
+_CONFIG_KEYS = {"shifts", "owners", "releaseNotes"}
 
 
 @app.get("/api/config/{key}")

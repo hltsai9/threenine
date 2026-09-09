@@ -3223,3 +3223,31 @@ button.rb-chip { appearance: none; -webkit-appearance: none; border: none; font-
   cursor: pointer;
 }
 .handover-del:hover { color: #8A3434; border-color: #8A3434; background: #f7ecec; }
+
+/* ---------- Release notes page ---------- */
+.rn-page { display: flex; flex-direction: column; gap: 18px; max-width: 760px; }
+.rn-date {
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-faint-2); margin: 4px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.rn-entry {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-xl);
+  padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow);
+}
+.rn-entry-head { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.rn-entry-body { font-size: 13.5px; color: var(--text); }
+.rn-entry-body p { margin: 6px 0; }
+.rn-body-list { margin: 6px 0 0; padding-left: 18px; }
+.rn-body-list li { margin: 3px 0; }
+.rn-entry-body code { background: var(--chip-soft-2); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+
+/* Release notes picker (Edit modal) */
+.rn-picklist { max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 11px; padding: 6px; }
+.rn-pick-date {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-faint-2); margin: 10px 6px 4px;
+}
+.rn-pick-date:first-child { margin-top: 2px; }
+.rn-pick { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
+.rn-pick:hover { background: var(--chip-soft-2); }
+.rn-pick input { margin-top: 2px; }

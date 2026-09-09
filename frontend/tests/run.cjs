@@ -520,6 +520,39 @@ test('extractCaseId: empty input → empty', () => {
   eq(app.extractCaseId('   '), '');
 });
 
+/* ---------- release notes page ---------- */
+test('renderReleaseNoteBody: escapes html, renders bold/code/links + bullets', () => {
+  const html = app.renderReleaseNoteBody('- **Fix** the `bug`, see [docs](https://x/y)\n- <script>alert(1)</script>');
+  ok(html.includes('<strong>Fix</strong>'), 'bold');
+  ok(html.includes('<code>bug</code>'), 'code');
+  ok(html.includes('<a href="https://x/y"'), 'link rendered');
+  ok(html.includes('&lt;script&gt;'), 'raw html escaped');
+  ok(!html.includes('<script>'), 'no live script tag');
+  ok(html.includes('<ul'), 'bullets become a list');
+});
+test('renderReleaseNoteBody: rejects javascript: links (keeps text, no href)', () => {
+  const html = app.renderReleaseNoteBody('see [x](javascript:alert(1))');
+  ok(!/href="javascript:/i.test(html), 'no javascript: href');
+  ok(html.includes('x'), 'link text preserved');
+});
+test('renderReleaseNotesPage: blank when nothing published', () => {
+  app.RELEASE_NOTES_SOURCE = [{ id: 'd::0', date: '2026-01-01', heading: 'H1', body: '- a' }];
+  app.__RELEASE_NOTES_PUBLISHED__ = [];
+  const html = app.renderReleaseNotesPage();
+  ok(html.includes('No release notes published yet'), 'blank state shown');
+  ok(!html.includes('H1'), 'unpublished entry not rendered');
+});
+test('renderReleaseNotesPage: shows only published entries, grouped by date', () => {
+  app.RELEASE_NOTES_SOURCE = [
+    { id: 'd2::0', date: '2026-02-02', heading: 'Second', body: '- two' },
+    { id: 'd1::0', date: '2026-01-01', heading: 'First', body: '- one' },
+  ];
+  app.__RELEASE_NOTES_PUBLISHED__ = ['d1::0'];
+  const html = app.renderReleaseNotesPage();
+  ok(html.includes('First') && html.includes('2026-01-01'), 'published entry + its date shown');
+  ok(!html.includes('Second'), 'unpublished entry hidden');
+});
+
 test('deleteHandoverNote: soft delete retains the note + text for audit/recovery', () => {
   const c = {
     history: [
