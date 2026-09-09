@@ -15,7 +15,7 @@ live together, and the merge rules in backend/merge.py decide who may write what
 """
 import os
 
-from sqlalchemy import Boolean, DateTime, Integer, String, create_engine
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.types import JSON
 
@@ -95,6 +95,22 @@ class Event(Base):
     case_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     # Kind-specific extras ({route}, {value}, {to, toOperator}, …).
     detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class ReleaseNote(Base):
+    """The changelog (docs/RELEASE_NOTES.md) loaded into the DB by backend/load_release_notes.py.
+    One row per note — a "### heading" under a "## YYYY-MM-DD" date. The Release notes page's
+    picker reads these via GET /api/release-notes and publishes a curated subset (config key
+    'releaseNotes'), so adding release notes doesn't require rebundling the frontend."""
+    __tablename__ = "release_notes"
+
+    # Stable id "YYYY-MM-DD::n" (date + position within that date).
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    date: Mapped[str] = mapped_column(String(16), index=True, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)   # order within a date
+    heading: Mapped[str] = mapped_column(String(500), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 def init_db() -> None:

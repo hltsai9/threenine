@@ -47,8 +47,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import select
+
 from .analytics import events_summary, insert_events
-from .db import REPO_ROOT, SessionLocal, init_db
+from .db import REPO_ROOT, ReleaseNote, SessionLocal, init_db
 from .merge import all_cases, case_by_id, get_config, set_config, upsert_operator
 
 logger = logging.getLogger("case_tracker.api")
@@ -213,6 +215,19 @@ def get_config_route(key: str, request: Request):
     with SessionLocal() as session:
         payload = get_config(session, key)
     return {"key": key, "payload": payload}
+
+
+# Changelog rows, loaded from docs/RELEASE_NOTES.md by `python -m backend.load_release_notes`.
+# The Release notes page's picker reads these (and publishes a curated subset via the
+# 'releaseNotes' config key). Read-only from the API — the loader script is the only writer.
+@app.get("/api/release-notes")
+def list_release_notes(request: Request):
+    require_auth(request)
+    with SessionLocal() as session:
+        rows = session.execute(
+            select(ReleaseNote).order_by(ReleaseNote.date.desc(), ReleaseNote.seq.asc())
+        ).scalars().all()
+    return [{"id": r.id, "date": r.date, "heading": r.heading, "body": r.body} for r in rows]
 
 
 @app.post("/api/config/{key}")

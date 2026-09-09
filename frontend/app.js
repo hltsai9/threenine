@@ -6461,8 +6461,22 @@ async function loadConfigFromServer() {
       else if (key === 'releaseNotes') applyReleaseNotesConfig(payload);
     } catch (e) { /* keep the bundled seed */ }
   }
+  await loadReleaseNotesSourceFromServer();
   // Lets bootServerLoad skip a duplicate pull when the login gate already loaded the config.
   window.__CONFIG_LOADED__ = true;
+}
+
+// In DB mode, prefer the changelog stored in the release_notes table (loaded by
+// `python -m backend.load_release_notes`) over the bundled RELEASE_NOTES_SOURCE — so the picker
+// reflects RELEASE_NOTES.md without a frontend rebundle. Empty/unreachable keeps the bundled one.
+async function loadReleaseNotesSourceFromServer() {
+  if (!/^https?:$/.test(location.protocol)) return;
+  try {
+    const res = await fetch(apiUrl('api/release-notes'), withAuth({ headers: { Accept: 'application/json' } }));
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) window.RELEASE_NOTES_SOURCE = data;
+  } catch (e) { /* keep the bundled source */ }
 }
 // Persist the shift roster/rota — to the DB (decoupled backend) or to shifts.js (serve.py).
 function persistRoster() {

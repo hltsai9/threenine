@@ -72,6 +72,23 @@ Then wire your request in **`local/casecenter.py`**:
 > **public** Pages), do **not** commit/push it. See [`local/README.md`](../local/README.md) for
 > the full safeguard (`skip-worktree`) and restore steps.
 
+## Release notes into the DB (optional, DB backend)
+
+The **Release notes** page shows a curated subset of the changelog. In DB mode the picker reads
+its source from a `release_notes` table instead of the bundled copy, so you can add release notes
+without rebundling the frontend — edit `docs/RELEASE_NOTES.md`, then load it:
+
+```bash
+cd backend && alembic upgrade head        # once: creates the release_notes table (0005)
+python -m backend.load_release_notes       # parse docs/RELEASE_NOTES.md → release_notes (replace-all)
+```
+
+The loader uses `DATABASE_URL` like the rest of the backend and holds no Case Center credentials.
+Re-run it after each changelog change (or wire it into your deploy). The API exposes the rows at
+`GET /api/release-notes` (read-only); publish the subset to show from the Analytics page's **Edit
+release notes** button (stored in the shared `releaseNotes` config). Demo/no-backend mode falls
+back to the bundled changelog and saves the picked subset in the browser.
+
 ## Environment variables
 
 | Var | Used by | Default | Purpose |

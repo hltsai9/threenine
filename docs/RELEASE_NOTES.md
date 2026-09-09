@@ -10,6 +10,17 @@ changes), **Internal** (tests, refactors, CI), **Docs**.
 
 ## 2026-09-09
 
+### Added (release notes loaded into a DB table; picker reads from it)
+
+- New `release_notes` table + Alembic migration `0005_add_release_notes` (`ReleaseNote` model in
+  `backend/db.py`). Loader script **`python -m backend.load_release_notes`** parses
+  `docs/RELEASE_NOTES.md` into it (replace-all; mirrors the `bundle.mjs` parser), so release notes
+  can be updated without rebundling the frontend. Read-only endpoint **`GET /api/release-notes`**
+  returns the rows (date desc, seq asc). In DB mode the SPA loads this as the picker's source
+  (`loadReleaseNotesSourceFromServer`, overriding the bundled `RELEASE_NOTES_SOURCE`); demo mode
+  still uses the bundled copy. Verified end-to-end against a scratch DB (155 entries parsed +
+  loaded, ordered, idempotent reload) and the full `alembic upgrade head` chain.
+
 ### Changed (release-notes editing lives on Analytics only; works in demo)
 
 - Removed the **Edit** button from the Release notes page — the changelog picker now opens only
